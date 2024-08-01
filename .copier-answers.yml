@@ -1,0 +1,10 @@
+# Changes here will be overwritten by Copier
+_commit: v2.0.2
+_src_path: gh:lincc-frameworks/python-project-template
+author_email: mtauraso@uw.edu
+author_name: LINCC Frameworks
+custom_install: false
+package_name: fibad
+project_license: MIT
+project_name: fibad
+project_organization: lincc-frameworks
