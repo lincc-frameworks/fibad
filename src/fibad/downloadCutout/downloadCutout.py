@@ -15,15 +15,14 @@ import tarfile
 import tempfile
 import time
 import urllib.request
-
-from typing import cast, Any, Callable, Dict, Generator, IO, List, Optional, Tuple, Union
+from collections.abc import Generator
+from typing import IO, Any, Callable, Optional, Union, cast
 
 __all__ = []
+
+
 def export(obj):
-    if isinstance(obj, str):
-        name = obj
-    else:
-        name = obj.__name__
+    name = obj if isinstance(obj, str) else obj.__name__
     __all__.append(name)
     return obj
 
@@ -39,7 +38,9 @@ available_reruns = [
 default_rerun = "pdr3_wide"
 
 available_types = [
-    "coadd", "coadd/bg", "warp",
+    "coadd",
+    "coadd/bg",
+    "warp",
 ]
 
 default_type = "coadd"
@@ -65,84 +66,181 @@ def main():
             Download FITS cutouts from the website of HSC data release.
         """,
     )
-    parser.add_argument("--ra", metavar="DEGREES", type=parse_longitude, help="""
+    parser.add_argument(
+        "--ra",
+        metavar="DEGREES",
+        type=parse_longitude,
+        help="""
         R.A.2000.
-    """)
-    parser.add_argument("--dec", metavar="DEGREES", type=parse_latitude, help="""
+    """,
+    )
+    parser.add_argument(
+        "--dec",
+        metavar="DEGREES",
+        type=parse_latitude,
+        help="""
         Dec.2000.
-    """)
-    parser.add_argument("--sw", metavar="DEGREES", type=parse_degree, help="""
+    """,
+    )
+    parser.add_argument(
+        "--sw",
+        metavar="DEGREES",
+        type=parse_degree,
+        help="""
         Semi-width in R.A. direction.
-    """)
-    parser.add_argument("--sh", metavar="DEGREES", type=parse_degree, help="""
+    """,
+    )
+    parser.add_argument(
+        "--sh",
+        metavar="DEGREES",
+        type=parse_degree,
+        help="""
         Semi-height in Dec. direction.
-    """)
-    parser.add_argument("--filter", type=parse_filter_opt, help="""
+    """,
+    )
+    parser.add_argument(
+        "--filter",
+        type=parse_filter_opt,
+        help="""
         Filter name.
-    """)
-    parser.add_argument("--rerun", choices=available_reruns, default=default_rerun, help="""
+    """,
+    )
+    parser.add_argument(
+        "--rerun",
+        choices=available_reruns,
+        default=default_rerun,
+        help="""
         Rerun name.
-    """)
-    parser.add_argument("--tract", type=parse_tract_opt, help="""
+    """,
+    )
+    parser.add_argument(
+        "--tract",
+        type=parse_tract_opt,
+        help="""
         Tract number.
-    """)
-    parser.add_argument("--image", metavar="BOOL", type=parse_bool, default=default_get_image, help=f"""
+    """,
+    )
+    parser.add_argument(
+        "--image",
+        metavar="BOOL",
+        type=parse_bool,
+        default=default_get_image,
+        help=f"""
         Get the image layer. (Default: {default_get_image})
-    """)
-    parser.add_argument("--mask", metavar="BOOL", type=parse_bool, default=default_get_mask, help=f"""
+    """,
+    )
+    parser.add_argument(
+        "--mask",
+        metavar="BOOL",
+        type=parse_bool,
+        default=default_get_mask,
+        help=f"""
         Get the mask layer. (Default: {default_get_mask})
-    """)
-    parser.add_argument("--variance", metavar="BOOL", type=parse_bool, default=default_get_variance, help=f"""
+    """,
+    )
+    parser.add_argument(
+        "--variance",
+        metavar="BOOL",
+        type=parse_bool,
+        default=default_get_variance,
+        help=f"""
         Get the variance layer. (Default: {default_get_variance})
-    """)
-    parser.add_argument("--type", choices=available_types, default=default_type, help="""
+    """,
+    )
+    parser.add_argument(
+        "--type",
+        choices=available_types,
+        default=default_type,
+        help="""
         Data type.
-    """)
-    parser.add_argument("--name", type=str, default=default_name, help=f"""
+    """,
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default=default_name,
+        help=f"""
         Output name. (python's format string; default: "{default_name}")
-    """)
-    parser.add_argument("--list", metavar="PATH", type=str, help="""
+    """,
+    )
+    parser.add_argument(
+        "--list",
+        metavar="PATH",
+        type=str,
+        help="""
         Path to a coordinate list.
         If this list is given, the other command-line arguments are optional.
         Missing fields in the list will default
         to the values given in the command-line.
-    """)
-    parser.add_argument("--listtype", choices=["auto", "txt", "csv"], default="auto", help="""
+    """,
+    )
+    parser.add_argument(
+        "--listtype",
+        choices=["auto", "txt", "csv"],
+        default="auto",
+        help="""
         How to interpret the argument of --list.
         "auto" (default): Follow the extension of the file name. /
         "txt": Fields are separated by one or more spaces. /
         "csv": Comma-separated volume.
-    """)
-    parser.add_argument("--user", type=str, help="""
+    """,
+    )
+    parser.add_argument(
+        "--user",
+        type=str,
+        help="""
         User account.
-    """)
-    parser.add_argument("--password", type=str, help="""
+    """,
+    )
+    parser.add_argument(
+        "--password",
+        type=str,
+        help="""
         Password.
         If you specify --password, your password is disclosed to everybody
         on the computer you use.
         Use of --password-env is recommended instead,
         especially when this script is run on a shared-use computer.
-    """)
-    parser.add_argument("--password-env", metavar="ENV", type=str, default="HSC_SSP_CAS_PASSWORD", help="""
+    """,
+    )
+    parser.add_argument(
+        "--password-env",
+        metavar="ENV",
+        type=str,
+        default="HSC_SSP_CAS_PASSWORD",
+        help="""
         Name of the environment variable from which to read password.
         Use `read -s HSC_SSP_CAS_PASSWORD` to put your password into
         $HSC_SSP_CAS_PASSWORD.
-    """)
-    parser.add_argument("--semaphore", metavar="PATH", type=str, default="", help=f"""
+    """,
+    )
+    parser.add_argument(
+        "--semaphore",
+        metavar="PATH",
+        type=str,
+        default="",
+        help=f"""
         Path to the named semaphore (This is not a Posix semaphore.)
         The default name is `/tmp/$(id -u -n)-downloadCutout`.
         This path must be in NFS (or any other shared filesystem)
         if you distribute the processes over a network.
         If you specify this option, `--max-connections` is {default_max_connections} by default.
-    """)
-    parser.add_argument("--max-connections", metavar="NUM", type=int, default=0, help="""
+    """,
+    )
+    parser.add_argument(
+        "--max-connections",
+        metavar="NUM",
+        type=int,
+        default=0,
+        help="""
         Maximum number of connections in parallel.
         This script itself won't make parallel connections,
         but _you_ should launch this script in parallel.
         The launched processes will communicate with each other to limit
         the number of connections in parallel.
         By default `--max-connections=0`, which means limitless.
-    """)
+    """,
+    )
 
     args = parser.parse_args()
 
@@ -169,7 +267,7 @@ def main():
             rects = read_rects(f, default=rect, type=args.listtype)
     else:
         if not rect.iscomplete():
-            raise RuntimeError(f"Specify either (--ra --dec --sw --sh) or --list.")
+            raise RuntimeError("Specify either (--ra --dec --sw --sh) or --list.")
         rects = [rect]
 
     if args.semaphore and not args.max_connections:
@@ -222,6 +320,7 @@ class Rect:
     lineno
         Line number in a list file.
     """
+
     rerun: str = default_rerun
     type: str = default_type
     filter: str = ALLFILTERS
@@ -305,10 +404,7 @@ class Rect:
         rect
             Created `Rect` object.
         """
-        if default is None:
-            rect = Rect()
-        else:
-            rect = Rect(*dataclasses.astuple(default))
+        rect = Rect() if default is None else Rect(*dataclasses.astuple(default))
 
         if rerun is not None:
             rect.rerun = parse_rerun(rerun)
@@ -353,13 +449,9 @@ class Rect:
         iscomplete
             True if `self` is complete
         """
-        return (self.ra == self.ra
-            and self.dec == self.dec
-            and self.sw == self.sw
-            and self.sh == self.sh
-        )
+        return self.ra == self.ra and self.dec == self.dec and self.sw == self.sw and self.sh == self.sh
 
-    def explode(self) -> List["Rect"]:
+    def explode(self) -> list["Rect"]:
         """
         Make copies of `self` with more specific values.
 
@@ -375,7 +467,9 @@ class Rect:
 
 
 @export
-def read_rects(file: Union[str, IO], default: Optional[Rect] = None, type: Optional[str] = None) -> List[Rect]:
+def read_rects(
+    file: Union[str, IO], default: Optional[Rect] = None, type: Optional[str] = None
+) -> list[Rect]:
     """
     Read a file to get a list of `Rect` objects.
 
@@ -399,10 +493,7 @@ def read_rects(file: Union[str, IO], default: Optional[Rect] = None, type: Optio
     """
     if (not type) or type == "auto":
         isfileobj = hasattr(file, "read")
-        if isfileobj:
-            name = getattr(file, "name", "(file name not available)")
-        else:
-            name = file
+        name = getattr(file, "name", "(file name not available)") if isfileobj else file
         _, ext = os.path.splitext(name)
         type = ext.lstrip(".") or "txt"
 
@@ -448,7 +539,10 @@ def read_rects_from_txt(file, default=None):
         for lineno, line in enumerate(f, start=2):
             row = line.strip().split()
             if len(row) != len(fieldnames):
-                raise RuntimeError(f"line {lineno}: number of fields ({len(row)}) does not agree with what expected ({len(fieldnames)})")
+                raise RuntimeError(
+                    f"line {lineno}: number of fields ({len(row)}) "
+                    f"does not agree with what expected ({len(fieldnames)})"
+                )
             args = {"lineno": lineno}
             args.update((field, row[i]) for i, field in validfields)
             rects.append(Rect.create(default=default, **args))
@@ -493,7 +587,10 @@ def read_rects_from_csv(file, default=None):
         rects = []
         for lineno, row in enumerate(reader, start=2):
             if len(row) != len(fieldnames):
-                raise RuntimeError(f"line {lineno}: number of fields ({len(row)}) does not agree with what expected ({len(fieldnames)})")
+                raise RuntimeError(
+                    f"line {lineno}: number of fields ({len(row)}) "
+                    f"does not agree with what expected ({len(fieldnames)})"
+                )
             args = {"lineno": lineno}
             args.update((field, row[i]) for i, field in validfields)
             rects.append(Rect.create(default=default, **args))
@@ -526,11 +623,8 @@ def open_inputfile(file: Union[str, IO]) -> Generator[IO[bytes], None, None]:
         yield getattr(file, "buffer", file)
     else:
         file = cast(str, file)
-        f = open(file, "rb")
-        try:
+        with open(file, "rb") as f:
             yield f
-        finally:
-            f.close()
 
 
 def parse_rerun(s: str) -> str:
@@ -571,7 +665,6 @@ def parse_type(s: str) -> str:
     if lower in available_types:
         return lower
     raise ValueError(f"Invalid type: {s}")
-
 
 
 def parse_tract_opt(s: Union[str, int, None]) -> int:
@@ -693,7 +786,7 @@ def parse_degree(s: Union[str, float]) -> float:
     return value
 
 
-def _parse_angle(s: Union[str, float]) -> Tuple[str, float]:
+def _parse_angle(s: Union[str, float]) -> tuple[str, float]:
     """
     Interpret an angle.
 
@@ -722,7 +815,9 @@ def _parse_angle(s: Union[str, float]) -> Tuple[str, float]:
             return "bare", float(s)
 
         s = re.sub(r"\s", "", s).lower()
-        m = re.match(r"\A(.+)(deg|degrees?|amin|arcmin|arcminutes?|asec|arcsec|arcseconds?|rad|radians?)\Z", s)
+        m = re.match(
+            r"\A(.+)(deg|degrees?|amin|arcmin|arcminutes?|asec|arcsec|arcseconds?|rad|radians?)\Z", s
+        )
         if m:
             value, unit = m.groups()
             return "deg", float(value) * _angle_units[unit]
@@ -795,39 +890,41 @@ def parse_filter(s: str) -> str:
     raise ValueError(f"filter '{s}' not found.")
 
 
-_all_filters = dict([
-    ("HSC-G", {"alias": {"W-S-G+", "g"}, "display": "g"}),
-    ("HSC-R", {"alias": {"W-S-R+", "r"}, "display": "r"}),
-    ("HSC-I", {"alias": {"W-S-I+", "i"}, "display": "i"}),
-    ("HSC-Z", {"alias": {"W-S-Z+", "z"}, "display": "z"}),
-    ("HSC-Y", {"alias": {"W-S-ZR", "y"}, "display": "y"}),
-    ("IB0945", {"alias": {"I945"}, "display": "I945"}),
-    ("NB0387", {"alias": {"N387"}, "display": "N387"}),
-    ("NB0400", {"alias": {"N400"}, "display": "N400"}),
-    ("NB0468", {"alias": {"N468"}, "display": "N468"}),
-    ("NB0515", {"alias": {"N515"}, "display": "N515"}),
-    ("NB0527", {"alias": {"N527"}, "display": "N527"}),
-    ("NB0656", {"alias": {"N656"}, "display": "N656"}),
-    ("NB0718", {"alias": {"N718"}, "display": "N718"}),
-    ("NB0816", {"alias": {"N816"}, "display": "N816"}),
-    ("NB0921", {"alias": {"N921"}, "display": "N921"}),
-    ("NB0926", {"alias": {"N926"}, "display": "N926"}),
-    ("NB0973", {"alias": {"N973"}, "display": "N973"}),
-    ("NB1010", {"alias": {"N1010"}, "display": "N1010"}),
-    ("ENG-R1", {"alias": {"109", "r1"}, "display": "r1"}),
-    ("PH", {"alias": {"PH"}, "display": "PH"}),
-    ("SH", {"alias": {"SH"}, "display": "SH"}),
-    ("MegaCam-u" , {"alias": {"u2"}, "display": "MegaCam-u" }),
-    ("MegaCam-uS", {"alias": {"u1"}, "display": "MegaCam-uS"}),
-    ("VIRCAM-H"    , {"alias": {"Hvir", "hvir"}, "display": "VIRCAM-H"    }),
-    ("VIRCAM-J"    , {"alias": {"Jvir", "jvir"}, "display": "VIRCAM-J"    }),
-    ("VIRCAM-Ks"   , {"alias": {"Ksvir", "ksvir"}, "display": "VIRCAM-Ks"   }),
-    ("VIRCAM-NB118", {"alias": {"NB118vir", "n118vir"}, "display": "VIRCAM-NB118"}),
-    ("VIRCAM-Y"    , {"alias": {"Yvir", "yvir"}, "display": "VIRCAM-Y"    }),
-    ("WFCAM-H", {"alias": {"Hwf", "hwf"}, "display": "WFCAM-H"}),
-    ("WFCAM-J", {"alias": {"Jwf", "jwf"}, "display": "WFCAM-J"}),
-    ("WFCAM-K", {"alias": {"Kwf", "kwf"}, "display": "WFCAM-K"}),
-])
+_all_filters = dict(
+    [
+        ("HSC-G", {"alias": {"W-S-G+", "g"}, "display": "g"}),
+        ("HSC-R", {"alias": {"W-S-R+", "r"}, "display": "r"}),
+        ("HSC-I", {"alias": {"W-S-I+", "i"}, "display": "i"}),
+        ("HSC-Z", {"alias": {"W-S-Z+", "z"}, "display": "z"}),
+        ("HSC-Y", {"alias": {"W-S-ZR", "y"}, "display": "y"}),
+        ("IB0945", {"alias": {"I945"}, "display": "I945"}),
+        ("NB0387", {"alias": {"N387"}, "display": "N387"}),
+        ("NB0400", {"alias": {"N400"}, "display": "N400"}),
+        ("NB0468", {"alias": {"N468"}, "display": "N468"}),
+        ("NB0515", {"alias": {"N515"}, "display": "N515"}),
+        ("NB0527", {"alias": {"N527"}, "display": "N527"}),
+        ("NB0656", {"alias": {"N656"}, "display": "N656"}),
+        ("NB0718", {"alias": {"N718"}, "display": "N718"}),
+        ("NB0816", {"alias": {"N816"}, "display": "N816"}),
+        ("NB0921", {"alias": {"N921"}, "display": "N921"}),
+        ("NB0926", {"alias": {"N926"}, "display": "N926"}),
+        ("NB0973", {"alias": {"N973"}, "display": "N973"}),
+        ("NB1010", {"alias": {"N1010"}, "display": "N1010"}),
+        ("ENG-R1", {"alias": {"109", "r1"}, "display": "r1"}),
+        ("PH", {"alias": {"PH"}, "display": "PH"}),
+        ("SH", {"alias": {"SH"}, "display": "SH"}),
+        ("MegaCam-u", {"alias": {"u2"}, "display": "MegaCam-u"}),
+        ("MegaCam-uS", {"alias": {"u1"}, "display": "MegaCam-uS"}),
+        ("VIRCAM-H", {"alias": {"Hvir", "hvir"}, "display": "VIRCAM-H"}),
+        ("VIRCAM-J", {"alias": {"Jvir", "jvir"}, "display": "VIRCAM-J"}),
+        ("VIRCAM-Ks", {"alias": {"Ksvir", "ksvir"}, "display": "VIRCAM-Ks"}),
+        ("VIRCAM-NB118", {"alias": {"NB118vir", "n118vir"}, "display": "VIRCAM-NB118"}),
+        ("VIRCAM-Y", {"alias": {"Yvir", "yvir"}, "display": "VIRCAM-Y"}),
+        ("WFCAM-H", {"alias": {"Hwf", "hwf"}, "display": "WFCAM-H"}),
+        ("WFCAM-J", {"alias": {"Jwf", "jwf"}, "display": "WFCAM-J"}),
+        ("WFCAM-K", {"alias": {"Kwf", "kwf"}, "display": "WFCAM-K"}),
+    ]
+)
 
 
 def parse_filter_opt(s: Optional[str]) -> str:
@@ -860,7 +957,13 @@ def parse_filter_opt(s: Optional[str]) -> str:
 
 
 @export
-def download(rects: Union[Rect, List[Rect]], user: Optional[str] = None, password: Optional[str] = None, *, onmemory: bool = True) -> Union[list, List[list], None]:
+def download(
+    rects: Union[Rect, list[Rect]],
+    user: Optional[str] = None,
+    password: Optional[str] = None,
+    *,
+    onmemory: bool = True,
+) -> Union[list, list[list], None]:
     """
     Cut `rects` out of the sky.
 
@@ -893,17 +996,19 @@ def download(rects: Union[Rect, List[Rect]], user: Optional[str] = None, passwor
     isscalar = isinstance(rects, Rect)
     if isscalar:
         rects = [cast(Rect, rects)]
-    rects = cast(List[Rect], rects)
+    rects = cast(list[Rect], rects)
 
     ret = _download(rects, user, password, onmemory=onmemory)
     if isscalar and onmemory:
-        ret = cast(List[list], ret)
+        ret = cast(list[list], ret)
         return ret[0]
 
     return ret
 
 
-def _download(rects: List[Rect], user: Optional[str], password: Optional[str], *, onmemory: bool) -> Optional[List[list]]:
+def _download(
+    rects: list[Rect], user: Optional[str], password: Optional[str], *, onmemory: bool
+) -> Optional[list[list]]:
     """
     Cut `rects` out of the sky.
 
@@ -934,7 +1039,7 @@ def _download(rects: List[Rect], user: Optional[str], password: Optional[str], *
         if not rect.iscomplete():
             raise RuntimeError(f"'ra', 'dec', 'sw', and 'sh' must be specified: {rect}")
 
-    exploded_rects: List[Tuple[Rect, int]] = []
+    exploded_rects: list[tuple[Rect, int]] = []
     for index, rect in enumerate(rects):
         exploded_rects.extend((r, index) for r in rect.explode())
 
@@ -954,22 +1059,24 @@ def _download(rects: List[Rect], user: Optional[str], password: Optional[str], *
             raise RuntimeError("Password is empty.")
 
     chunksize = 990
-    datalist: List[Tuple[int, dict, bytes]] = []
+    datalist: list[tuple[int, dict, bytes]] = []
 
     for i in range(0, len(exploded_rects), chunksize):
-        ret = _download_chunk(exploded_rects[i : i+chunksize], user, password, onmemory=onmemory)
+        ret = _download_chunk(exploded_rects[i : i + chunksize], user, password, onmemory=onmemory)
         if onmemory:
             datalist += cast(list, ret)
 
     if onmemory:
-        returnedlist: List[List[Tuple[dict, bytes]]] = [[] for i in range(len(rects))]
+        returnedlist: list[list[tuple[dict, bytes]]] = [[] for i in range(len(rects))]
         for index, metadata, data in datalist:
             returnedlist[index].append((metadata, data))
 
     return returnedlist if onmemory else None
 
 
-def _download_chunk(rects: List[Tuple[Rect, Any]], user: str, password: str, *, onmemory: bool) -> Optional[list]:
+def _download_chunk(
+    rects: list[tuple[Rect, Any]], user: str, password: str, *, onmemory: bool
+) -> Optional[list]:
     """
     Cut `rects` out of the sky.
 
@@ -1001,28 +1108,25 @@ def _download_chunk(rects: List[Tuple[Rect, Any]], user: str, password: str, *, 
     """
     fields = list(_format_rect_member.keys())
     coordlist = [f"#? {' '.join(fields)}"]
-    for rect, index in rects:
+    for rect, _ in rects:
         coordlist.append(" ".join(_format_rect_member[field](getattr(rect, field)) for field in fields))
 
     boundary = "Boundary"
     header = (
-        f'--{boundary}\r\n'
+        f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="list"; filename="coordlist.txt"\r\n'
-        f'\r\n'
+        f"\r\n"
     )
-    footer = (
-        f'\r\n'
-        f'--{boundary}--\r\n'
-    )
+    footer = f"\r\n" f"--{boundary}--\r\n"
 
     data = (header + "\n".join(coordlist) + footer).encode("utf-8")
-    secret = base64.standard_b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+    secret = base64.standard_b64encode(f"{user}:{password}".encode()).decode("ascii")
 
     req = urllib.request.Request(
         api_url.rstrip("/") + "/cgi-bin/cutout",
         data=data,
         headers={
-            "Authorization": f'Basic {secret}',
+            "Authorization": f"Basic {secret}",
             "Content-Type": f'multipart/form-data; boundary="{boundary}"',
         },
         method="POST",
@@ -1062,7 +1166,7 @@ def _download_chunk(rects: List[Tuple[Rect, Any]], user: str, password: str, *, 
     return returnedlist if onmemory else None
 
 
-_format_rect_member: Dict[str, Callable[[str], Any]] = {
+_format_rect_member: dict[str, Callable[[str], Any]] = {
     "rerun": str,
     "type": str,
     "filter": str,
@@ -1097,17 +1201,23 @@ def _tar_decompose_item_name(name: str) -> dict:
           - "rerun": Rerun name.
           - "visit": (warp only) Visit number.
     """
-    m = re.fullmatch(r"arch-[0-9]+-[0-9]+/(?P<lineno>[0-9]+)-(?P<type>cutout|coadd\+bg)-(?P<filter>[^/]+)-(?P<tract>[0-9]+)-(?P<rerun>[^/]+)\.fits", name)
+    m = re.fullmatch(
+        r"arch-[0-9]+-[0-9]+/(?P<lineno>[0-9]+)-(?P<type>cutout|coadd\+bg)-(?P<filter>[^/]+)-(?P<tract>[0-9]+)-(?P<rerun>[^/]+)\.fits",
+        name,
+    )
     if m:
-        metadata: Dict[str, Any] = m.groupdict()
+        metadata: dict[str, Any] = m.groupdict()
         metadata["lineno"] = int(metadata["lineno"])
         metadata["type"] = {"cutout": "coadd", "coadd+bg": "coadd/bg"}[metadata["type"]]
         metadata["tract"] = int(metadata["tract"])
         return metadata
 
-    m = re.fullmatch(r"arch-[0-9]+-[0-9]+/(?P<lineno>[0-9]+)-warps-(?P<filter>[^/]+)-(?P<tract>[0-9]+)-(?P<rerun>[^/]+)/warp-(?P<visit>[0-9]+)\.fits", name)
+    m = re.fullmatch(
+        r"arch-[0-9]+-[0-9]+/(?P<lineno>[0-9]+)-warps-(?P<filter>[^/]+)-(?P<tract>[0-9]+)-(?P<rerun>[^/]+)/warp-(?P<visit>[0-9]+)\.fits",
+        name,
+    )
     if m:
-        metadata: Dict[str, Any] = m.groupdict()
+        metadata: dict[str, Any] = m.groupdict()
         metadata["lineno"] = int(metadata["lineno"])
         metadata["type"] = "warp"
         metadata["tract"] = int(metadata["tract"])
@@ -1183,6 +1293,7 @@ class Semaphore:
         E.g. "/tmp/semaphore-cutout", "/share/data/sem_cutout" etc.
         Be warned that many files will be made under this path (directory).
     """
+
     def __init__(self, init_num: int, path: str):
         self.init_num = init_num
         self.path = path
@@ -1219,7 +1330,7 @@ class Semaphore:
                 for i in range(self.init_num):
                     fd = os.open(os.path.join(self.path, f"{i}.sem"), os.O_RDWR | os.O_CREAT, 0o644)
                     try:
-                        os.lockf(fd, os.F_TLOCK, 0);
+                        os.lockf(fd, os.F_TLOCK, 0)
                         self.fd = fd
                         fd = -1
                         return
