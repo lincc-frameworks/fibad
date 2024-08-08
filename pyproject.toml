@@ -16,6 +16,9 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.9"
 dependencies = [
+    "toml",
+    "torch",
+    "torchvision",
 ]
 
 [project.scripts]
