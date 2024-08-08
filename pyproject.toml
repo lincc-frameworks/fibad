@@ -16,12 +16,11 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.9"
 dependencies = [
+    "astropy" # Used to load fits files of sources to query HSC cutout server
 ]
 
 [project.scripts]
 fibad = "fibad_cli.main:main"
-fibad-train = "fibad_cli.train:main"
-fibad-predict = "fibad_cli.predict:main"
 
 [project.urls]
 "Source Code" = "https://github.com/lincc-frameworks/fibad"
