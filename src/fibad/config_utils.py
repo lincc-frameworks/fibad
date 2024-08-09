@@ -42,7 +42,7 @@ def get_runtime_config(
 
     final_runtime_config = merge_configs(default_runtime_config, users_runtime_config)
 
-    #~ Uncomment when we have a better place to stash results.
+    # ~ Uncomment when we have a better place to stash results.
     # log_runtime_config(final_runtime_config)
 
     return final_runtime_config

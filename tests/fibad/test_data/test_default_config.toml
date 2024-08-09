@@ -2,7 +2,8 @@
 use_gpu = true
 
 [train]
-model_name = "example_model"
+model_name = "example_model" # Use a built-in FIBAD model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
 
 [train.model]
 model_weights = "example_model.pth"

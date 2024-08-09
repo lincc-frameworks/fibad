@@ -48,7 +48,11 @@ def test_get_runtime_config():
 
     expected = {
         "general": {"use_gpu": False},
-        "train": {"model_name": "example_model", "model": {"model_weights": "final_best.pth", "layers": 3}},
+        "train": {
+            "model_name": "example_model",
+            "model_class": "new_thing.cool_model.CoolModel",
+            "model": {"model_weights": "final_best.pth", "layers": 3},
+        },
         "predict": {"batch_size": 8},
     }
 
