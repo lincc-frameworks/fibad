@@ -1,9 +1,13 @@
+# ruff: noqa: D101, D102
+
 # This example model is taken from the PyTorch CIFAR10 tutorial:
 # https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#define-a-convolutional-neural-network
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa N812
+import torch.optim as optim
+
 from fibad.models import fibad_model
 
 
@@ -26,3 +30,14 @@ class ExampleCNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+    # ~ The following methods are placeholders for future work
+    # ~ I don't think this will be the final API!!!
+    def criterion(self):
+        return nn.CrossEntropyLoss()
+
+    def optimizer(self):
+        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
+
+    def save(self, path):
+        torch.save(self.state_dict(), path)

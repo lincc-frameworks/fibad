@@ -51,7 +51,7 @@ def test_get_runtime_config():
         "train": {
             "model_name": "example_model",
             "model_class": "new_thing.cool_model.CoolModel",
-            "model": {"model_weights": "final_best.pth", "layers": 3},
+            "model": {"model_weights_filepath": "final_best.pth", "layers": 3},
         },
         "predict": {"batch_size": 8},
     }
