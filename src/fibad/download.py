@@ -1,5 +1,7 @@
 import contextlib
+import datetime
 import os
+import urllib.request
 from pathlib import Path
 from typing import Union
 
@@ -38,34 +40,34 @@ def run(args, config):
 
     config = config.get("download", {})
 
-    print("Download command")
+    print("Download command Start")
 
+    fits_file = config.get("fits_file", "")
+    print(f"Reading in fits catalog: {fits_file}")
     # Filter the fits file for the fields we want
     column_names = ["object_id"] + variable_fields
-    locations = filterfits(config.get("fits_file"), column_names)
+    locations = filterfits(fits_file, column_names)
 
-    # Sort by tract, ra, dec to optimize speed that the cutout server can serve us
-    #
-    # TODO: See if this sort is performed by downloadCutouts
-    # It appears downloadCutouts is doing some sorting prior to download, but
-    # unclear if it is the same sort
-    locations.sort(variable_fields)
+    # TODO slice up the locations to multiplex across connections if necessary, but for now
+    # we simply mask off a few
+    offset = config.get("offset", 0)
+    end = offset + config.get("num_sources", 10)
+    locations = locations[offset:end]
 
-    # TODO slice up the locations
-    locations = locations[0:10]
-
-    # make a list of rects
+    # Make a list of rects to pass to downloadCutout
     rects = create_rects(locations, offset=0, default=rect_from_config(config))
 
     # Configure global parameters for the downloader
     dC.set_max_connections(num=config.get("max_connections", 2))
 
+    print("Requesting cutouts")
     # pass the rects to the cutout downloader
     download_cutout_group(
         rects=rects, cutout_dir=config.get("cutout_dir"), user=config["username"], password=config["password"]
     )
 
-    print(locations)
+    # print(locations)
+    print("Done")
 
 
 # TODO add error checking
@@ -118,6 +120,70 @@ def create_rects(locations: Table, offset: int = 0, default: dC.Rect = None) -> 
     return rects
 
 
+stats = {
+    "request_duration": datetime.timedelta(),  # Time from request sent to first byte from the server
+    "response_duration": datetime.timedelta(),  # Total time spent recieving and processing a response
+    "request_size_bytes": 0,  # Total size of all requests
+    "response_size_bytes": 0,  # Total size of all responses
+    "snapshots": 0,  # Number of fits snapshots downloaded
+}
+
+
+def _stat_accumulate(name: str, value: Union[int, datetime.timedelta]):
+    global stats
+    stats[name] += value
+
+
+def _print_stats():
+    global stats
+
+    total_dur_s = (stats["request_duration"] + stats["response_duration"]).total_seconds()
+
+    resp_s = stats["response_duration"].total_seconds()
+    down_rate_mb_s = (stats["response_size_bytes"] / (1024**2)) / resp_s
+
+    req_s = stats["request_duration"].total_seconds()
+    up_rate_mb_s = (stats["request_size_bytes"] / (1024**2)) / req_s
+
+    snapshot_rate = stats["snapshots"] / total_dur_s
+
+    print(
+        f"Stats: Duration: {total_dur_s:.2f} s, Files: {stats['snapshots']}, \
+Upload: {up_rate_mb_s:.2f} MB/s, Download: {down_rate_mb_s:.2f} MB/s File rate: {snapshot_rate:.2f} files/s",
+        end="\r",
+        flush=True,
+    )
+
+
+def request_hook(
+    request: urllib.request.Request,
+    request_start: datetime.datetime,
+    response_start: datetime.datetime,
+    response_size: int,
+    chunk_size: int,
+):
+    """
+    Called on each chunk of snapshots downloaded.
+    Called immediately after the server has finished responding to the
+    request, so datetime.datetime.now() is the end moment of the request
+
+    request: Our request object
+    request_start: datetime when we started sending the request
+    response_start: when the server responded to the request
+    response_size: Size in bytes of the response from the server.
+    """
+
+    now = datetime.datetime.now()
+
+    _stat_accumulate("request_duration", response_start - request_start)
+    _stat_accumulate("response_duration", now - response_start)
+    _stat_accumulate("request_size_bytes", len(request.data))
+    _stat_accumulate("response_size_bytes", response_size)
+    _stat_accumulate("snapshots", chunk_size)
+
+    _print_stats()
+
+
 def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], user, password):
     """
     Download cutouts to the given directory
@@ -125,4 +191,6 @@ def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], us
     Calls downloadCutout.download, so supports long lists of rects and
     """
     with working_directory(Path(cutout_dir)):
-        dC.download(rects, user=user, password=password, onmemory=False)
+        dC.download(rects, user=user, password=password, onmemory=True, request_hook=request_hook)
+
+    print("")  # Print a newline so the stats stay and look pretty.
