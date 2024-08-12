@@ -4,13 +4,17 @@ from fibad.config_utils import get_runtime_config
 from fibad.plugin_utils import fetch_model_class
 
 
-def run(args):
+def run(args, config):
     """Placeholder for training code.
 
     Parameters
     ----------
     args : argparse.Namespace
         The parsed command line arguments.
+
+    config : dict
+        The parsed config file as a nested
+        dict
     """
 
     runtime_config = get_runtime_config(args.runtime_config)
