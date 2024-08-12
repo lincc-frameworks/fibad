@@ -8,7 +8,7 @@ from importlib.metadata import version
 download_config = {
     "sw": "22asec",
     "sh": "22asec",
-    "filter": "all",
+    "filter": ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"],
     "type": "coadd",
     "rerun": "pdr3_wide",
     "username": "mtauraso@local",
@@ -16,6 +16,8 @@ download_config = {
     "max_connections": 2,
     "fits_file": "../hscplay/temp.fits",
     "cutout_dir": "../hscplay/cutouts/",
+    "offset": 0,
+    "num_sources": 10,
 }
 
 config = {"download": download_config}

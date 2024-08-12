@@ -4,6 +4,7 @@ import base64
 import contextlib
 import csv
 import dataclasses
+import datetime
 import errno
 import getpass
 import io
@@ -15,6 +16,7 @@ import tarfile
 import tempfile
 import time
 import urllib.request
+import urllib.response
 from collections.abc import Generator
 from typing import IO, Any, Callable, Optional, Union, cast
 
@@ -323,7 +325,7 @@ class Rect:
 
     rerun: str = default_rerun
     type: str = default_type
-    filter: str = ALLFILTERS
+    filter: Union[str, list[str]] = ALLFILTERS
     tract: int = ANYTRACT
     ra: float = math.nan
     dec: float = math.nan
@@ -339,7 +341,7 @@ class Rect:
     def create(
         rerun: Union[str, None] = None,
         type: Union[str, None] = None,
-        filter: Union[str, None] = None,
+        filter: Union[Union[str, list[str]], None] = None,
         tract: Union[str, int, None] = None,
         ra: Union[str, float, None] = None,
         dec: Union[str, float, None] = None,
@@ -460,7 +462,9 @@ class Rect:
         rects
             List of `Rect` objects, each being more specific than `self`.
         """
-        if self.filter == ALLFILTERS:
+        if isinstance(self.filter, list):
+            return [Rect.create(filter=f, default=self) for f in self.filter]
+        elif self.filter == ALLFILTERS:
             return [Rect.create(filter=f, default=self) for f in _all_filters]
         else:
             return [Rect.create(default=self)]
@@ -927,7 +931,7 @@ _all_filters = dict(
 )
 
 
-def parse_filter_opt(s: Optional[str]) -> str:
+def parse_filter_opt(s: Optional[Union[str, list]]) -> Union[str, list]:
     """
     Interpret a filter name.
     The argument may be `ALLFILTERS`.or None
@@ -950,7 +954,8 @@ def parse_filter_opt(s: Optional[str]) -> str:
     """
     if s is None:
         return ALLFILTERS
-
+    if isinstance(s, list):
+        return [parse_filter(filter) for filter in s]
     if s.lower() == ALLFILTERS:
         return ALLFILTERS
     return parse_filter(s)
@@ -963,6 +968,7 @@ def download(
     password: Optional[str] = None,
     *,
     onmemory: bool = True,
+    **kwargs_request,
 ) -> Union[list, list[list], None]:
     """
     Cut `rects` out of the sky.
@@ -978,6 +984,8 @@ def download(
     onmemory
         Return `datalist` on memory.
         If `onmemory` is False, downloaded cut-outs are written to files.
+    kwargs_request
+        Additional keyword args are passed through to _download
 
     Returns
     -------
@@ -998,7 +1006,7 @@ def download(
         rects = [cast(Rect, rects)]
     rects = cast(list[Rect], rects)
 
-    ret = _download(rects, user, password, onmemory=onmemory)
+    ret = _download(rects, user, password, onmemory=onmemory, **kwargs_request)
     if isscalar and onmemory:
         ret = cast(list[list], ret)
         return ret[0]
@@ -1007,7 +1015,13 @@ def download(
 
 
 def _download(
-    rects: list[Rect], user: Optional[str], password: Optional[str], *, onmemory: bool
+    rects: list[Rect],
+    user: Optional[str],
+    password: Optional[str],
+    *,
+    onmemory: bool,
+    chunksize: int = 990,
+    **kwargs_request,
 ) -> Optional[list[list]]:
     """
     Cut `rects` out of the sky.
@@ -1023,6 +1037,10 @@ def _download(
     onmemory
         Return `datalist` on memory.
         If `onmemory` is False, downloaded cut-outs are written to files.
+    chunksize
+        Number of cutout lines to pack into a single request. Defaults to 990 if unspecified.
+    kwargs_request
+        Additional keyword args are passed through to _download_chunk
 
     Returns
     -------
@@ -1058,11 +1076,12 @@ def _download(
         if not password:
             raise RuntimeError("Password is empty.")
 
-    chunksize = 990
     datalist: list[tuple[int, dict, bytes]] = []
 
     for i in range(0, len(exploded_rects), chunksize):
-        ret = _download_chunk(exploded_rects[i : i + chunksize], user, password, onmemory=onmemory)
+        ret = _download_chunk(
+            exploded_rects[i : i + chunksize], user, password, onmemory=onmemory, **kwargs_request
+        )
         if onmemory:
             datalist += cast(list, ret)
 
@@ -1075,7 +1094,15 @@ def _download(
 
 
 def _download_chunk(
-    rects: list[tuple[Rect, Any]], user: str, password: str, *, onmemory: bool
+    rects: list[tuple[Rect, Any]],
+    user: str,
+    password: str,
+    *,
+    onmemory: bool,
+    request_hook: Optional[
+        Callable[[urllib.request.Request, datetime.datetime, datetime.datetime, int, int], Any]
+    ],
+    **kwargs_request,
 ) -> Optional[list]:
     """
     Cut `rects` out of the sky.
@@ -1095,6 +1122,11 @@ def _download_chunk(
     onmemory
         Return `datalist` on memory.
         If `onmemory` is False, downloaded cut-outs are written to files.
+    request_hook
+        Function that is called with the response of all requests made
+        Intended to support bandwidth instrumentation.
+    kwargs_request
+        Additional keyword args are passed through to urllib.request.urlopen
 
     Returns
     -------
@@ -1134,11 +1166,18 @@ def _download_chunk(
 
     returnedlist = []
 
+    # Set timeout to 1 hour if no timout was set higher up
+    kwargs_request.setdefault("timeout", 3600)
+
     with get_connection_semaphore():
-        with urllib.request.urlopen(req, timeout=3600) as fin:
+        request_started = datetime.datetime.now()
+        with urllib.request.urlopen(req, **kwargs_request) as fin:
+            response_started = datetime.datetime.now()
+            response_size = 0
             with tarfile.open(fileobj=fin, mode="r|") as tar:
                 for info in tar:
                     fitem = tar.extractfile(info)
+                    response_size += info.size
                     if fitem is None:
                         continue
                     with fitem:
@@ -1162,6 +1201,8 @@ def _download_chunk(
                                 os.makedirs(dirname, exist_ok=True)
                             with open(filename, "wb") as fout:
                                 _splice(fitem, fout)
+            if request_hook:
+                request_hook(req, request_started, response_started, response_size, len(rects))
 
     return returnedlist if onmemory else None
 
