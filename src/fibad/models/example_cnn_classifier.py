@@ -8,7 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
 
-from fibad.models import fibad_model
+# extra long import here to address a circular import issue
+from fibad.models.model_registry import fibad_model
 
 
 @fibad_model
