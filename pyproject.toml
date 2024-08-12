@@ -16,10 +16,10 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.9"
 dependencies = [
-    "astropy" # Used to load fits files of sources to query HSC cutout server
-    "toml",
-    "torch",
-    "torchvision",
+    "astropy", # Used to load fits files of sources to query HSC cutout server
+    "toml", # Used to load configuration files as dictionaries
+    "torch", # Used in example model
+    "torchvision", # Used in example model
 ]
 
 [project.scripts]
