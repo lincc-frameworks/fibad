@@ -1,0 +1,9 @@
+[general]
+use_gpu = false
+
+[train.model]
+model_weights_filepath = "final_best.pth"
+layers = 3
+
+[predict]
+batch_size = 8
