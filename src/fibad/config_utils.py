@@ -2,7 +2,7 @@ import os
 
 import toml
 
-DEFAULT_CONFIG_FILEPATH = "default_runtime_config.toml"
+DEFAULT_CONFIG_FILEPATH = "fibad_default_config.toml"
 
 
 def get_runtime_config(
