@@ -25,12 +25,12 @@ def fetch_model_class(runtime_config: dict) -> type:
         If no model was specified in the runtime configuration.
     """
 
-    training_config = runtime_config.get("train", {})
+    model_config = runtime_config.get("model", {})
     model_cls = None
 
     # User specifies one of the built in models by name
-    if "model_name" in training_config:
-        model_name = training_config.get("model_name", None)
+    if "name" in model_config:
+        model_name = model_config.get("name", None)
 
         if model_name not in MODEL_REGISTRY:  # noqa: F405
             raise ValueError(f"Model not found in model registry: {model_name}")
@@ -38,8 +38,8 @@ def fetch_model_class(runtime_config: dict) -> type:
         model_cls = MODEL_REGISTRY[model_name]  # noqa: F405
 
     # User provides a custom model, attempt to import it with the module spec
-    elif "model_cls" in training_config:
-        model_cls = _import_module_from_string(training_config["model_cls"])
+    elif "model_cls" in model_config:
+        model_cls = _import_module_from_string(model_config["model_cls"])
 
     # User failed to define a model to load
     else:

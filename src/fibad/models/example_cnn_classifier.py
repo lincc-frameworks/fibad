@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
 
 # extra long import here to address a circular import issue
 from fibad.models.model_registry import fibad_model
@@ -14,7 +16,7 @@ from fibad.models.model_registry import fibad_model
 
 @fibad_model
 class ExampleCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, model_config):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -22,6 +24,8 @@ class ExampleCNN(nn.Module):
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
+
+        self.config = model_config
 
     def forward(self, x):
         x = self.pool(F.relu(self.confv1(x)))
@@ -32,13 +36,40 @@ class ExampleCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-    # ~ The following methods are placeholders for future work
-    # ~ I don't think this will be the final API!!!
-    def criterion(self):
+    # ~ This isn't the correct place for this method, this should be outside of the model class
+    def data_set(self, path):
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        )
+        return torchvision.datasets.CIFAR10(root=path, train=True, download=True, transform=transform)
+
+    # ~ This isn't the correct place for this method, this should be outside of the model class
+    def data_loader(self, trainset):
+        return torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
+
+    def train(self, trainloader):
+        self.optimizer = self._optimizer()
+        self.criterion = self._criterion()
+
+        for epoch in range(self.config.get("epochs", 2)):
+            running_loss = 0.0
+            for i, data in enumerate(trainloader, 0):
+                inputs, labels = data
+                self.optimizer.zero_grad()
+                outputs = self(inputs)
+                loss = self.criterion(outputs, labels)
+                loss.backward()
+                self.optimizer.step()
+                running_loss += loss.item()
+                if i % 2000 == 1999:
+                    print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
+                    running_loss = 0.0
+
+    def _criterion(self):
         return nn.CrossEntropyLoss()
 
-    def optimizer(self):
+    def _optimizer(self):
         return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
 
-    def save(self, path):
-        torch.save(self.state_dict(), path)
+    def save(self):
+        torch.save(self.state_dict(), self.config.get("weights_filepath", "example_cnn.pth"))

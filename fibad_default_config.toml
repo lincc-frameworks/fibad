@@ -1,0 +1,24 @@
+[general]
+use_gpu = true
+
+[download]
+sw = "22asec"
+sh = "22asec"
+filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+type = "coadd"
+rerun = "pdr3_wide"
+username = "mtauraso@local"
+password = "cCw+nX53lmNLHMy+JbizpH/dl4t7sxljiNm6a7k1"
+max_connections = 2
+fits_file = "../hscplay/temp.fits"
+cutout_dir = "../hscplay/cutouts/"
+offset = 0
+num_sources = 10
+
+[model]
+name = "example_cnn"
+weights_filepath = "example_model.pth"
+epochs = 10
+
+[predict]
+batch_size = 32

@@ -50,7 +50,7 @@ def test_import_module_from_string_no_class():
 
 def test_fetch_model_class():
     """Test the fetch_model_class function."""
-    config = {"train": {"model_cls": "builtins.BaseException"}}
+    config = {"model": {"model_cls": "builtins.BaseException"}}
 
     model_cls = plugin_utils.fetch_model_class(config)
 
@@ -61,7 +61,7 @@ def test_fetch_model_class_no_model():
     """Test that the fetch_model_class function raises an error when no model
     is specified in the configuration."""
 
-    config = {"train": {}}
+    config = {"model": {}}
 
     with pytest.raises(ValueError) as excinfo:
         plugin_utils.fetch_model_class(config)
@@ -72,7 +72,7 @@ def test_fetch_model_class_no_model():
 def test_fetch_model_class_no_model_cls():
     """Test that an exception is raised when a non-existent model class is requested."""
 
-    config = {"train": {"model_cls": "builtins.Nonexistent"}}
+    config = {"model": {"model_cls": "builtins.Nonexistent"}}
 
     with pytest.raises(AttributeError) as excinfo:
         plugin_utils.fetch_model_class(config)
@@ -83,7 +83,7 @@ def test_fetch_model_class_no_model_cls():
 def test_fetch_model_class_not_in_registry():
     """Test that an exception is raised when a model is requested that is not in the registry."""
 
-    config = {"train": {"model_name": "Nonexistent"}}
+    config = {"model": {"name": "Nonexistent"}}
 
     with pytest.raises(ValueError) as excinfo:
         plugin_utils.fetch_model_class(config)
@@ -99,7 +99,7 @@ def test_fetch_model_class_in_registry():
     class NewClass:
         pass
 
-    config = {"train": {"model_name": "NewClass"}}
+    config = {"model": {"name": "NewClass"}}
     model_cls = plugin_utils.fetch_model_class(config)
 
     assert model_cls.__name__ == "NewClass"
