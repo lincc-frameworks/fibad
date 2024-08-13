@@ -1114,7 +1114,7 @@ def _download(
 
     datalist: list[tuple[int, dict, bytes]] = []
 
-    failed_rect_index = None
+    failed_rect_index = 0
 
     start_rect_index = 0
     if not onmemory and resume:
@@ -1131,29 +1131,35 @@ def _download(
                     )
                     break
                 except (Exception, KeyboardInterrupt) as chunk_exception:
+                    # Humans count attempts from 1, this loop counts from zero.
+                    print(
+                        f"Attempt {attempt + 1} of {retries} to request rects [{i}:{i+chunksize}] has error:"
+                    )
+                    print(chunk_exception)
+
                     # Reraise if the final attempt on this chunk has failed, or if we're being terminated
-                    # This is the hard-fail codepath, where user will need to rerun from CLI
-                    if attempt == retries or isinstance(chunk_exception, KeyboardInterrupt):
+                    if attempt + 1 == retries or isinstance(chunk_exception, KeyboardInterrupt):
                         failed_rect_index = i
                         raise
+
+                    # Otherwise do exponential backoff and try again
                     else:
-                        # Humans count attempts from 1, this loop counts from zero.
-                        print(f"Attempt {attempt + 1} to request rects [{i}:{i+chunksize}] has raised:")
-                        print(chunk_exception)
                         backoff = retrywait * (2**attempt)
                         if backoff != 0:
-                            print(f"Retrying in {backoff} seconds...", end="")
+                            print(f"Retrying in {backoff} seconds... ", end="", flush=True)
                             time.sleep(backoff)
-                        print("Retrying.")
+                        print("Retrying now.")
                         continue
             if onmemory:
                 datalist += cast(list, ret)
+
+    # Retries have failed or we are being killed
     except (Exception, KeyboardInterrupt):
-        # Retries have failed OR we are being killed
-        # Write out resume data if we're saving to filesystem
-        if not onmemory:
+        # Write out resume data if we're saving to filesystem and there's been any progress
+        if (not onmemory) and failed_rect_index != 0:
             _write_resume_data(exploded_rects, failed_rect_index)
-        # Reraise so exception can reach top level.
+
+        # Reraise so exception can reach top level, very important for KeyboardInterrupt
         raise
 
     if onmemory:
