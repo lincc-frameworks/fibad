@@ -264,12 +264,20 @@ def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], us
         The rects we would like to download
     cutout_dir : Union[str, Path]
         The directory to put the files
-    user : _type_
+    user : string
         Username for HSC's download service to use
-    password : _type_
+    password : string
         Password for HSC's download service to use
     """
     with working_directory(Path(cutout_dir)):
-        dC.download(rects, user=user, password=password, onmemory=True, request_hook=request_hook)
+        dC.download(
+            rects,
+            user=user,
+            password=password,
+            onmemory=False,
+            request_hook=request_hook,
+            resume=True,
+            chunksize=10,
+        )
 
     print("")  # Print a newline so the stats stay and look pretty.
