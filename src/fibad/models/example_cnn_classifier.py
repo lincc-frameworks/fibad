@@ -7,11 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
 
 # extra long import here to address a circular import issue
-from fibad.models.model_registry import fibad_model
+from .model_registry import fibad_model
 
 
 @fibad_model
@@ -35,17 +33,6 @@ class ExampleCNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-
-    # ~ This isn't the correct place for this method, this should be outside of the model class
-    def data_set(self, path):
-        transform = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-        )
-        return torchvision.datasets.CIFAR10(root=path, train=True, download=True, transform=transform)
-
-    # ~ This isn't the correct place for this method, this should be outside of the model class
-    def data_loader(self, trainset):
-        return torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
 
     def train(self, trainloader):
         self.optimizer = self._optimizer()

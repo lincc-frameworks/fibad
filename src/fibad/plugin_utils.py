@@ -1,54 +1,53 @@
 import importlib
 
-from fibad.models import *  # noqa: F403
-from fibad.models import MODEL_REGISTRY
 
-
-def fetch_model_class(runtime_config: dict) -> type:
-    """Fetch the model class from the model registry.
+def get_or_load_class(config: dict, registry: dict) -> type:
+    """Given a configuration dictionary and a registry dictionary, attempt to return
+    the requested class either from the registry or by dynamically importing it.
 
     Parameters
     ----------
-    runtime_config : dict
-        The runtime configuration dictionary.
+    config : dict
+        The configuration dictionary. Should at least one of the following two
+        keys: "name" or "external_cls".
+    registry : dict
+        The registry dictionary of <class name> : <class type> pairs.
 
     Returns
     -------
     type
-        The model class.
+        The returned class to be instantiated
 
     Raises
     ------
     ValueError
-        If a built in model was requested, but not found in the model registry.
+        User specified a `name` key in the config that doesn't match any keys in the registry.
     ValueError
-        If no model was specified in the runtime configuration.
+        User failed to specify a class to load in the runtime configuration. Neither
+        a `name` nor `external_cls` key was found in the config.
     """
 
-    model_config = runtime_config.get("model", {})
-    model_cls = None
+    # User specifies one of the built in classes by name
+    if "name" in config:
+        class_name = config.get("name")
 
-    # User specifies one of the built in models by name
-    if "name" in model_config:
-        model_name = model_config.get("name", None)
+        if class_name not in registry:
+            raise ValueError(f"Could not find {class_name} in registry: {registry.keys()}")
 
-        if model_name not in MODEL_REGISTRY:  # noqa: F405
-            raise ValueError(f"Model not found in model registry: {model_name}")
+        returned_class = registry[class_name]
 
-        model_cls = MODEL_REGISTRY[model_name]  # noqa: F405
+    # User provides an external class, attempt to import it with the module spec
+    elif "external_cls" in config:
+        returned_class = import_module_from_string(config["external_cls"])
 
-    # User provides a custom model, attempt to import it with the module spec
-    elif "model_cls" in model_config:
-        model_cls = _import_module_from_string(model_config["model_cls"])
-
-    # User failed to define a model to load
+    # User failed to define a class to load
     else:
-        raise ValueError("No model specified in the runtime configuration")
+        raise ValueError("No class requested. Specify a `name` or `external_cls` key in the runtime config.")
 
-    return model_cls
+    return returned_class
 
 
-def _import_module_from_string(module_path: str) -> type:
+def import_module_from_string(module_path: str) -> type:
     """Dynamically import a module from a string.
 
     Parameters
@@ -98,3 +97,19 @@ def _import_module_from_string(module_path: str) -> type:
         raise ModuleNotFoundError(f"Module {module_name} not found") from exc
 
     return model_cls
+
+
+def update_registry(registry: dict, name: str, class_type: type):
+    """Add a class to a given registry dictionary.
+
+    Parameters
+    ----------
+    registry : dict
+        The registry to update.
+    name : str
+        The name of the class.
+    class_type : type
+        The class type to be instantiated.
+    """
+
+    registry.update({name: class_type})

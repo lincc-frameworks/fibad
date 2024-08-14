@@ -1,7 +1,8 @@
 import torch
 
 from fibad.config_utils import get_runtime_config
-from fibad.plugin_utils import fetch_model_class
+from fibad.data_loaders.data_loader_registry import fetch_data_loader_class
+from fibad.models.model_registry import fetch_model_class
 
 
 def run(args, config):
@@ -22,6 +23,9 @@ def run(args, config):
     model_cls = fetch_model_class(runtime_config)
     model = model_cls(runtime_config.get("model", {}))
 
+    data_loader_cls = fetch_data_loader_class(runtime_config)
+    data_loader = data_loader_cls(runtime_config.get("data_loader", {})).get_data_loader()
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if torch.cuda.device_count() > 1:
         # ~ PyTorch docs indicate that batch size should be < number of GPUs.
@@ -32,9 +36,6 @@ def run(args, config):
         model = torch.nn.DataParallel(model)
 
     model.to(device)
-
-    data_set = model.data_set()
-    data_loader = model.data_loader(data_set)
 
     model.train(data_loader)
 

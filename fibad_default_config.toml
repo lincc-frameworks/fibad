@@ -16,9 +16,27 @@ offset = 0
 num_sources = 10
 
 [model]
-name = "example_cnn"
+name = "ExampleCNN"
+
+# An example of requesting an external model class
+# external_class = "user_package.submodule.ExternalModel"
+
 weights_filepath = "example_model.pth"
 epochs = 10
+
+[data_loader]
+name = "CifarDataLoader"
+
+# An example of requesting an external data loader class
+# external_class = "user_package.submodule.ExternalDataLoader"
+
+# Directory path where the data is stored
+path = "./data"
+
+# Default PyTorch DataLoader parameters
+batch_size = 4
+shuffle = true
+num_workers = 2
 
 [predict]
 batch_size = 32
