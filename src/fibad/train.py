@@ -37,7 +37,7 @@ def run(args, config):
 
     model.to(device)
 
-    model.train(data_loader)
+    model.train(data_loader, device=device)
 
     model.save()
     print("Finished Training")

@@ -26,7 +26,7 @@ class ExampleCNN(nn.Module):
         self.config = model_config
 
     def forward(self, x):
-        x = self.pool(F.relu(self.confv1(x)))
+        x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
@@ -34,7 +34,7 @@ class ExampleCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-    def train(self, trainloader):
+    def train(self, trainloader, device=None):
         self.optimizer = self._optimizer()
         self.criterion = self._criterion()
 
@@ -42,6 +42,8 @@ class ExampleCNN(nn.Module):
             running_loss = 0.0
             for i, data in enumerate(trainloader, 0):
                 inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = self.criterion(outputs, labels)
