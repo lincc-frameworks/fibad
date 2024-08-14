@@ -18,8 +18,7 @@ requires-python = ">=3.9"
 dependencies = [
     "astropy", # Used to load fits files of sources to query HSC cutout server
     "toml", # Used to load configuration files as dictionaries
-    "torch", # Used in example model
-    "torchvision", # Used in example model
+    "torch", # Used for CNN model and in train.py
 ]
 
 [project.scripts]
@@ -30,6 +29,10 @@ fibad = "fibad_cli.main:main"
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
+examples = [
+    "torchvision", # Used for CNN model data set
+]
+
 dev = [
     "asv==0.6.3", # Used to compute performance benchmarks
     "jupyter", # Clears output from Jupyter notebooks
