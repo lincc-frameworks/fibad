@@ -1,4 +1,11 @@
 from .config_utils import get_runtime_config, log_runtime_config, merge_configs
-from .plugin_utils import fetch_model_class
+from .plugin_utils import get_or_load_class, import_module_from_string, update_registry
 
-__all__ = ["get_runtime_config", "merge_configs", "log_runtime_config", "fetch_model_class"]
+__all__ = [
+    "get_runtime_config",
+    "merge_configs",
+    "log_runtime_config",
+    "get_or_load_class",
+    "import_module_from_string",
+    "update_registry",
+]

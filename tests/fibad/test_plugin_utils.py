@@ -1,13 +1,14 @@
 import pytest
 from fibad import plugin_utils
 from fibad.models import fibad_model
+from fibad.models.model_registry import fetch_model_class
 
 
 def test_import_module_from_string():
     """Test the import_module_from_string function."""
     module_path = "builtins.BaseException"
 
-    model_cls = plugin_utils._import_module_from_string(module_path)
+    model_cls = plugin_utils.import_module_from_string(module_path)
 
     assert model_cls.__name__ == "BaseException"
 
@@ -19,7 +20,7 @@ def test_import_module_from_string_no_base_module():
     module_path = "nonexistent.BaseException"
 
     with pytest.raises(ModuleNotFoundError) as excinfo:
-        plugin_utils._import_module_from_string(module_path)
+        plugin_utils.import_module_from_string(module_path)
 
     assert "Module nonexistent not found" in str(excinfo.value)
 
@@ -31,7 +32,7 @@ def test_import_module_from_string_no_submodule():
     module_path = "builtins.nonexistent.BaseException"
 
     with pytest.raises(ModuleNotFoundError) as excinfo:
-        plugin_utils._import_module_from_string(module_path)
+        plugin_utils.import_module_from_string(module_path)
 
     assert "Module builtins.nonexistent not found" in str(excinfo.value)
 
@@ -43,16 +44,16 @@ def test_import_module_from_string_no_class():
     module_path = "builtins.Nonexistent"
 
     with pytest.raises(AttributeError) as excinfo:
-        plugin_utils._import_module_from_string(module_path)
+        plugin_utils.import_module_from_string(module_path)
 
     assert "Model class Nonexistent not found" in str(excinfo.value)
 
 
 def test_fetch_model_class():
     """Test the fetch_model_class function."""
-    config = {"train": {"model_cls": "builtins.BaseException"}}
+    config = {"model": {"external_cls": "builtins.BaseException"}}
 
-    model_cls = plugin_utils.fetch_model_class(config)
+    model_cls = fetch_model_class(config)
 
     assert model_cls.__name__ == "BaseException"
 
@@ -61,21 +62,21 @@ def test_fetch_model_class_no_model():
     """Test that the fetch_model_class function raises an error when no model
     is specified in the configuration."""
 
-    config = {"train": {}}
+    config = {"model": {}}
 
     with pytest.raises(ValueError) as excinfo:
-        plugin_utils.fetch_model_class(config)
+        fetch_model_class(config)
 
-    assert "No model specified in the runtime configuration" in str(excinfo.value)
+    assert "Error fetching model class" in str(excinfo.value)
 
 
 def test_fetch_model_class_no_model_cls():
     """Test that an exception is raised when a non-existent model class is requested."""
 
-    config = {"train": {"model_cls": "builtins.Nonexistent"}}
+    config = {"model": {"external_cls": "builtins.Nonexistent"}}
 
     with pytest.raises(AttributeError) as excinfo:
-        plugin_utils.fetch_model_class(config)
+        fetch_model_class(config)
 
     assert "Model class Nonexistent not found" in str(excinfo.value)
 
@@ -83,12 +84,12 @@ def test_fetch_model_class_no_model_cls():
 def test_fetch_model_class_not_in_registry():
     """Test that an exception is raised when a model is requested that is not in the registry."""
 
-    config = {"train": {"model_name": "Nonexistent"}}
+    config = {"model": {"name": "Nonexistent"}}
 
     with pytest.raises(ValueError) as excinfo:
-        plugin_utils.fetch_model_class(config)
+        fetch_model_class(config)
 
-    assert "Model not found in model registry: Nonexistent" in str(excinfo.value)
+    assert "Error fetching model class" in str(excinfo.value)
 
 
 def test_fetch_model_class_in_registry():
@@ -99,7 +100,7 @@ def test_fetch_model_class_in_registry():
     class NewClass:
         pass
 
-    config = {"train": {"model_name": "NewClass"}}
-    model_cls = plugin_utils.fetch_model_class(config)
+    config = {"model": {"name": "NewClass"}}
+    model_cls = fetch_model_class(config)
 
     assert model_cls.__name__ == "NewClass"
