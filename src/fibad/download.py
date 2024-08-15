@@ -12,9 +12,6 @@ import fibad.downloadCutout.downloadCutout as dC
 # These are the fields that are allowed to vary across the locations
 # input from the catalog fits file. Other values for HSC cutout server
 # must be provided by config.
-#
-# Order here is intentional, this is also a sort order to optimize
-# queries to the cutout server.
 variable_fields = ["tract", "ra", "dec"]
 
 
@@ -162,6 +159,9 @@ def create_rects(locations: Table, offset: int = 0, default: dC.Rect = None) -> 
         args = {field: location[field] for field in variable_fields}
         args["lineno"] = index + offset
         args["tract"] = str(args["tract"])
+        # Sets the file name on the rect to be the object_id, also includes other rect fields
+        # which are interpolated at save time, and are native fields of dc.Rect.
+        args["name"] = f"{location['object_id']}_{{type}}_{{ra:.5f}}_{{dec:+.5f}}_{{tract}}_{{filter}}"
         rect = dC.Rect.create(default=default, **args)
         rects.append(rect)
 
