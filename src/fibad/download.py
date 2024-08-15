@@ -190,7 +190,7 @@ class DownloadStats:
         }
 
     def __enter__(self):
-        return self
+        return self.hook
 
     def __exit__(self, exc_type, exc_value, traceback):
         print("")  # Print a newline so the final stats line stays in the terminal and look pretty.
@@ -278,9 +278,42 @@ class FailedChunkCollector:
 
     """
 
-    def __init__(self):
+    def __init__(self, filepath: Path, **kwargs):
+        """_summary_
+
+        Parameters
+        ----------
+        filepath : Path
+            File to read in if we are resuming a download, and where to save the failed chunks after.
+            If the file does not exist yet an empty state is initialized.
+
+        **kwargs : dict
+            Keyword args passed to astropy.table.Table.read() and write() in the case that a file is used.
+            Should only be used to control file format, not read/write semantics
+        """
         self.__dict__.update({key: [] for key in variable_fields + ["object_id"]})
-        self.count = 0
+        self.seen_object_ids = set()
+        self.filepath = filepath.resolve()
+        self.format_kwargs = kwargs
+
+        # If there is a failed chunk file from a previous run,
+        # Read it in to initialize us
+        if filepath.exists():
+            prev_failed_chunks = Table.read(filepath)
+            for key in variable_fields + ["object_id"]:
+                column_as_list = prev_failed_chunks[key].data.tolist()
+                self.__dict__[key] += column_as_list
+            print(self.object_id)
+
+            self.seen_object_ids = {id for id in self.object_id}
+
+        self.count = len(self.seen_object_ids)
+
+    def __enter__(self):
+        return self.hook
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.save()
 
     def hook(self, rects: list[dC.Rect], exception: Exception, attempts: int):
         """Called when dc.Download fails to download a chunk of rects
@@ -298,25 +331,23 @@ class FailedChunkCollector:
         print("Failed chunk handler got called.")
 
         for rect in rects:
-            # Relies on the name format set in create_rects to work properly
-            self.object_id.append(int(rect.name.split("_")[0]))
+            # Relies on the name format set up in create_rects to work properly
+            object_id = int(rect.name.split("_")[0])
 
-            for key in variable_fields:
-                self.__dict__[key].append(rect.__dict__[key])
+            if object_id not in self.seen_object_ids:
+                self.seen_object_ids.add(object_id)
 
-            self.count += 1
+                self.object_id.append(object_id)
 
-    def save(self, filename: str, **kwargs: dict):
-        """Saves the current set of failed locations to the path specified.
+                for key in variable_fields:
+                    self.__dict__[key].append(rect.__dict__[key])
+
+                self.count += 1
+
+    def save(self):
+        """
+        Saves the current set of failed locations to the path specified.
         If no failed locations were saved by the hook, this function does nothing.
-
-        Parameters
-        ----------
-        filename : str
-            File path to save to.
-        kwargs : optional, dict
-            Additional keyword arguments are passed to astropy.Table.write() to allow caller to control the
-            output format and write semantics.
         """
         if self.count == 0:
             return
@@ -326,7 +357,14 @@ class FailedChunkCollector:
                 self.__dict__[key] = np.array(self.__dict__[key])
 
             missed = Table({key: self.__dict__[key] for key in variable_fields + ["object_id"]})
-            missed.write(filename, **kwargs)
+
+            # note that the choice to do overwrite=True here and to read in the entire fits file in
+            # ___init__() is necessary because snapshots corresponding to the same object may cross
+            # chunk boundaries decided by dC.download.
+            #
+            # Since we are de-duplicating rects by object_id, we need to read in all rects from a prior
+            # run, and we therefore replace the file we were passed.
+            missed.write(self.filepath, overwrite=True, **self.format_kwargs)
 
 
 def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], user, password):
@@ -346,18 +384,18 @@ def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], us
         Password for HSC's download service to use
     """
 
-    failed_chunks = FailedChunkCollector()
-
-    with DownloadStats() as stats, working_directory(Path(cutout_dir)):
-        dC.download(
-            rects,
-            user=user,
-            password=password,
-            onmemory=False,
-            request_hook=stats.hook,
-            failed_chunk_hook=failed_chunks.hook,
-            resume=True,
-            chunksize=10,
-        )
-
-        failed_chunks.save("failed_locations.fits", format="fits")
+    with working_directory(Path(cutout_dir)):
+        with (
+            DownloadStats() as stats_hook,
+            FailedChunkCollector(Path("failed_locations.fits"), format="fits") as failed_chunk_hook,
+        ):
+            dC.download(
+                rects,
+                user=user,
+                password=password,
+                onmemory=False,
+                request_hook=stats_hook,
+                failed_chunk_hook=failed_chunk_hook,
+                resume=True,
+                chunksize=10,
+            )
