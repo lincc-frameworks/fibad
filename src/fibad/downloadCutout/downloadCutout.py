@@ -982,28 +982,51 @@ def download(
     password: Optional[str] = None,
     *,
     onmemory: bool = True,
-    **kwargs_request,
+    **kwargs__download,
 ) -> Union[list, list[list], None]:
     """
     Cut `rects` out of the sky.
 
     Parameters
     ----------
-    rects
-        A `Rect` object or a list of `Rect` objects
-    user
+    rects : Union[Rect, list[Rect]]
+        A `Rect` object or a list of `Rect` objects to download
+    user : Optional[str]
         Username. If None, it will be asked interactively.
-    password
+    password : Optional [str]
         Password. If None, it will be asked interactively.
-    onmemory
+    onmemory, optional : bool
         Return `datalist` on memory.
         If `onmemory` is False, downloaded cut-outs are written to files.
-    kwargs_request
-        Additional keyword args are passed through to _download
+    kwargs__download: dict
+        Additional keyword args are passed through to _download and eventually to _download_chunk() and
+        urllib.request.urlopen.
+
+        Some important (but entirely optional!) keyword args processed later in the download callstack are
+        listed below. Anything urllib.request.urlopen will accept is fair game too!
+
+            resume : bool
+                Whether to attempt to resume an ongoing download from filesystem data in onmemory=False mode.
+                Default: False. See _download() for greater detail.
+            chunksize : int
+                The number of rects to include in a single http request. Default 990 rects. See _download()
+                for greater detail.
+            retries : int
+                The number of times to retry a failed http request before moving on or attempting to trigger
+                failed_chunk_handler. Default is 3. See _download() for greater detail.
+            retrywait : int
+                Base seconds to wait between retries. Acts as base for exponential retry formula of
+                base * (2**attempt_num) seconds. Default is 30 s. See _download() for greater detail.
+            failed_chunk_hook : Callable[[list[Rect], Exception, int], Any]
+                Hook which is called every time a chunk fails `retries` time. The arguments to the hook are
+                the rects in the failed chunk, the exception encountered while making the last request, and
+                the number of attempts. See _download() for greater detail.
+            request_hook : Callable[[urllib.request.Request, datetime.datetime, datetime.datetime, int, int]
+                Optional hook called on every request. See _download_chunk() for greater detail
 
     Returns
     -------
-    datalist
+    datalist : Union[list, list[list], None]
         If onmemory == False, `datalist` is None.
         If onmemory == True:
           - If `rects` is a simple `Rect` object,
@@ -1020,7 +1043,7 @@ def download(
         rects = [cast(Rect, rects)]
     rects = cast(list[Rect], rects)
 
-    ret = _download(rects, user, password, onmemory=onmemory, **kwargs_request)
+    ret = _download(rects, user, password, onmemory=onmemory, **kwargs__download)
     if isscalar and onmemory:
         ret = cast(list[list], ret)
         return ret[0]
@@ -1038,7 +1061,8 @@ def _download(
     resume: bool = False,
     retries: int = 3,
     retrywait: int = 30,
-    **kwargs_request,
+    failed_chunk_hook: Optional[Callable[[list[Rect], Exception, int], Any]] = None,
+    **kwargs__download_chunk,
 ) -> Optional[list[list]]:
     """
     Cut `rects` out of the sky. Implements configurable request size, retries and exponential backoff.
@@ -1075,8 +1099,15 @@ def _download(
         where the retry time for attempts is calculated as retrywait * (2 ** attempt) seconds , with attempt=0
         for the first wait.
 
-    kwargs_request: dict, optional
-        Additional keyword args are passed through to _download_chunk
+    failed_chunk_hook: Callable[[list[Rect], Exception, int], Any]
+        Hook which is called every time a chunk fails `retries` time. The arguments to the hook are
+        the rects in the failed chunk, the exception encountered while making the last request, and
+        the number of attempts.
+
+        If this function raises, the entire download stops, but otherwise the download will ocntinue
+
+    kwargs__download_chunk: dict, optional
+        Additional keyword args are passed through to _download_chunk()
 
     Returns
     -------
@@ -1127,21 +1158,31 @@ def _download(
             for attempt in range(0, retries):
                 try:
                     ret = _download_chunk(
-                        exploded_rects[i : i + chunksize], user, password, onmemory=onmemory, **kwargs_request
+                        exploded_rects[i : i + chunksize],
+                        user,
+                        password,
+                        onmemory=onmemory,
+                        **kwargs__download_chunk,
                     )
                     break
-                except (Exception, KeyboardInterrupt) as chunk_exception:
+                except KeyboardInterrupt:
+                    print("Keyboard Interrupt recieved.")
+                    failed_rect_index = i
+                    raise
+                except Exception as exception:
                     # Humans count attempts from 1, this loop counts from zero.
                     print(
                         f"Attempt {attempt + 1} of {retries} to request rects [{i}:{i+chunksize}] has error:"
                     )
-                    print(chunk_exception)
+                    print(exception)
 
-                    # Reraise if the final attempt on this chunk has failed, or if we're being terminated
-                    if attempt + 1 == retries or isinstance(chunk_exception, KeyboardInterrupt):
-                        failed_rect_index = i
-                        raise
-
+                    # If the final attempt on this chunk fails, we try to call the failed_chunk_hook
+                    if attempt + 1 == retries:
+                        if failed_chunk_hook is not None:
+                            rect_chunk = [rect for rect, idx in exploded_rects[i : i + chunksize]]
+                            failed_chunk_hook(rects=rect_chunk, exception=exception, attempts=retries)
+                        # If no hook provided, or if the provided hook doesn't raise, we continue the download
+                        break
                     # Otherwise do exponential backoff and try again
                     else:
                         backoff = retrywait * (2**attempt)
@@ -1277,7 +1318,7 @@ def _download_chunk(
     request_hook: Optional[
         Callable[[urllib.request.Request, datetime.datetime, datetime.datetime, int, int], Any]
     ],
-    **kwargs_request,
+    **kwargs_urlopen,
 ) -> Optional[list]:
     """
     Cut `rects` out of the sky.
@@ -1300,7 +1341,7 @@ def _download_chunk(
     request_hook
         Function that is called with the response of all requests made
         Intended to support bandwidth instrumentation.
-    kwargs_request
+    kwargs_urlopen
         Additional keyword args are passed through to urllib.request.urlopen
 
     Returns
@@ -1342,11 +1383,11 @@ def _download_chunk(
     returnedlist = []
 
     # Set timeout to 1 hour if no timout was set higher up
-    kwargs_request.setdefault("timeout", 3600)
+    kwargs_urlopen.setdefault("timeout", 3600)
 
     with get_connection_semaphore():
         request_started = datetime.datetime.now()
-        with urllib.request.urlopen(req, **kwargs_request) as fin:
+        with urllib.request.urlopen(req, **kwargs_urlopen) as fin:
             response_started = datetime.datetime.now()
             response_size = 0
             with tarfile.open(fileobj=fin, mode="r|") as tar:
