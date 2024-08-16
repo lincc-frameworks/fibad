@@ -12,9 +12,6 @@ class Fibad:
     CLI functions in fibad_cli are implemented by calling this class
     """
 
-    #! We could potentially make this dynamic
-    #! Somewhat difficult (perhaps impossible) to get this list from importlib/pkglib given
-    #! That a fibad verb is simply an object in a file.
     verbs = ["train", "predict", "download"]
 
     def __init__(self, *, config_file: Union[Path, str] = None):
