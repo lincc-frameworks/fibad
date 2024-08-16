@@ -46,5 +46,6 @@ Notes:
    :hidden:
 
    Home page <self>
+   Configuration <configuration>
    API Reference <autoapi/index>
    Notebooks <notebooks>
