@@ -34,16 +34,14 @@ def working_directory(path: Path):
         os.chdir(old_cwd)
 
 
-def run(args, config):
+def run(config):
     """
     Main entrypoint for downloading cutouts from HSC for use with fibad
 
     Parameters
     ----------
-    args : list
-        Command line arguments (unused)
     config : dict
-        Runtime configuration, which is only read by this function
+        Runtime configuration as a nested dictionary
     """
 
     config = config.get("download", {})
@@ -81,8 +79,6 @@ def run(args, config):
 # TODO add error checking
 def filterfits(filename: str, column_names: list[str]) -> Table:
     """Read a fits file with the required column names for making cutouts
-
-
 
     The easiest way to make such a fits file is to select from the main HSC catalog
 

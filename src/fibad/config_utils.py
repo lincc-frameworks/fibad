@@ -1,12 +1,14 @@
-import os
+from pathlib import Path
+from typing import Union
 
 import toml
 
-DEFAULT_CONFIG_FILEPATH = "fibad_default_config.toml"
+DEFAULT_CONFIG_FILEPATH = Path(__file__).parent.resolve() / "fibad_default_config.toml"
 
 
 def get_runtime_config(
-    runtime_config_filepath: str = None, default_config_filepath: str = DEFAULT_CONFIG_FILEPATH
+    runtime_config_filepath: Union[Path, str, None] = None,
+    default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
 ) -> dict:
     """This function will load the default runtime configuration file, as well
     as the user defined runtime configuration file.
@@ -19,9 +21,9 @@ def get_runtime_config(
 
     Parameters
     ----------
-    runtime_config_filepath : str
+    runtime_config_filepath : Union[Path, str, None]
         The path to the runtime configuration file.
-    default_config_filepath : str
+    default_config_filepath : Union[Path, str]
         The path to the default runtime configuration file.
 
     Returns
@@ -30,17 +32,22 @@ def get_runtime_config(
         The parsed runtime configuration.
     """
 
-    if runtime_config_filepath:
-        if not os.path.exists(runtime_config_filepath):
+    if isinstance(runtime_config_filepath, str):
+        runtime_config_filepath = Path(runtime_config_filepath)
+
+    with open(default_config_filepath, "r") as f:
+        default_runtime_config = toml.load(f)
+
+    if runtime_config_filepath is not None:
+        if not runtime_config_filepath.exists():
             raise FileNotFoundError(f"Runtime configuration file not found: {runtime_config_filepath}")
 
         with open(runtime_config_filepath, "r") as f:
             users_runtime_config = toml.load(f)
 
-    with open(default_config_filepath, "r") as f:
-        default_runtime_config = toml.load(f)
-
-    final_runtime_config = merge_configs(default_runtime_config, users_runtime_config)
+            final_runtime_config = merge_configs(default_runtime_config, users_runtime_config)
+    else:
+        final_runtime_config = default_runtime_config
 
     # ~ Uncomment when we have a better place to stash results.
     # log_runtime_config(final_runtime_config)
