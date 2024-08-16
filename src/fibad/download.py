@@ -308,6 +308,7 @@ class FailedChunkCollector:
             self.seen_object_ids = {id for id in self.object_id}
 
         self.count = len(self.seen_object_ids)
+        print(f"Failed chunk handler initialized with {self.count} objects")
 
     def __enter__(self):
         return self.hook
@@ -328,7 +329,6 @@ class FailedChunkCollector:
             The number of attempts that were made to request this chunk
 
         """
-        print("Failed chunk handler got called.")
 
         for rect in rects:
             # Relies on the name format set up in create_rects to work properly
@@ -343,6 +343,7 @@ class FailedChunkCollector:
                     self.__dict__[key].append(rect.__dict__[key])
 
                 self.count += 1
+        print(f"Failed chunk handler processed {len(rects)} rects and is now of size {self.count}")
 
     def save(self):
         """
