@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import logging
 import os
 import urllib.request
 from pathlib import Path
@@ -14,6 +15,8 @@ import fibad.downloadCutout.downloadCutout as dC
 # input from the catalog fits file. Other values for HSC cutout server
 # must be provided by config.
 variable_fields = ["tract", "ra", "dec"]
+
+logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -47,10 +50,10 @@ def run(config):
 
     config = config.get("download", {})
 
-    print("Download command Start")
+    logger.info("Download command Start")
 
     fits_file = config.get("fits_file", "")
-    print(f"Reading in fits catalog: {fits_file}")
+    logger.info(f"Reading in fits catalog: {fits_file}")
     # Filter the fits file for the fields we want
     column_names = ["object_id"] + variable_fields
     locations = filterfits(fits_file, column_names)
@@ -67,14 +70,13 @@ def run(config):
     # Configure global parameters for the downloader
     dC.set_max_connections(num=config.get("max_connections", 2))
 
-    print("Requesting cutouts")
+    logger.info("Requesting cutouts")
     # pass the rects to the cutout downloader
     download_cutout_group(
         rects=rects, cutout_dir=config.get("cutout_dir"), user=config["username"], password=config["password"]
     )
 
-    # print(locations)
-    print("Done")
+    logger.info("Done")
 
 
 # TODO add error checking
@@ -189,7 +191,7 @@ class DownloadStats:
         return self.hook
 
     def __exit__(self, exc_type, exc_value, traceback):
-        print("")  # Print a newline so the final stats line stays in the terminal and look pretty.
+        self._print_stats(logging.INFO)
 
     def _stat_accumulate(self, name: str, value: Union[int, datetime.timedelta]):
         """Accumulate a sum into the global stats dict
@@ -203,7 +205,7 @@ class DownloadStats:
         """
         self.stats[name] += value
 
-    def _print_stats(self):
+    def _print_stats(self, log_level):
         """Print the accumulated stats including bandwidth calculated from duration and sizes
 
         This prints out multiple lines with `\r` at the end in order to create a continuously updating
@@ -222,11 +224,13 @@ class DownloadStats:
 
         snapshot_rate = self.stats["snapshots"] / total_dur_s
 
-        print(f"Stats: Duration: {total_dur_s:.2f} s, ", end="", flush=True)
-        print(f"Files: {self.stats['snapshots']}, ", end="", flush=True)
-        print(f"Upload: {up_rate_mb_s:.2f} MB/s, ", end="", flush=True)
-        print(f"Download: {down_rate_mb_s:.2f} MB/s, ", end="", flush=True)
-        print(f"File rate: {snapshot_rate:.2f} files/s", end="\r", flush=True)
+        stats_message = f"Stats: Duration: {total_dur_s:.2f} s, "
+        stats_message += f"Files: {self.stats['snapshots']}, "
+        stats_message += f"Upload: {up_rate_mb_s:.2f} MB/s, "
+        stats_message += f"Download: {down_rate_mb_s:.2f} MB/s, "
+        stats_message += f"File rate: {snapshot_rate:.2f} files/s"
+
+        logger.log(log_level, stats_message)
 
     def hook(
         self,
@@ -262,7 +266,7 @@ class DownloadStats:
         self._stat_accumulate("response_size_bytes", response_size)
         self._stat_accumulate("snapshots", chunk_size)
 
-        self._print_stats()
+        self._print_stats(logging.DEBUG)
 
 
 class FailedChunkCollector:
@@ -299,12 +303,12 @@ class FailedChunkCollector:
             for key in variable_fields + ["object_id"]:
                 column_as_list = prev_failed_chunks[key].data.tolist()
                 self.__dict__[key] += column_as_list
-            print(self.object_id)
+            logger.debug(f"Adding object ID :{self.object_id} to failed list")
 
             self.seen_object_ids = {id for id in self.object_id}
 
         self.count = len(self.seen_object_ids)
-        print(f"Failed chunk handler initialized with {self.count} objects")
+        logger.debug(f"Failed chunk handler initialized with {self.count} objects")
 
     def __enter__(self):
         return self.hook
@@ -339,7 +343,7 @@ class FailedChunkCollector:
                     self.__dict__[key].append(rect.__dict__[key])
 
                 self.count += 1
-        print(f"Failed chunk handler processed {len(rects)} rects and is now of size {self.count}")
+        logger.debug(f"Failed chunk handler processed {len(rects)} rects and is now of size {self.count}")
 
     def save(self):
         """

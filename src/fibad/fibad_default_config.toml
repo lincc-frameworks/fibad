@@ -1,6 +1,21 @@
 [general]
 use_gpu = true
 
+# Destination of log messages
+# 'stderr' and 'stdout' specify the console.
+log_destination = "stderr"
+# A path name specifies a file e.g.
+# log = "fibad_log.txt"
+
+# Lowest log level to emit.
+# As you go down the list, fibad will become more verbose in the log.
+#
+# log_level = "critical" # Only emit the most severe of errors
+# log_level = "error"    # Emit all errors
+# log_level = "warning"  # Emit warnings and all errors
+log_level = "info"     # Emit informational messages, warnings and all errors
+# log_level = "debug"    # Very verbose, emit all log messages.
+
 [download]
 sw = "22asec"
 sh = "22asec"

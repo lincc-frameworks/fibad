@@ -2,6 +2,7 @@
 
 # This example model is taken from the PyTorch CIFAR10 tutorial:
 # https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#define-a-convolutional-neural-network
+import logging
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,8 @@ import torch.optim as optim
 
 # extra long import here to address a circular import issue
 from .model_registry import fibad_model
+
+logger = logging.getLogger(__name__)
 
 
 @fibad_model
@@ -51,7 +54,7 @@ class ExampleCNN(nn.Module):
                 self.optimizer.step()
                 running_loss += loss.item()
                 if i % 2000 == 1999:
-                    print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
+                    logger.info(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
                     running_loss = 0.0
 
     def _criterion(self):

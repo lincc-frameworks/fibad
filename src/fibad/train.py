@@ -1,7 +1,11 @@
+import logging
+
 import torch
 
 from fibad.data_loaders.data_loader_registry import fetch_data_loader_class
 from fibad.models.model_registry import fetch_model_class
+
+logger = logging.getLogger(__name__)
 
 
 def run(config):
@@ -34,4 +38,4 @@ def run(config):
     model.train(data_loader, device=device)
 
     model.save()
-    print("Finished Training")
+    logger.info("Finished Training")
