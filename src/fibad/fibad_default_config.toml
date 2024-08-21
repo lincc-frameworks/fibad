@@ -28,7 +28,7 @@ max_connections = 2
 fits_file = "../hscplay/temp.fits"
 cutout_dir = "../hscplay/cutouts/"
 offset = 0
-num_sources = 10
+num_sources = 1000
 
 [model]
 name = "ExampleAutoencoder"
@@ -40,13 +40,15 @@ weights_filepath = "example_model.pth"
 epochs = 10
 
 [data_loader]
-name = "CifarDataLoader"
+# Name of data loader to use
+name = "HSCDataLoader"
 
 # An example of requesting an external data loader class
 # external_class = "user_package.submodule.ExternalDataLoader"
 
 # Directory path where the data is stored
-path = "./data"
+# path = "./data"
+path = "../hscplay/cutouts/"
 
 # Default PyTorch DataLoader parameters
 batch_size = 4
