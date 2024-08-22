@@ -30,6 +30,16 @@ cutout_dir = "../hscplay/cutouts/"
 offset = 0
 num_sources = 10
 
+# These control the downloader's HTTP requests and retries
+# `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
+retry_wait = 30
+# `retries` How many times to retry a failed HTTP request before moving on to the next one. Default 3 times
+retries = 3
+# `timepout` How long should we wait to get a full HTTP response from the server. Default 3600s (1hr)
+timeout = 3600
+# `chunksize` How many sky location rectangles should we request in a single request. Default is 990
+chunksize = 990
+
 [model]
 name = "ExampleCNN"
 
