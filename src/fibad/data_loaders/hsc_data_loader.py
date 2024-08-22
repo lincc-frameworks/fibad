@@ -3,6 +3,7 @@
 import logging
 import re
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import torch
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 class HSCDataLoader:
     def __init__(self, data_loader_config):
         self.config = data_loader_config
+        self._data_set = self.data_set()
 
     def get_data_loader(self):
         """This is the primary method for this class.
@@ -31,6 +33,10 @@ class HSCDataLoader:
         return self.data_loader(self.data_set())
 
     def data_set(self):
+        # Only construct a data set once per loader object, since it involves a filesystem scan.
+        if self.__dict__.get("_data_set", None) is not None:
+            return self._data_set
+
         self.config.get("path", "./data")
 
         # TODO: What will be a reasonable set of tranformations?
@@ -49,9 +55,23 @@ class HSCDataLoader:
             num_workers=self.config.get("num_workers", 2),
         )
 
+    def shape(self):
+        return self.data_set().shape()
+
 
 class HSCDataSet(Dataset):
-    def __init__(self, path, transform=None):
+    def __init__(self, path: Union[Path, str], transform=None):
+        """Initialize an HSC data set from a path. This involves several filesystem scan operations and will
+        ultimately open and read the header info of every fits file in the given directory
+
+        Parameters
+        ----------
+        path : Union[Path, str]
+            Path or string specifying the directory path to scan. It is expected that all files will
+            be flat in this directory
+        transform : _type_, optional
+            _description_, by default None
+        """
         self.path = path
         self.transform = transform
 
@@ -72,6 +92,10 @@ class HSCDataSet(Dataset):
         # Applying any transforms we were passed.
         crop = CenterCrop(size=(self.cutout_width, self.cutout_height))
         self.transform = Compose([crop, self.transform]) if self.transform is not None else crop
+
+        self.tensors = {}
+
+        logger.info(f"HSC Data set loader has {len(self)} objects")
 
     def _scan_files(self) -> dict[str, dict[str, str]]:
         """Class initialization helper
@@ -189,7 +213,27 @@ class HSCDataSet(Dataset):
 
         return cutout_width, cutout_height
 
+    def shape(self) -> tuple[int, int, int]:
+        """Shape of the individual cutouts this will give to a model
+
+        Returns
+        -------
+        tuple[int,int,int]
+            Tuple describing the dimensions of the 3 dimensional tensor handed back to models
+            The first index is the number of filters
+            The second index is the width of each image
+            The third index is the height of each image
+        """
+        return (self.num_filters, self.cutout_width, self.cutout_height)
+
     def __len__(self) -> int:
+        """Returns number of objects in this loader
+
+        Returns
+        -------
+        int
+            number of objects in this data loader
+        """
         return len(self.object_ids)
 
     def __getitem__(self, idx: int) -> torch.Tensor:
@@ -291,7 +335,8 @@ class HSCDataSet(Dataset):
         self.cutout_height). This is done by reading the file and slicing away any excess pixels at the
         far corners of the image from (0,0).
 
-        The current implementation reads the files every time rather than doing any in-memory caching.
+        The current implementation reads the files once the first time they are accessed, and then
+        keeps them in a dict for future accesses.
 
         Parameters
         ----------
@@ -303,6 +348,10 @@ class HSCDataSet(Dataset):
         torch.Tensor
             A tensor with dimension (self.num_filters, self.cutout_width, self.cutout_height)
         """
+        data_torch = self.tensors.get(object_id, None)
+        if data_torch is not None:
+            return data_torch
+
         # Read all the files corresponding to this object
         data = []
 
@@ -317,4 +366,5 @@ class HSCDataSet(Dataset):
         # Apply our transform stack
         data_torch = self.transform(data_torch) if self.transform is not None else data_torch
 
+        self.tensors[object_id] = data_torch
         return data_torch

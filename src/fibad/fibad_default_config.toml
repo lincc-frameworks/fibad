@@ -28,7 +28,7 @@ max_connections = 2
 fits_file = "../hscplay/temp.fits"
 cutout_dir = "../hscplay/cutouts/"
 offset = 0
-num_sources = 1000
+num_sources = 500
 
 [model]
 name = "ExampleAutoencoder"
@@ -51,9 +51,9 @@ name = "HSCDataLoader"
 path = "../hscplay/cutouts/"
 
 # Default PyTorch DataLoader parameters
-batch_size = 4
+batch_size = 500
 shuffle = true
-num_workers = 2
+num_workers = 10
 
 [predict]
 batch_size = 32

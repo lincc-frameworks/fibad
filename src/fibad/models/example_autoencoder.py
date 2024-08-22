@@ -3,6 +3,7 @@
 # This example model is taken from the autoenocoder tutorial here
 # https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial9/AE_CIFAR10.html
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
@@ -16,30 +17,34 @@ from fibad.models.model_registry import fibad_model
 
 @fibad_model
 class ExampleAutoencoder(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, model_config, shape=(5, 250, 250)):
         super().__init__()
         self.config = model_config
 
         # TODO xcxc config-ize or get from data loader somehow
-        self.image_width = 262
-        self.image_height = 262
+        self.num_input_channels, self.image_width, self.image_height = shape
 
         self.c_hid = self.config.get("base_channel_size", 32)
-        self.num_input_channels = self.config.get("num_input_channels", 5)
         self.latent_dim = self.config.get("latent_dim", 64)
 
         # Calculate how much our convolutional layers will affect the size of final convolution
         # Formula evaluated from: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
         #
-        # If encoder/decoder convolutional params are recalculated, this will need to be rewritten
-        self.conv_end_w = int((int((int((self.image_width - 1) / 2 + 1) - 1) / 2 + 1) - 1) / 2 + 1)
-        self.conv_end_h = int((int((int((self.image_height - 1) / 2 + 1) - 1) / 2 + 1) - 1) / 2 + 1)
+        # If the number of layers are changed this will need to be rewritten.
+        self.conv_end_w = self.conv2d_multi_layer(self.image_width, 3, kernel_size=3, padding=1, stride=2)
+        self.conv_end_h = self.conv2d_multi_layer(self.image_height, 3, kernel_size=3, padding=1, stride=2)
+
         self._init_encoder()
         self._init_decoder()
 
-    def conv2d_output_size(self, input_size, kernel_size, padding=0, stride=1, dilation=1):
+    def conv2d_multi_layer(self, input_size, num_applications, **kwargs) -> int:
+        for _ in range(num_applications):
+            input_size = self.conv2d_output_size(input_size, **kwargs)
+
+        return input_size
+
+    def conv2d_output_size(self, input_size, kernel_size, padding=0, stride=1, dilation=1) -> int:
         # From https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
-        # Uncalled, but a helpful reference.
         numerator = input_size + 2 * padding - dilation * (kernel_size - 1) - 1
         return int((numerator / stride) + 1)
 
@@ -103,9 +108,10 @@ class ExampleAutoencoder(nn.Module):
 
         torch.set_grad_enabled(True)
 
+        print(f"len(trainloder) = {len(trainloader)}")
         for epoch in range(self.config.get("epochs", 2)):
             running_loss = 0.0
-            for i, data in enumerate(trainloader, 0):
+            for batch_num, data in enumerate(trainloader, 0):
                 # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
                 x = data[0] if isinstance(data, tuple) else data
 
@@ -120,8 +126,13 @@ class ExampleAutoencoder(nn.Module):
 
                 self.optimizer.step()
                 running_loss += loss.item()
-                if i % 2000 == 1999:
-                    print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
+
+                # Log every 2000 batches in an epoch, or the end of the epoch
+                # Ensure we get one log message at the end of every epoch even if the
+                # data size is less than 2000.
+                log_freq = np.min([2000, len(trainloader)])
+                if batch_num % log_freq == log_freq - 1:
+                    print(f"[{epoch + 1}, {batch_num + 1}] loss: {running_loss / 2000}")
                     running_loss = 0.0
 
     def _optimizer(self):

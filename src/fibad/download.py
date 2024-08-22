@@ -266,7 +266,7 @@ class DownloadStats:
         self._stat_accumulate("response_size_bytes", response_size)
         self._stat_accumulate("snapshots", chunk_size)
 
-        self._print_stats(logging.DEBUG)
+        self._print_stats(logging.INFO)
 
 
 class FailedChunkCollector:
