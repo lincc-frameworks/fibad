@@ -1,4 +1,7 @@
 """Scaffolding placeholder for prediction code."""
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def run(config):
@@ -11,6 +14,6 @@ def run(config):
         dict
     """
 
-    print("Prending to run prediction...")
-    print("Dumping configuration:")
-    print(config)
+    logger.info("Prending to run prediction...")
+    logger.debug("Dumping configuration:")
+    logger.debug(config)

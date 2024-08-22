@@ -10,6 +10,7 @@ import getpass
 import hashlib
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -64,6 +65,8 @@ export("ANYTRACT")
 ANYTRACT = -1
 export("ALLFILTERS")
 ALLFILTERS = "all"
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -1166,15 +1169,15 @@ def _download(
                     )
                     break
                 except KeyboardInterrupt:
-                    print("Keyboard Interrupt recieved.")
+                    logger.critical("Keyboard Interrupt recieved.")
                     failed_rect_index = i
                     raise
                 except Exception as exception:
                     # Humans count attempts from 1, this loop counts from zero.
-                    print(
+                    logger.warning(
                         f"Attempt {attempt + 1} of {retries} to request rects [{i}:{i+chunksize}] has error:"
                     )
-                    print(exception)
+                    logger.warning(exception)
 
                     # If the final attempt on this chunk fails, we try to call the failed_chunk_hook
                     if attempt + 1 == retries:
@@ -1187,9 +1190,9 @@ def _download(
                     else:
                         backoff = retrywait * (2**attempt)
                         if backoff != 0:
-                            print(f"Retrying in {backoff} seconds... ", end="", flush=True)
+                            logger.info(f"Retrying in {backoff} seconds... ")
                             time.sleep(backoff)
-                        print("Retrying now.")
+                            logger.info("Retrying now")
                         continue
             if onmemory:
                 datalist += cast(list, ret)
@@ -1249,7 +1252,7 @@ def _read_resume_data(rects: list[Rect]) -> int:
     if not os.path.exists(resume_data_filename):
         return 0
 
-    print(f"Resuming failed download from {Path.cwd() / resume_data_filename}")
+    logger.info(f"Resuming failed download from {Path.cwd() / resume_data_filename}")
     with open(resume_data_filename, "r") as f:
         resumedata = toml.load(f)
         if "start_rect_index" not in resumedata or "checksum" not in resumedata:
@@ -1276,7 +1279,7 @@ def _write_resume_data(rects: list[Rect], failed_rect_index: int) -> None:
     failed_rect_index : int
         The index of the beginning of the first chunk of rects to fail.
     """
-    print("\nWriting resume data")
+    logger.info("Writing resume data")
     # Output enough information that we can retry/resume assuming same dir but,
     # whatever was DL'ed in current chunk is corrupt
     resumedata = {
@@ -1285,7 +1288,7 @@ def _write_resume_data(rects: list[Rect], failed_rect_index: int) -> None:
     }
     with open(resume_data_filename, mode="w") as f:
         toml.dump(resumedata, f)
-    print("Done writing resume data")
+    logger.info("Done writing resume data")
 
 
 def _calc_rect_list_checksum(rects: list[Rect]) -> str:

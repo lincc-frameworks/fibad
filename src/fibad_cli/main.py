@@ -22,8 +22,6 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"Runtime config: {args.runtime_config}")
-
     if args.version:
         print(version("fibad"))
         return
