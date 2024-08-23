@@ -151,3 +151,5 @@ _html/
 
 # General purposes data
 data/
+# Common location to stash personal or notebook example config
+fibad_config.toml
