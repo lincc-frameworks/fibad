@@ -73,7 +73,14 @@ def run(config):
     logger.info("Requesting cutouts")
     # pass the rects to the cutout downloader
     download_cutout_group(
-        rects=rects, cutout_dir=config.get("cutout_dir"), user=config["username"], password=config["password"]
+        rects=rects,
+        cutout_dir=config.get("cutout_dir"),
+        user=config["username"],
+        password=config["password"],
+        retrywait=config.get("retry_wait", 30),
+        retries=config.get("retries", 3),
+        timeout=config.get("timeout", 3600),
+        chunksize=config.get("chunk_size", 990),
     )
 
     logger.info("Done")
@@ -368,7 +375,7 @@ class FailedChunkCollector:
             missed.write(self.filepath, overwrite=True, **self.format_kwargs)
 
 
-def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], user, password):
+def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], user, password, **kwargs):
     """Download cutouts to the given directory
 
     Calls downloadCutout.download, so supports long lists of rects beyond the limits of the HSC web API
@@ -383,6 +390,8 @@ def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], us
         Username for HSC's download service to use
     password : string
         Password for HSC's download service to use
+    **kwargs: dict
+        Additonal arguments for downloadCutout.download. See downloadCutout.download for details
     """
 
     with working_directory(Path(cutout_dir)):
@@ -398,5 +407,5 @@ def download_cutout_group(rects: list[dC.Rect], cutout_dir: Union[str, Path], us
                 request_hook=stats_hook,
                 failed_chunk_hook=failed_chunk_hook,
                 resume=True,
-                chunksize=10,
+                **kwargs,
             )
