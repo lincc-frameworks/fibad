@@ -28,7 +28,7 @@ def run(config):
     cuda_available = torch.cuda.is_available()
     mps_available = torch.backends.mps.is_available()
 
-    # We don't expect mps (Apple's Metal backend) and cuda (Nvidia's backend to ever be)
+    # We don't expect mps (Apple's Metal backend) and cuda (Nvidia's backend) to ever be
     # both available on the same system.
     device_str = "cuda:0" if cuda_available else "cpu"
     device_str = "mps" if mps_available else "cpu"
