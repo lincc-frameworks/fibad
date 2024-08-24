@@ -19,6 +19,7 @@ dependencies = [
     "astropy", # Used to load fits files of sources to query HSC cutout server
     "toml", # Used to load configuration files as dictionaries
     "torch", # Used for CNN model and in train.py
+    "torchvision", # Used in data loader and example autoencoder
 ]
 
 [project.scripts]
