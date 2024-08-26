@@ -108,7 +108,7 @@ class ExampleAutoencoder(nn.Module):
 
         torch.set_grad_enabled(True)
 
-        print(f"len(trainloder) = {len(trainloader)}")
+        # print(f"len(trainloder) = {len(trainloader)}")
         for epoch in range(self.config.get("epochs", 2)):
             running_loss = 0.0
             for batch_num, data in enumerate(trainloader, 0):

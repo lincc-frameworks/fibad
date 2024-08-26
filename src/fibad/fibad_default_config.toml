@@ -59,6 +59,13 @@ name = "HSCDataLoader"
 # Directory path where the data is stored
 path = "./data"
 
+# Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
+#
+# If not provided, the default is to scan the directory for the smallest dimensioned files, and use 
+# those pixel dimensions as the crop size.
+#
+#crop_to = [100,100]
+
 # Default PyTorch DataLoader parameters
 batch_size = 500
 shuffle = true
