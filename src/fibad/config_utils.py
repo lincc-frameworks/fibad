@@ -4,6 +4,7 @@ from typing import Union
 import toml
 
 DEFAULT_CONFIG_FILEPATH = Path(__file__).parent.resolve() / "fibad_default_config.toml"
+DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
 
 
 def get_runtime_config(
@@ -37,6 +38,10 @@ def get_runtime_config(
 
     with open(default_config_filepath, "r") as f:
         default_runtime_config = toml.load(f)
+
+    # If a named config exists in cwd, and no config specified on cmdline, use cwd.
+    if runtime_config_filepath is None and DEFAULT_USER_CONFIG_FILEPATH.exists():
+        runtime_config_filepath = DEFAULT_USER_CONFIG_FILEPATH
 
     if runtime_config_filepath is not None:
         if not runtime_config_filepath.exists():
