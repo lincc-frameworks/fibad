@@ -27,6 +27,21 @@ class Fibad:
         setup_logging : bool, optional
             Logging setup for a fibad object is global loggers named "fibad.*" If you want to turn off
             logging config for "fibad.*" python loggers, pass False here. By default True.
+
+            You may want to set this to True if:
+            - You have multiple Fibad objects in your application or notebook, and would like to control
+              which of their logging configs is used globally. By creating one of your objects with
+              setup_logging=True and the others with setup_logging=False, the single object created with
+              setup_logging=True will control where the log is emitted to and what the threshold level is.
+            - You have another library which needs overall control over python logging's config, and you
+              do not want fibad to alter any global logging config. In this case you should always pass
+              setup_logging=False. Fibad will stil send logs into python logging; however, the other
+              system will be responsible for where those logs are emitted, and what the threshold level
+              is.
+
+            You may want to leave the default of setup_logging=True if:
+            - You have a single Fibad object in use at any time. This is true in most notebook like
+              environments.
         """
         self.config = get_runtime_config(runtime_config_filepath=config_file)
 
