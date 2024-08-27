@@ -224,12 +224,12 @@ class DownloadStats:
         total_dur_s = (self.stats["request_duration"] + self.stats["response_duration"]).total_seconds()
 
         resp_s = self.stats["response_duration"].total_seconds()
-        down_rate_mb_s = (self.stats["response_size_bytes"] / (1024**2)) / resp_s
+        down_rate_mb_s = (self.stats["response_size_bytes"] / (1024**2)) / resp_s if resp_s != 0 else 0
 
         req_s = self.stats["request_duration"].total_seconds()
-        up_rate_mb_s = (self.stats["request_size_bytes"] / (1024**2)) / req_s
+        up_rate_mb_s = (self.stats["request_size_bytes"] / (1024**2)) / req_s if req_s != 0 else 0
 
-        snapshot_rate = self.stats["snapshots"] / total_dur_s
+        snapshot_rate = self.stats["snapshots"] / total_dur_s if total_dur_s != 0 else 0
 
         stats_message = f"Stats: Duration: {total_dur_s:.2f} s, "
         stats_message += f"Files: {self.stats['snapshots']}, "
