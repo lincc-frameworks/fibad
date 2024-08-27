@@ -66,6 +66,13 @@ path = "./data"
 #
 #crop_to = [100,100]
 
+# Limit data loader to only particular filters when there are more in the data set.
+#
+# When not provided, the number of filters will be automatically gleaned from the data set.
+# Defaults to not provided.
+#
+#filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+
 # Default PyTorch DataLoader parameters
 batch_size = 500
 shuffle = true

@@ -285,3 +285,48 @@ def test_prune_size(caplog):
         # We should warn that we are dropping objects and the reason
         assert "Dropping object" in caplog.text
         assert "too small" in caplog.text
+
+
+def test_partial_filter(caplog):
+    """Test to ensure when we only load some of the filters, only those filters end up in the dataset"""
+    caplog.set_level(logging.WARNING)
+    test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
+    with FakeFitsFS(test_files):
+        a = HSCDataSet("thispathdoesnotexist", filters=["HSC-G", "HSC-R"])
+
+        # 10 objects should load
+        assert len(a) == 10
+
+        # The number of filters, and image dimensions should be correct
+        assert a.shape() == (2, 262, 263)
+
+        # No warnings should be printed
+        assert caplog.text == ""
+
+
+def test_partial_filter_prune_warn_1_percent(caplog):
+    """Test to ensure when a the user supplies a filter list and >1% of loaded objects are
+    missing a filter, that is a warning and that the resulting dataset drops the objects that
+    are missing filters.
+    """
+    caplog.set_level(logging.WARNING)
+
+    # Generate two files which
+    test_files = generate_files(num_objects=98, num_filters=3, shape=(100, 100))
+    # Object 101 is missing the HSC-G and HSC-I filters, we only provide the R filter
+    test_files["00000000000000101_missing_g_HSC-R.fits"] = (100, 100)
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet("thispathdoesnotexist", filters=["HSC-R", "HSC-I"])
+
+        # We should have the correct number of objects
+        assert len(a) == 98
+
+        # Object 101 should not be loaded
+        assert "00000000000000101" not in a
+
+        # We should Error log because greater than 5% of the objects were pruned
+        assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
+
+        # We should warn that we dropped an object explicitly
+        assert "Dropping object" in caplog.text
