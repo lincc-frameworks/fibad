@@ -149,7 +149,8 @@ _html/
 # Project initialization script
 .initialize_new_project.sh
 
-# General purposes data
+# Default save locations for fibad
 data/
+example_model.pth
 # Common location to stash personal or notebook example config
 fibad_config.toml

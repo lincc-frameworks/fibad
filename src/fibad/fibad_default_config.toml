@@ -28,10 +28,20 @@ max_connections = 2
 fits_file = "../hscplay/temp.fits"
 cutout_dir = "../hscplay/cutouts/"
 offset = 0
-num_sources = 10
+num_sources = 500
+
+# These control the downloader's HTTP requests and retries
+# `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
+retry_wait = 30
+# `retries` How many times to retry a failed HTTP request before moving on to the next one. Default 3 times
+retries = 3
+# `timepout` How long should we wait to get a full HTTP response from the server. Default 3600s (1hr)
+timeout = 3600
+# `chunksize` How many sky location rectangles should we request in a single request. Default is 990
+chunksize = 990
 
 [model]
-name = "ExampleCNN"
+name = "ExampleAutoencoder"
 
 # An example of requesting an external model class
 # external_class = "user_package.submodule.ExternalModel"
@@ -40,7 +50,8 @@ weights_filepath = "example_model.pth"
 epochs = 10
 
 [data_loader]
-name = "CifarDataLoader"
+# Name of data loader to use
+name = "HSCDataLoader"
 
 # An example of requesting an external data loader class
 # external_class = "user_package.submodule.ExternalDataLoader"
@@ -49,9 +60,9 @@ name = "CifarDataLoader"
 path = "./data"
 
 # Default PyTorch DataLoader parameters
-batch_size = 4
+batch_size = 500
 shuffle = true
-num_workers = 2
+num_workers = 10
 
 [predict]
 batch_size = 32
