@@ -149,7 +149,7 @@ class HSCDataSet(Dataset):
     def _prune_objects(self, filters_ref: list[str]) -> list[str]:
         """Class initialization helper. Prunes objects from the list of objects.
 
-        1) Removes any objects which do not ahve all the filters specified in filters_ref
+        1) Removes any objects which do not have all the filters specified in filters_ref
         2) If a cutout_shape was provided in the constructor, prunes files that are too small
            for the chosen cutout size
 
@@ -210,7 +210,7 @@ class HSCDataSet(Dataset):
             return hdul[1].shape
 
     def _check_file_dimensions(self) -> tuple[int, int]:
-        """Class initialization helper. Find the minimal pixel size that all images can support
+        """Class initialization helper. Find the maximal pixel size that all images can support
 
         It is assumed that all the cutouts will be of very similar size; however, HSC's cutout
         server does not return exactly the same number of pixels for every query, even when it
@@ -227,7 +227,7 @@ class HSCDataSet(Dataset):
             The minimum width and height in pixels of the entire dataset. In other words: the maximal image
             size in pixels that can be generated from ALL cutout images via cropping.
         """
-        # Find the minimum cutout size that all images can support
+        # Find the makximal cutout size that all images can support
         all_widths = [shape[0] for shape_list in self.dims.values() for shape in shape_list]
         cutout_width = np.min(all_widths)
 

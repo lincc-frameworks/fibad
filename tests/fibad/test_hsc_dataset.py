@@ -159,6 +159,9 @@ def test_prune_warn_1_percent(caplog):
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
 
+        # We should warn that we dropped an object explicitly
+        assert "Dropping object" in caplog.text
+
 
 def test_prune_error_5_percent(caplog):
     """Test to ensure when >5% of loaded objects are missing a filter, that is an error
@@ -232,7 +235,7 @@ def test_crop_warn_2px_larger(caplog):
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
 
-        # No warnings should be printed since we're within 1px of the mean size
+        # We should warn that images differ
         assert "Some images differ" in caplog.text
 
 
@@ -258,7 +261,7 @@ def test_crop_warn_2px_smaller(caplog):
         assert len(a) == 70
         assert a.shape() == (5, 98, 98)
 
-        # No warnings should be printed since we're within 1px of the mean size
+        # We should warn that images differ
         assert "Some images differ" in caplog.text
 
 
@@ -279,6 +282,6 @@ def test_prune_size(caplog):
         assert len(a) == 20
         assert a.shape() == (5, 99, 99)
 
-        # No warnings should be printed since we're within 1px of the mean size
+        # We should warn that we are dropping objects and the reason
         assert "Dropping object" in caplog.text
         assert "too small" in caplog.text
