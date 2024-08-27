@@ -12,6 +12,9 @@ class CifarDataLoader:
     def __init__(self, data_loader_config):
         self.config = data_loader_config
 
+    def shape(self):
+        return (3, 32, 32)
+
     def get_data_loader(self):
         """This is the primary method for this class.
 
