@@ -19,7 +19,7 @@ dependencies = [
     "astropy", # Used to load fits files of sources to query HSC cutout server
     "toml", # Used to load configuration files as dictionaries
     "torch", # Used for CNN model and in train.py
-    "torchvision", # Used in data loader and example autoencoder
+    "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
 ]
 
 [project.scripts]
@@ -31,7 +31,6 @@ fibad = "fibad_cli.main:main"
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
 examples = [
-    "torchvision", # Used for CNN model data set
 ]
 
 dev = [
