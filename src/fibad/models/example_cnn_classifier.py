@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
 
-# extra long import here to address a circular import issue
 from .model_registry import fibad_model
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @fibad_model
 class ExampleCNN(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, model_config, shape):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -56,6 +55,19 @@ class ExampleCNN(nn.Module):
                 if i % 2000 == 1999:
                     logger.info(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
                     running_loss = 0.0
+
+    # Creating a train_step function to be used with pytorch-ignite
+    # ! figure out how to pass `device` correctly!!! It shouldn't be in the method signature
+    # ! I just put it there to pass linting.
+    def train_step(self, batch, device):
+        inputs, labels = batch
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        self.optimizer.zero_grad()
+        outputs = self(inputs)
+        loss = self.criterion(outputs, labels)
+        loss.backward()
+        self.optimizer.step()
 
     def _criterion(self):
         return nn.CrossEntropyLoss()

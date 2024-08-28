@@ -41,7 +41,7 @@ timeout = 3600
 chunksize = 990
 
 [model]
-name = "ExampleAutoencoder"
+name = "ExampleCNN"
 
 # An example of requesting an external model class
 # external_class = "user_package.submodule.ExternalModel"
@@ -51,7 +51,7 @@ epochs = 10
 
 [data_loader]
 # Name of data loader to use
-name = "HSCDataLoader"
+name = "CifarDataLoader"
 
 # An example of requesting an external data loader class
 # external_class = "user_package.submodule.ExternalDataLoader"
