@@ -49,6 +49,7 @@ class HSCDataLoader:
             self.config.get("path", "./data"),
             transform=transform,
             cutout_shape=self.config.get("crop_to", None),
+            filters=self.config.get("filters", None),
         )
 
     def data_loader(self, data_set):
@@ -65,7 +66,12 @@ class HSCDataLoader:
 
 class HSCDataSet(Dataset):
     def __init__(
-        self, path: Union[Path, str], *, transform=None, cutout_shape: Optional[tuple[int, int]] = None
+        self,
+        path: Union[Path, str],
+        *,
+        transform=None,
+        cutout_shape: Optional[tuple[int, int]] = None,
+        filters: Optional[list[str]] = None,
     ):
         """Initialize an HSC data set from a path. This involves several filesystem scan operations and will
         ultimately open and read the header info of every fits file in the given directory
@@ -78,19 +84,24 @@ class HSCDataSet(Dataset):
         transform : torchvision.transforms.v2.Transform, optional
             Transformation to apply to every image in the dataset, by default None
         cutout_shape: tuple[int,int], optional
-            Forces all cutouts to be a particular pixel size. RuntimeError is raised if this size is larger
-            than the pixel dimension of any cutout in the dataset.
+            Forces all cutouts to be a particular pixel size. If this size is larger than the pixel dimension
+            of particular cutouts on the filesystem, those objects are dropped from the data set.
+        filters: list[str], optional
+            Forces all cutout tensors provided to be from the list of HSC filters provided. If provided, any
+            cutouts which do not have fits files corresponding to every filter in the list will be dropped
+            from the data set. Defaults to None. If not provided, the filters available on the filesystem for
+            the first object in the directory will be used.
         """
         self.path = path
         self.transform = transform
 
-        self.files = self._scan_file_names()
+        self.files = self._scan_file_names(filters)
         self.dims = self._scan_file_dimensions()
 
-        # We choose the first file in the dict as the prototypical set of filters
-        # Any objects lacking this full set of filters will be pruned by
-        # _prune_objects
-        filters_ref = list(list(self.files.values())[0])
+        # If no filters provided, we choose the first file in the dict as the prototypical set of filters
+        # Any objects lacking this full set of filters will be pruned by _prune_objects
+        filters_ref = list(list(self.files.values())[0]) if filters is None else filters
+
         self.num_filters = len(filters_ref)
 
         self.cutout_shape = cutout_shape
@@ -109,8 +120,14 @@ class HSCDataSet(Dataset):
 
         logger.info(f"HSC Data set loader has {len(self)} objects")
 
-    def _scan_file_names(self) -> dict[str, dict[str, str]]:
+    def _scan_file_names(self, filters: Optional[list[str]] = None) -> dict[str, dict[str, str]]:
         """Class initialization helper
+
+        Parameters
+        ----------
+        filters : list[str], optional
+            If passed, only these filters will be scanned for from the data files. Defaults to None, which
+            corresponds to the standard set of filters ["HSC-G","HSC-R","HSC-I","HSC-Z","HSC-Y"].
 
         Returns
         -------
@@ -118,11 +135,21 @@ class HSCDataSet(Dataset):
             Nested dictionary where the first level maps object_id -> dict, and the second level maps
             filter_name -> file name. Corresponds to self.files
         """
+
+        object_id_regex = r"[0-9]{17}"
+        filter_regex = r"HSC-[GRIZY]" if filters is None else "|".join(filters)
+        full_regex = f"({object_id_regex})_.*_({filter_regex}).fits"
+
         files = {}
         # Go scan the path for object ID's so we have a list.
         for filepath in Path(self.path).glob("[0-9]*.fits"):
             filename = filepath.name
-            m = re.match(r"([0-9]{17})_.*\_(HSC-[GRIZY]).fits", filename)
+            m = re.match(full_regex, filename)
+
+            # Skip files that don't match the pattern.
+            if m is None:
+                continue
+
             object_id = m[1]
             filter = m[2]
 
