@@ -27,6 +27,11 @@ class ExampleCNN(nn.Module):
 
         self.config = model_config
 
+        # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
+        # but we define them as methods as a way to allow for more flexibility in the future.
+        self.optimizer = self._optimizer()
+        self.criterion = self._criterion()
+
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
@@ -36,38 +41,28 @@ class ExampleCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-    def train(self, trainloader, device=None):
-        self.optimizer = self._optimizer()
-        self.criterion = self._criterion()
+    def train_step(self, batch):
+        """This function contains the logic for a single training step. i.e. the
+        contents of the inner loop of a ML training process.
 
-        for epoch in range(self.config.get("epochs", 2)):
-            running_loss = 0.0
-            for i, data in enumerate(trainloader, 0):
-                inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
+        Parameters
+        ----------
+        batch : tuple
+            A tuple containing the inputs and labels for the current batch.
 
-                self.optimizer.zero_grad()
-                outputs = self(inputs)
-                loss = self.criterion(outputs, labels)
-                loss.backward()
-                self.optimizer.step()
-                running_loss += loss.item()
-                if i % 2000 == 1999:
-                    logger.info(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 2000}")
-                    running_loss = 0.0
-
-    # Creating a train_step function to be used with pytorch-ignite
-    # ! figure out how to pass `device` correctly!!! It shouldn't be in the method signature
-    # ! I just put it there to pass linting.
-    def train_step(self, batch, device):
+        Returns
+        -------
+        Current loss value
+            The loss value for the current batch.
+        """
         inputs, labels = batch
-        inputs, labels = inputs.to(device), labels.to(device)
 
         self.optimizer.zero_grad()
         outputs = self(inputs)
         loss = self.criterion(outputs, labels)
         loss.backward()
         self.optimizer.step()
+        return loss.item()
 
     def _criterion(self):
         return nn.CrossEntropyLoss()

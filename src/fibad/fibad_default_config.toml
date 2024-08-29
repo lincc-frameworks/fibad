@@ -47,7 +47,7 @@ name = "ExampleCNN"
 # external_class = "user_package.submodule.ExternalModel"
 
 weights_filepath = "example_model.pth"
-epochs = 10
+epochs = 2
 
 [data_loader]
 # Name of data loader to use
@@ -60,9 +60,9 @@ name = "CifarDataLoader"
 path = "./data"
 
 # Default PyTorch DataLoader parameters
-batch_size = 500
+batch_size = 128
 shuffle = true
-num_workers = 10
+num_workers = 2
 
 [predict]
 batch_size = 32
