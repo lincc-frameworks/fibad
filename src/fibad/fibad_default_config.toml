@@ -22,11 +22,9 @@ sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
-username = "mtauraso@local"
-password = "cCw+nX53lmNLHMy+JbizpH/dl4t7sxljiNm6a7k1"
 max_connections = 2
-fits_file = "../hscplay/temp.fits"
-cutout_dir = "../hscplay/cutouts/"
+fits_file = "./catalog.fits"
+cutout_dir = "./data"
 offset = 0
 num_sources = 500
 
