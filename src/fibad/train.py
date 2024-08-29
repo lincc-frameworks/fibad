@@ -1,6 +1,7 @@
 import logging
 
 import ignite.distributed as idist
+import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine
 
@@ -60,15 +61,43 @@ def _train_data_loader(data_set, config):
 
 
 def _create_trainer(model):
+    """This function is originally copied from here:
+    https://github.com/pytorch-ignite/examples/blob/main/tutorials/intermediate/cifar10-distributed.py#L164
+
+    It was initially trimmed down to make it easier to understand.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The model to train.
+
+    Returns
+    -------
+    pytorch-ignite.Engine
+        Engine object that will be used to train the model.
+    """
     device = idist.device()
     print(f"Working with device: {device}")
     model = idist.auto_model(model)
 
+    # Extract the train_step from the model, which is sometimes wrapped.
+    if type(model) == torch.nn.parallel.DistributedDataParallel:
+        inner_train_step = model.module.train_step
+    elif type(model) == torch.nn.parallel.DataParallel:
+        inner_train_step = model.module.train_step
+    else:
+        inner_train_step = model.train_step
+
     def train_step(engine, batch):
+        # move data to the appropriate device
         batch = tuple(i.to(device) for i in batch)
-        model.train_step(engine, batch)
+
+        # call the train_step method defined in the model class
+        inner_train_step(batch)
 
     trainer = Engine(train_step)
+
+    # ~ Temporarily use a progress bar until we have for informative logging
     ProgressBar().attach(trainer)
 
     return trainer
