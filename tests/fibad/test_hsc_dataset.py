@@ -51,7 +51,9 @@ class FakeFitsFS:
             patcher.stop()
 
 
-def generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0) -> dict:
+def generate_files(
+    num_objects=10, num_filters=5, shape=(100, 100), offset=0, infill_str="all_filters"
+) -> dict:
     """Generates a dictionary to pass in to FakeFitsFS.
 
     This generates a dict from filename->shape tuple for a set of uniform fake fits files
@@ -72,6 +74,8 @@ def generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0) ->
         What are the dimensions of the image in each fits file, by default (100,100)
     offset : int, optional
         What is the first object_id to start with, by default 0
+    infill_str: str, optional
+        What to put in the fake filename in between the object ID and filter name. By default "all_filters"
 
     Returns
     -------
@@ -82,7 +86,7 @@ def generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0) ->
     test_files = {}
     for object_id in range(offset, num_objects + offset):
         for filter in filters:
-            test_files[f"{object_id:017d}_all_filters_{filter}.fits"] = shape
+            test_files[f"{object_id:017d}_{infill_str}_{filter}.fits"] = shape
 
     return test_files
 
@@ -104,6 +108,34 @@ def test_load(caplog):
         assert caplog.text == ""
 
 
+def test_load_duplicate(caplog):
+    """Test to ensure duplicate fits files that reference the same object id and filter create the
+    appropriate error messages.
+    """
+    caplog.set_level(logging.ERROR)
+    test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
+    duplicate_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263), infill_str="duplicate")
+    test_files.update(duplicate_files)
+    with FakeFitsFS(test_files):
+        a = HSCDataSet("thispathdoesnotexist")
+
+        # Only 10 objects should load
+        assert len(a) == 10
+
+        # The number of filters, and image dimensions should be correct
+        assert a.shape() == (5, 262, 263)
+
+        # We should get duplicate object errors
+        assert "Duplicate object ID" in caplog.text
+
+        # We should get errors that include the duplicate filenames
+        assert "_duplicate_" in caplog.text
+
+        # The duplicate files should not be in the data set
+        for filepath in a._all_files():
+            assert "_duplicate_" not in str(filepath)
+
+
 def test_prune_warn_1_percent(caplog):
     """Test to ensure when >1% of loaded objects are missing a filter, that is a warning
     and that the resulting dataset drops the objects that are missing filters
@@ -122,10 +154,13 @@ def test_prune_warn_1_percent(caplog):
         assert len(a) == 98
 
         # Object 2 should not be loaded
-        assert "00000000000000101" not in a.object_ids
+        assert "00000000000000101" not in a
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
+
+        # We should warn that we dropped an object explicitly
+        assert "Dropping object" in caplog.text
 
 
 def test_prune_error_5_percent(caplog):
@@ -146,7 +181,7 @@ def test_prune_error_5_percent(caplog):
         assert len(a) == 18
 
         # Object 20 should not be loaded
-        assert "00000000000000020" not in a.object_ids
+        assert "00000000000000020" not in a
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 5% of objects in the data directory were pruned." in caplog.text
@@ -200,7 +235,7 @@ def test_crop_warn_2px_larger(caplog):
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
 
-        # No warnings should be printed since we're within 1px of the mean size
+        # We should warn that images differ
         assert "Some images differ" in caplog.text
 
 
@@ -226,5 +261,27 @@ def test_crop_warn_2px_smaller(caplog):
         assert len(a) == 70
         assert a.shape() == (5, 98, 98)
 
-        # No warnings should be printed since we're within 1px of the mean size
+        # We should warn that images differ
         assert "Some images differ" in caplog.text
+
+
+def test_prune_size(caplog):
+    """Test to ensure images that are too small will be pruned from the data set when a custom size is
+    passed."""
+    caplog.set_level(logging.WARNING)
+    test_files = {}
+    test_files.update(generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0))
+    # Add some images with dimensions 1 px larger
+    test_files.update(generate_files(num_objects=10, num_filters=5, shape=(101, 101), offset=20))
+    # Add some images with dimensions 2 px smaller
+    test_files.update(generate_files(num_objects=10, num_filters=5, shape=(98, 98), offset=30))
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet("thispathdoesnotexist", cutout_shape=(99, 99))
+
+        assert len(a) == 20
+        assert a.shape() == (5, 99, 99)
+
+        # We should warn that we are dropping objects and the reason
+        assert "Dropping object" in caplog.text
+        assert "too small" in caplog.text
