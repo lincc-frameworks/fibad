@@ -1,9 +1,8 @@
 import logging
 
-import ignite.distributed as idist
 import torch
-from ignite.contrib.handlers import ProgressBar
-from ignite.engine import Engine
+from ignite import distributed as idist
+from ignite.engine import Engine, Events
 
 from fibad.data_loaders.data_loader_registry import fetch_data_loader_class
 from fibad.models.model_registry import fetch_model_class
@@ -64,7 +63,7 @@ def _create_trainer(model):
     """This function is originally copied from here:
     https://github.com/pytorch-ignite/examples/blob/main/tutorials/intermediate/cifar10-distributed.py#L164
 
-    It was initially trimmed down to make it easier to understand.
+    It was substantially trimmed down to make it easier to understand.
 
     Parameters
     ----------
@@ -76,11 +75,12 @@ def _create_trainer(model):
     pytorch-ignite.Engine
         Engine object that will be used to train the model.
     """
+    # Get currently available device for training, and set the model to use it
     device = idist.device()
-    print(f"Working with device: {device}")
+    # logger.info(f"Training on device: {device}")
     model = idist.auto_model(model)
 
-    # Extract the train_step from the model, which is sometimes wrapped.
+    # Extract `train_step` from model, which can be wrapped after idist.auto_model(...)
     if type(model) == torch.nn.parallel.DistributedDataParallel:
         inner_train_step = model.module.train_step
     elif type(model) == torch.nn.parallel.DataParallel:
@@ -88,16 +88,31 @@ def _create_trainer(model):
     else:
         inner_train_step = model.train_step
 
+    # Wrap the `train_step` so that batch data is moved to the appropriate device
     def train_step(engine, batch):
         # move data to the appropriate device
         batch = tuple(i.to(device) for i in batch)
+        return inner_train_step(batch)
 
-        # call the train_step method defined in the model class
-        inner_train_step(batch)
-
+    # Create the ignite `Engine` object
     trainer = Engine(train_step)
 
-    # ~ Temporarily use a progress bar until we have for informative logging
-    ProgressBar().attach(trainer)
+    @trainer.on(Events.STARTED)
+    def log_training_start(trainer):
+        logger.info(f"Training model on device: {device}")
+        logger.info(f"Total epochs: {trainer.state.max_epochs}")
+
+    @trainer.on(Events.EPOCH_STARTED)
+    def log_epoch_start(trainer):
+        logger.debug(f"Starting epoch {trainer.state.epoch}")
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def log_training_loss(trainer):
+        logger.info(f"Epoch {trainer.state.epoch} run time: {trainer.state.times['EPOCH_COMPLETED']:.2f}[s]")
+        logger.info(f"Epoch {trainer.state.epoch} metrics: {trainer.state.output}")
+
+    @trainer.on(Events.COMPLETED)
+    def log_total_time(trainer):
+        logger.info(f"Total training time: {trainer.state.times['COMPLETED']:.2f}[s]")
 
     return trainer

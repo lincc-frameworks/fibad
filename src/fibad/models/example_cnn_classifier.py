@@ -62,7 +62,7 @@ class ExampleCNN(nn.Module):
         loss = self.criterion(outputs, labels)
         loss.backward()
         self.optimizer.step()
-        return loss.item()
+        return {"loss": loss.item()}
 
     def _criterion(self):
         return nn.CrossEntropyLoss()
