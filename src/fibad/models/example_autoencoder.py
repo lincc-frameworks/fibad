@@ -37,6 +37,9 @@ class ExampleAutoencoder(nn.Module):
         self._init_encoder()
         self._init_decoder()
 
+        # create this here for use in `train_step`, to avoid recreating at each step.
+        self.optimizer = self._optimizer()
+
     def conv2d_multi_layer(self, input_size, num_applications, **kwargs) -> int:
         for _ in range(num_applications):
             input_size = self.conv2d_output_size(input_size, **kwargs)
@@ -134,6 +137,34 @@ class ExampleAutoencoder(nn.Module):
                 if batch_num % log_freq == log_freq - 1:
                     print(f"[{epoch + 1}, {batch_num + 1}] loss: {running_loss / 2000}")
                     running_loss = 0.0
+
+    def train_step(self, batch):
+        """This function contains the logic for a single training step. i.e. the
+        contents of the inner loop of a ML training process.
+
+        Parameters
+        ----------
+        batch : tuple
+            A tuple containing the inputs and labels for the current batch.
+
+        Returns
+        -------
+        Current loss value
+            The loss value for the current batch.
+        """
+        x = batch[0] if isinstance(batch, tuple) else batch
+
+        x_hat = self.forward(x)
+        loss = F.mse_loss(x, x_hat, reduction="none")
+        loss = loss.sum(dim=[1, 2, 3]).mean(dim=[0])
+
+        self.optimizer.zero_grad()
+
+        loss.backward()
+
+        self.optimizer.step()
+
+        return {"loss": loss.item()}
 
     def _optimizer(self):
         return optim.Adam(self.parameters(), lr=1e-3)
