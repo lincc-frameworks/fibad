@@ -126,6 +126,7 @@ class Downloader:
         download_threads = []
 
         try:
+            logger.info(f"Downloading cutouts to {cutout_path}")
             # downloadCutouts.py works with relative paths so we set cwd here.
             # Since cwd is process-level, and our threads all share this state, we need to
             # keep cwd the same until all threads finish.
@@ -253,6 +254,22 @@ resuming the correct download? Deleting the manifest and cutout files will start
         If a manifest file is present from an earlier download, this function will read that manifest in,
         and include the entire content of that manifest in addition to the manifests passed in.
 
+        The format of the manifest file has the following columns
+
+        object_id: The object ID from the original catalog
+        filename: The file name where the file can be found OR the string "Attempted" indicating the download
+                  did not complete successfully.
+        tract: The HSC tract ID number this either comes from the catalog or is the tract ID returned by the
+               cutout server for downloaded files.
+
+        ra: Right ascension in degrees of the center of the cutout box
+        dec: Declination in degrees of the center of the cutout box
+        filter: The name of the filter requested
+        sw: Semi-width of the cutout box in degrees
+        sh: Semi-height of the cutout box in degrees
+        rerun: The data release in use e.g. pdr3_wide
+        type: coadd, warp, or other values allowed by the HSC docs
+
         Parameters
         ----------
         thread_manifests : list[dict[dC.Rect,str]]
@@ -294,6 +311,8 @@ resuming the correct download? Deleting the manifest and cutout files will start
 
         manifest_table = Table(columns)
         manifest_table.write(file_path / Downloader.MANIFEST_FILE_NAME, overwrite=True, format="fits")
+
+        logger.info("Finished writing download manifest")
 
     @staticmethod
     def read_manifest(file_path: Path) -> dict[dC.Rect, str]:
@@ -457,6 +476,12 @@ resuming the correct download? Deleting the manifest and cutout files will start
             args["name"] = f"{location['object_id']}_{{type}}_{{ra:.5f}}_{{dec:+.5f}}_{{tract}}_{{filter}}"
             rect = dC.Rect.create(default=default, **args)
             rects.append(rect)
+
+        # We sort rects here so they end up tract,ra,dec ordered across all requests made in all threads
+        # Threads do their own sorting prior to each chunked request in downloadCutout.py; however
+        # sorting at this stage will allow a greater number of rects that are co-located in the sky
+        # to end up in the same thread and same chunk.
+        rects.sort()
 
         return rects
 
