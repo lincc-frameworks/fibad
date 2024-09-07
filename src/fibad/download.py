@@ -1,11 +1,10 @@
-import contextlib
 import datetime
 import itertools
 import logging
-import os
+import time
 import urllib.request
 from pathlib import Path
-from threading import Thread
+from threading import Lock, Thread
 from typing import Optional, Union
 
 from astropy.table import Table, hstack
@@ -15,36 +14,156 @@ import fibad.downloadCutout.downloadCutout as dC
 logger = logging.getLogger(__name__)
 
 
-# TODO: Alter downloadCutout.py such that this is unnecessary
-@contextlib.contextmanager
-def working_directory(path: Path):
-    """
-    Context Manager to change our working directory.
-    Supports downloadCutouts which always writes to cwd.
+class DownloadStats:
+    """Subsytem for keeping statistics on downloads:
 
-    Parameters
-    ----------
-    path : Path
-        Path that we change `Path.cwd()` while we are active.
-    """
-    old_cwd = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(old_cwd)
+    Accumulates time spent on request, responses as well as sizes for same and number of snapshots
 
-
-# TODO: Remove this in favor of itertools.batched() when we no longer support python < 3.12.
-def _batched(iterable, n):
-    """Brazenly copied and pasted from the python 3.12 documentation.
-    This is a dodgy version of a new itertools function in Python 3.12 called itertools.batched()
+    Can be used as a context manager for pretty printing.
     """
-    if n < 1:
-        raise ValueError("n must be at least one")
-    iterator = iter(iterable)
-    while batch := tuple(itertools.islice(iterator, n)):
-        yield batch
+
+    def __init__(self, print_interval_s=30):
+        self.lock = Lock()
+        self.stats = {
+            "request_duration": datetime.timedelta(),  # Time from request sent to first byte from the server
+            "response_duration": datetime.timedelta(),  # Total time spent recieving and processing a response
+            "request_size_bytes": 0,  # Total size of all requests
+            "response_size_bytes": 0,  # Total size of all responses
+            "snapshots": 0,  # Number of fits snapshots downloaded
+        }
+
+        # Reference count active threads and whether we've started
+        self.active_threads = 0
+        self.num_threads = 0
+        self.data_start = None
+
+        # How often the watcher thread prints (seconds)
+        self.print_interval_s = print_interval_s
+
+        # Start our watcher thread to print stats to the log
+        self.watcher_thread = Thread(
+            target=self._watcher_thread, name="stats watcher thread", args=(logging.INFO,), daemon=True
+        )
+        self.watcher_thread.start()
+
+    def __enter__(self):
+        # Count how many threads are using stats
+        with self.lock:
+            self.active_threads += 1
+            self.num_threads += 1
+
+        return self.hook
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Count how many threads are using stats
+        with self.lock:
+            self.active_threads -= 1
+
+    def _stat_accumulate(self, name: str, value: Union[int, datetime.timedelta]):
+        """Accumulate a sum into the global stats dict
+
+        Parameters
+        ----------
+        name : str
+            Name of the stat. Assumed to exist in the dict already.
+        value : Union[int, datetime.timedelta]
+            How much time or count to add to the stat
+        """
+        self.stats[name] += value
+
+    def _watcher_thread(self, log_level):
+        # Simple polling loop to print
+        while self.active_threads != 0 or not self.data_start:
+            if self.data_start:
+                self._print_stats(log_level)
+            time.sleep(self.print_interval_s)
+
+    def _print_stats(self, log_level):
+        """Print the accumulated stats including bandwidth calculated from duration and sizes
+
+        This prints out multiple lines with `\r` at the end in order to create a continuously updating
+        line of text during download if your terminal supports it.
+
+        If you use this class as a context manager, the end of context will output a newline, perserving
+        the last line of stats in your terminal
+        """
+
+        def _div(num, denom, default=0.0):
+            return num / denom if denom != 0 else default
+
+        with self.lock:
+            now = datetime.datetime.now()
+
+            wall_clock_dur_s = (now - self.data_start).total_seconds() if self.data_start else 0
+
+            # This is the duration across all threads added up
+            total_dur_s = (self.stats["request_duration"] + self.stats["response_duration"]).total_seconds()
+
+            resp_s = self.stats["response_duration"].total_seconds()
+            down_rate_mb_s = _div(self.stats["response_size_bytes"] / (1024**2), resp_s)
+            down_rate_mb_s_overall = _div(self.stats["response_size_bytes"] / (1024**2), wall_clock_dur_s)
+
+            req_s = self.stats["request_duration"].total_seconds()
+            up_rate_mb_s = _div(self.stats["request_size_bytes"] / (1024**2), req_s)
+
+            snapshot_rate = _div(self.stats["snapshots"], wall_clock_dur_s)
+            snapshot_rate_thread = _div(self.stats["snapshots"], total_dur_s)
+
+            connnection_efficiency = _div(total_dur_s, wall_clock_dur_s * self.num_threads)
+
+            thread_avg_dur = _div(total_dur_s, self.num_threads)
+
+        stats_message = "Overall stats: "
+        stats_message += f"Wall-clock Duration: {wall_clock_dur_s:.2f} s, "
+        stats_message += f"Files: {self.stats['snapshots']}, "
+        stats_message += f"Download rate: {down_rate_mb_s_overall:.2f} MB/s, "
+        stats_message += f"File rate: {snapshot_rate:.2f} files/s, "
+        stats_message += f"Conn eff: {connnection_efficiency:.2f}"
+        logger.log(log_level, stats_message)
+
+        stats_message = f"Per Thread Averages ({self.num_threads} threads): "
+        stats_message += f"Duration: {thread_avg_dur:.2f} s, "
+        stats_message += f"Upload: {up_rate_mb_s:.2f} MB/s, "
+        stats_message += f"Download: {down_rate_mb_s:.2f} MB/s, "
+        stats_message += f"File rate: {snapshot_rate_thread:.2f} files/s, "
+        logger.log(log_level, stats_message)
+
+    def hook(
+        self,
+        request: urllib.request.Request,
+        request_start: datetime.datetime,
+        response_start: datetime.datetime,
+        response_size: int,
+        chunk_size: int,
+    ):
+        """This hook is called on each chunk of snapshots downloaded.
+        It is called immediately after the server has finished responding to the
+        request, so datetime.datetime.now() is the end moment of the request
+
+        Parameters
+        ----------
+        request : urllib.request.Request
+            The request object relevant to this call
+        request_start : datetime.datetime
+            The moment the request was handed off to urllib.request.urlopen()
+        response_start : datetime.datetime
+            The moment there were bytes from the server to process
+        response_size : int
+            The size of the response from the server in bytes
+        chunk_size : int
+            The number of cutout files recieved in this request
+        """
+        now = datetime.datetime.now()
+
+        with self.lock:
+            if not self.data_start:
+                self.data_start = request_start
+
+            self._stat_accumulate("request_duration", response_start - request_start)
+            self._stat_accumulate("response_duration", now - response_start)
+            self._stat_accumulate("request_size_bytes", len(request.data))
+            self._stat_accumulate("response_size_bytes", response_size)
+            self._stat_accumulate("snapshots", chunk_size)
 
 
 class Downloader:
@@ -75,7 +194,7 @@ class Downloader:
 
         logger.info("Download command Start")
 
-        fits_file = config.get("fits_file", "")
+        fits_file = Path(config.get("fits_file", "")).resolve()
         logger.info(f"Reading in fits catalog: {fits_file}")
         # Filter the fits file for the fields we want
         column_names = ["object_id"] + Downloader.VARIABLE_FIELDS
@@ -87,16 +206,20 @@ class Downloader:
         if end is not None:
             locations = locations[offset:end]
 
+        cutout_path = Path(config.get("cutout_dir")).resolve()
+        logger.info(f"Downloading cutouts to {cutout_path}")
+
         # Make a list of rects to pass to downloadCutout
-        rects = Downloader.create_rects(locations, offset=0, default=Downloader.rect_from_config(config))
+        rects = Downloader.create_rects(
+            locations, offset=0, default=Downloader.rect_from_config(config), path=cutout_path
+        )
 
         # Prune any previously downloaded rects from our list using the manifest from the previous download
-        cutout_path = Path(config.get("cutout_dir"))
         rects = Downloader._prune_downloaded_rects(cutout_path, rects)
 
         # Early return if there is nothing to download.
         if len(rects) == 0:
-            logger.info("Download already completed according to manifest.")
+            logger.info("Download already complete according to manifest.")
             return
 
         # Create thread objects for each of our worker threads
@@ -106,6 +229,17 @@ class Downloader:
 
         # If we are using more than one connection, cut the list of rectangles into
         # batches, one batch for each thread.
+        # TODO: Remove this in favor of itertools.batched() when we no longer support python < 3.12.
+        def _batched(iterable, n):
+            """Brazenly copied and pasted from the python 3.12 documentation.
+            This is a dodgy version of a new itertools function in Python 3.12 called itertools.batched()
+            """
+            if n < 1:
+                raise ValueError("n must be at least one")
+            iterator = iter(iterable)
+            while batch := tuple(itertools.islice(iterator, n)):
+                yield batch
+
         thread_rects = list(_batched(rects, int(len(rects) / num_threads))) if num_threads != 1 else [rects]
 
         # Empty dictionaries for the threads to create download manifests in
@@ -114,6 +248,7 @@ class Downloader:
         shared_thread_args = (
             config["username"],
             config["password"],
+            DownloadStats(print_interval_s=config.get("stats_print_interval", 30)),
         )
 
         shared_thread_kwargs = {
@@ -123,31 +258,24 @@ class Downloader:
             "chunksize": config.get("chunk_size", 990),
         }
 
-        download_threads = []
+        download_threads = [
+            Thread(
+                target=Downloader.download_thread,
+                name=f"thread_{i}",
+                daemon=True,  # daemon so these threads will die when the main thread is interrupted
+                args=(thread_rects[i],)  # rects
+                + shared_thread_args  # username, password, download stats
+                + (i, thread_manifests[i]),  # thread_num, manifest
+                kwargs=shared_thread_kwargs,
+            )
+            for i in range(num_threads)
+        ]
 
         try:
-            logger.info(f"Downloading cutouts to {cutout_path}")
-            # downloadCutouts.py works with relative paths so we set cwd here.
-            # Since cwd is process-level, and our threads all share this state, we need to
-            # keep cwd the same until all threads finish.
-            with working_directory(cutout_path):
-                download_threads = [
-                    Thread(
-                        target=Downloader.download_thread,
-                        name=f"thread_{i}",
-                        args=(thread_rects[i],)  # rects
-                        + shared_thread_args  # cutout_dir,username, password
-                        + (i, thread_manifests[i]),  # thread_num, manifest
-                        kwargs=shared_thread_kwargs,
-                    )
-                    for i in range(num_threads)
-                ]
-
-                logger.info(f"Started {len(download_threads)} request threads")
-                [thread.start() for thread in download_threads]
-                [thread.join() for thread in download_threads]
-
-        finally:  # Ensure this occurs even when we get a KeyboardInterrupt during download
+            logger.info(f"Started {len(download_threads)} request threads")
+            [thread.start() for thread in download_threads]
+            [thread.join() for thread in download_threads]
+        finally:  # Ensure manifest is written even when we get a KeyboardInterrupt during download
             Downloader.write_manifest(thread_manifests, cutout_path)
 
         logger.info("Done")
@@ -298,9 +426,15 @@ resuming the correct download? Deleting the manifest and cutout files will start
 
         for rect, msg in combined_manifest.items():
             # This parsing relies on the name format set up in create_rects to work properly
-            object_id = int(rect.name.split("_")[0])
+            # We parse the object_id from rect.name in case the filename is "Attempted" because the
+            # download did not finish.
+            rect_filename = Path(rect.name).name
+            object_id = int(rect_filename.split("_")[0])
             columns["object_id"].append(object_id)
-            columns["filename"].append(msg)
+
+            # Remove the leading path from the filename if any.
+            filename = Path(msg).name
+            columns["filename"].append(filename)
 
             for key in Downloader.RECT_COLUMN_NAMES:
                 columns[key].append(rect.__dict__[key])
@@ -335,7 +469,9 @@ resuming the correct download? Deleting the manifest and cutout files will start
         filename = file_path / Downloader.MANIFEST_FILE_NAME
         if filename.exists():
             manifest_table = Table.read(filename, format="fits")
-            rects = Downloader.create_rects(locations=manifest_table, fields=Downloader.RECT_COLUMN_NAMES)
+            rects = Downloader.create_rects(
+                locations=manifest_table, fields=Downloader.RECT_COLUMN_NAMES, path=file_path
+            )
             return {rect: filename for rect, filename in zip(rects, manifest_table["filename"])}
         else:
             return {}
@@ -345,6 +481,7 @@ resuming the correct download? Deleting the manifest and cutout files will start
         rects: list[dC.Rect],
         user: str,
         password: str,
+        stats: DownloadStats,
         thread_num: int,
         manifest: dict[dC.Rect, str],
         **kwargs,
@@ -361,6 +498,8 @@ resuming the correct download? Deleting the manifest and cutout files will start
             Username for HSC's download service to use
         password : string
             Password for HSC's download service to use
+        stats : DownloadStats
+            Instance of DownloadStats to use for stats tracking.
         thread_num : int,
             The ID number of thread we are, sequential from zero to num_threads-1
         manifest:
@@ -369,8 +508,8 @@ resuming the correct download? Deleting the manifest and cutout files will start
         **kwargs: dict
             Additonal arguments for downloadCutout.download. See downloadCutout.download for details
         """
-        logger.info(f"Thread {thread_num} got {len(rects)} rects")
-        with DownloadStats(thread_num) as stats_hook:
+        logger.info(f"Thread {thread_num} starting download of {len(rects)} rects")
+        with stats as stats_hook:
             dC.download(
                 rects,
                 user=user,
@@ -383,7 +522,7 @@ resuming the correct download? Deleting the manifest and cutout files will start
 
     # TODO add error checking
     @staticmethod
-    def filterfits(filename: str, column_names: list[str]) -> Table:
+    def filterfits(filename: Path, column_names: list[str]) -> Table:
         """Read a fits file with the required column names for making cutouts
 
         The easiest way to make such a fits file is to select from the main HSC catalog
@@ -429,7 +568,11 @@ resuming the correct download? Deleting the manifest and cutout files will start
 
     @staticmethod
     def create_rects(
-        locations: Table, offset: int = 0, default: dC.Rect = None, fields: Optional[list[str]] = None
+        locations: Table,
+        path: Path,
+        offset: int = 0,
+        default: dC.Rect = None,
+        fields: Optional[list[str]] = None,
     ) -> list[dC.Rect]:
         """Create the rects we will need to pass to the downloader.
         One Rect per location in our list of sky locations.
@@ -444,6 +587,8 @@ resuming the correct download? Deleting the manifest and cutout files will start
         ----------
         locations : Table
             Table containing ra, dec locations in the sky
+        path : Path
+            Directory where the cutuout files ought live. Used to generate file names on the rect object.
         offset : int, optional
             Index to start the `lineno` field in the rects at, by default 0. The purpose of this is to allow
             multiple downloads on different sections of a larger source list without file name clobbering
@@ -470,10 +615,9 @@ resuming the correct download? Deleting the manifest and cutout files will start
             args["tract"] = str(args["tract"])
             # Sets the file name on the rect to be the object_id, also includes other rect fields
             # which are interpolated at save time, and are native fields of dc.Rect.
-            #
-            # This name is also parsed by FailedChunkCollector.hook to identify the object_id, so don't
-            # change it without updating code there too.
-            args["name"] = f"{location['object_id']}_{{type}}_{{ra:.5f}}_{{dec:+.5f}}_{{tract}}_{{filter}}"
+            args["name"] = str(
+                path / f"{location['object_id']}_{{type}}_{{ra:.5f}}_{{dec:+.5f}}_{{tract}}_{{filter}}"
+            )
             rect = dC.Rect.create(default=default, **args)
             rects.append(rect)
 
@@ -484,104 +628,3 @@ resuming the correct download? Deleting the manifest and cutout files will start
         rects.sort()
 
         return rects
-
-
-class DownloadStats:
-    """Subsytem for keeping statistics on downloads:
-
-    Accumulates time spent on request, responses as well as sizes for same and number of snapshots
-
-    Can be used as a context manager for pretty printing.
-    """
-
-    def __init__(self, tid):
-        self.stats = {
-            "request_duration": datetime.timedelta(),  # Time from request sent to first byte from the server
-            "response_duration": datetime.timedelta(),  # Total time spent recieving and processing a response
-            "request_size_bytes": 0,  # Total size of all requests
-            "response_size_bytes": 0,  # Total size of all responses
-            "snapshots": 0,  # Number of fits snapshots downloaded
-        }
-        self.tid = tid
-
-    def __enter__(self):
-        return self.hook
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._print_stats(logging.INFO)
-
-    def _stat_accumulate(self, name: str, value: Union[int, datetime.timedelta]):
-        """Accumulate a sum into the global stats dict
-
-        Parameters
-        ----------
-        name : str
-            Name of the stat. Assumed to exist in the dict already.
-        value : Union[int, datetime.timedelta]
-            How much time or count to add to the stat
-        """
-        self.stats[name] += value
-
-    def _print_stats(self, log_level):
-        """Print the accumulated stats including bandwidth calculated from duration and sizes
-
-        This prints out multiple lines with `\r` at the end in order to create a continuously updating
-        line of text during download if your terminal supports it.
-
-        If you use this class as a context manager, the end of context will output a newline, perserving
-        the last line of stats in your terminal
-        """
-        total_dur_s = (self.stats["request_duration"] + self.stats["response_duration"]).total_seconds()
-
-        resp_s = self.stats["response_duration"].total_seconds()
-        down_rate_mb_s = (self.stats["response_size_bytes"] / (1024**2)) / resp_s if resp_s != 0 else 0
-
-        req_s = self.stats["request_duration"].total_seconds()
-        up_rate_mb_s = (self.stats["request_size_bytes"] / (1024**2)) / req_s if req_s != 0 else 0
-
-        snapshot_rate = self.stats["snapshots"] / total_dur_s if total_dur_s != 0 else 0
-
-        stats_message = f"Thread {self.tid} "
-        stats_message += f"Stats: Duration: {total_dur_s:.2f} s, "
-        stats_message += f"Files: {self.stats['snapshots']}, "
-        stats_message += f"Upload: {up_rate_mb_s:.2f} MB/s, "
-        stats_message += f"Download: {down_rate_mb_s:.2f} MB/s, "
-        stats_message += f"File rate: {snapshot_rate:.2f} files/s"
-
-        logger.log(log_level, stats_message)
-
-    def hook(
-        self,
-        request: urllib.request.Request,
-        request_start: datetime.datetime,
-        response_start: datetime.datetime,
-        response_size: int,
-        chunk_size: int,
-    ):
-        """This hook is called on each chunk of snapshots downloaded.
-        It is called immediately after the server has finished responding to the
-        request, so datetime.datetime.now() is the end moment of the request
-
-        Parameters
-        ----------
-        request : urllib.request.Request
-            The request object relevant to this call
-        request_start : datetime.datetime
-            The moment the request was handed off to urllib.request.urlopen()
-        response_start : datetime.datetime
-            The moment there were bytes from the server to process
-        response_size : int
-            The size of the response from the server in bytes
-        chunk_size : int
-            The number of cutout files recieved in this request
-        """
-
-        now = datetime.datetime.now()
-
-        self._stat_accumulate("request_duration", response_start - request_start)
-        self._stat_accumulate("response_duration", now - response_start)
-        self._stat_accumulate("request_size_bytes", len(request.data))
-        self._stat_accumulate("response_size_bytes", response_size)
-        self._stat_accumulate("snapshots", chunk_size)
-
-        self._print_stats(logging.INFO)

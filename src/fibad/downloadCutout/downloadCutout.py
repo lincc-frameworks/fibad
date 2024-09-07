@@ -8,7 +8,6 @@ import datetime
 import errno
 import getpass
 import io
-import json
 import logging
 import math
 import os
@@ -507,15 +506,6 @@ class Rect:
         same semantics as Rect.__eq__(). Look at Rect.__eq__() for further details.
         """
         return hash(tuple([self.__dict__[field] for field in Rect.immutable_fields]))
-
-
-class RectEncoder(json.JSONEncoder):
-    # TODO this needs to be implemented on a subclass of JSONEncoder
-    # And it needs to do something very particular in order to work.
-    def default(self, obj):
-        if isinstance(obj, Rect):
-            return obj.__dict__
-        return json.JSONEncoder.default(self, obj)
 
 
 @export
@@ -1089,7 +1079,6 @@ def _download(
     *,
     onmemory: bool,
     chunksize: int = 990,
-    # manifest: dict[Rect,str] = {},
     retries: int = 3,
     retrywait: int = 30,
     **kwargs__download_chunk,
@@ -1143,7 +1132,6 @@ def _download(
     exploded_rects: list[tuple[Rect, int]] = []
     for index, rect in enumerate(rects):
         exploded_rects.extend((r, index) for r in rect.explode())
-        # manifest.update({r:None for r in rect.explode()})
 
     # Sort the rects so that the server can use cache
     # as frequently as possible.
@@ -1171,7 +1159,6 @@ def _download(
                     exploded_rects[i : i + chunksize],
                     user,
                     password,
-                    # manifest,
                     onmemory=onmemory,
                     **kwargs__download_chunk,
                 )
