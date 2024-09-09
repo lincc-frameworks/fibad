@@ -22,11 +22,10 @@ sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
-max_connections = 2
+concurrent_connections = 1
+stats_print_interval = 30
 fits_file = "./catalog.fits"
 cutout_dir = "./data"
-offset = 0
-num_sources = 500
 
 # These control the downloader's HTTP requests and retries
 # `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
