@@ -57,7 +57,7 @@ name = "HSCDataLoader"
 # external_class = "user_package.submodule.ExternalDataLoader"
 
 # Directory path where the data is stored
-path = "/home/drew/code/fibad/data/hsc_R_cutouts/hsc-samples"
+path = "/Users/drew/code/fibad/data/hsc-samples"
 
 # Default PyTorch DataLoader parameters
 batch_size = 100
