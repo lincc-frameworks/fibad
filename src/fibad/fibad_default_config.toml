@@ -41,28 +41,28 @@ timeout = 3600
 chunksize = 990
 
 [model]
-name = "ExampleCNN"
+name = "ExampleAutoencoder"
 
 # An example of requesting an external model class
 # external_class = "user_package.submodule.ExternalModel"
 
 weights_filepath = "example_model.pth"
-epochs = 2
+epochs = 10
 
 [data_loader]
 # Name of data loader to use
-name = "CifarDataLoader"
+name = "HSCDataLoader"
 
 # An example of requesting an external data loader class
 # external_class = "user_package.submodule.ExternalDataLoader"
 
 # Directory path where the data is stored
-path = "./data"
+path = "/home/drew/code/fibad/data/hsc_R_cutouts/hsc-samples"
 
 # Default PyTorch DataLoader parameters
-batch_size = 128
+batch_size = 100
 shuffle = true
-num_workers = 2
+num_workers = 10
 
 [predict]
 batch_size = 32
