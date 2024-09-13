@@ -3,7 +3,8 @@
 # This example model is taken from the autoenocoder tutorial here
 # https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial9/AE_CIFAR10.html
 
-import numpy as np
+# The train function has been converted into train_step for use with pytorch-ignite.
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
@@ -106,38 +107,6 @@ class ExampleAutoencoder(nn.Module):
         x_hat = self._eval_decoder(z)
         return x_hat
 
-    def train(self, trainloader, device=None):
-        self.optimizer = self._optimizer()
-
-        torch.set_grad_enabled(True)
-
-        print(f"len(trainloder) = {len(trainloader)}")
-        for epoch in range(self.config.get("epochs", 2)):
-            running_loss = 0.0
-            for batch_num, data in enumerate(trainloader, 0):
-                # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
-                x = data[0] if isinstance(data, tuple) else data
-
-                x = x.to(device)
-                x_hat = self.forward(x)
-                loss = F.mse_loss(x, x_hat, reduction="none")
-                loss = loss.sum(dim=[1, 2, 3]).mean(dim=[0])
-
-                self.optimizer.zero_grad()
-
-                loss.backward()
-
-                self.optimizer.step()
-                running_loss += loss.item()
-
-                # Log every 2000 batches in an epoch, or the end of the epoch
-                # Ensure we get one log message at the end of every epoch even if the
-                # data size is less than 2000.
-                log_freq = np.min([2000, len(trainloader)])
-                if batch_num % log_freq == log_freq - 1:
-                    print(f"[{epoch + 1}, {batch_num + 1}] loss: {running_loss / 2000}")
-                    running_loss = 0.0
-
     def train_step(self, batch):
         """This function contains the logic for a single training step. i.e. the
         contents of the inner loop of a ML training process.
@@ -152,6 +121,7 @@ class ExampleAutoencoder(nn.Module):
         Current loss value
             The loss value for the current batch.
         """
+        # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
         x = batch[0] if isinstance(batch, tuple) else batch
 
         x_hat = self.forward(x)

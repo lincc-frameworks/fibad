@@ -90,8 +90,13 @@ def _create_trainer(model):
 
     # Wrap the `train_step` so that batch data is moved to the appropriate device
     def train_step(engine, batch):
-        # move data to the appropriate device
-        batch = tuple(i.to(device) for i in batch)
+        #! This feels brittle, it would be worth revisiting this.
+        #  We assume that the batch data will generally have two forms.
+        # 1) A torch.Tensor that represents N samples.
+        # 2) A tuple (or list) of torch.Tensors, where the first tensor is the
+        # data, and the second is labels.
+        batch = batch.to(device) if isinstance(batch, torch.Tensor) else tuple(i.to(device) for i in batch)
+
         return inner_train_step(batch)
 
     # Create the ignite `Engine` object
