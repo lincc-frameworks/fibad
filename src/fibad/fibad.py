@@ -147,9 +147,9 @@ class Fibad:
         """
         See Fibad.download.run()
         """
-        from .download import run
+        from .download import Downloader
 
-        return run(config=self.config, **kwargs)
+        return Downloader.run(config=self.config, **kwargs)
 
     def predict(self, **kwargs):
         """
