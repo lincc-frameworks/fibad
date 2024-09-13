@@ -35,7 +35,7 @@ retries = 3
 # `timepout` How long should we wait to get a full HTTP response from the server. Default 3600s (1hr)
 timeout = 3600
 # `chunksize` How many sky location rectangles should we request in a single request. Default is 990
-chunksize = 990
+chunk_size = 990
 
 [model]
 name = "ExampleAutoencoder"
