@@ -22,13 +22,10 @@ sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
-username = "mtauraso@local"
-password = "cCw+nX53lmNLHMy+JbizpH/dl4t7sxljiNm6a7k1"
-max_connections = 2
-fits_file = "../hscplay/temp.fits"
-cutout_dir = "../hscplay/cutouts/"
-offset = 0
-num_sources = 500
+concurrent_connections = 1
+stats_print_interval = 30
+fits_file = "./catalog.fits"
+cutout_dir = "./data"
 
 # These control the downloader's HTTP requests and retries
 # `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
@@ -58,6 +55,20 @@ name = "HSCDataLoader"
 
 # Directory path where the data is stored
 path = "/Users/drew/code/fibad/data/hsc-samples"
+
+# Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
+#
+# If not provided, the default is to scan the directory for the smallest dimensioned files, and use 
+# those pixel dimensions as the crop size.
+#
+#crop_to = [100,100]
+
+# Limit data loader to only particular filters when there are more in the data set.
+#
+# When not provided, the number of filters will be automatically gleaned from the data set.
+# Defaults to not provided.
+#
+#filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 
 # Default PyTorch DataLoader parameters
 batch_size = 100
