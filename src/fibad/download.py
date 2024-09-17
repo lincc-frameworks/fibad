@@ -73,9 +73,10 @@ class Downloader:
             return
 
         # Create thread objects for each of our worker threads
-        num_threads = self.config.get("concurrent_connections", 2)
-        if num_threads > 5:
-            raise RuntimeError("This client only opens 5 connections or fewer.")
+        num_threads = self.config.get("concurrent_connections", 10)
+
+        if num_threads > 10:
+            RuntimeError("More than 10 concurrent connections to HSC is disallowed on a per-user basis")
 
         # If we are using more than one connection, cut the list of rectangles into
         # batches, one batch for each thread.
@@ -423,6 +424,9 @@ resuming the correct download? Deleting the manifest and cutout files will start
             filter=config["filter"],
             rerun=config["rerun"],
             type=config["type"],
+            image=config.get("image"),
+            mask=config.get("mask"),
+            variance=config.get("variance"),
         )
 
     @staticmethod
@@ -471,7 +475,10 @@ resuming the correct download? Deleting the manifest and cutout files will start
         for index, location in enumerate(locations):
             args = {field: location.get(field) for field in fields}
             args["lineno"] = index + offset
+
+            # tracts are ints in the fits files and dC.rect constructor wants them as str
             args["tract"] = str(args["tract"])
+
             # Sets the file name on the rect to be the object_id, also includes other rect fields
             # which are interpolated at save time, and are native fields of dc.Rect.
             args["name"] = str(
@@ -481,9 +488,9 @@ resuming the correct download? Deleting the manifest and cutout files will start
             rects.append(rect)
 
         # We sort rects here so they end up tract,ra,dec ordered across all requests made in all threads
-        # Threads do their own sorting prior to each chunked request in downloadCutout.py; however
+        # Threads do their own sorting prior to all chunked request in downloadCutout.py; however
         # sorting at this stage will allow a greater number of rects that are co-located in the sky
-        # to end up in the same thread and same chunk.
+        # to end up in the same thread and therefore be sorted into the same request.
         rects.sort()
 
         return rects

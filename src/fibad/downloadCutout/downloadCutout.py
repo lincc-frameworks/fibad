@@ -332,8 +332,8 @@ class Rect:
 
     rerun: str = default_rerun
     type: str = default_type
-    filter: Union[str, list[str]] = ALLFILTERS
     tract: int = ANYTRACT
+    filter: Union[str, list[str]] = ALLFILTERS
     ra: float = math.nan
     dec: float = math.nan
     sw: float = math.nan
@@ -349,8 +349,8 @@ class Rect:
     def create(
         rerun: Union[str, None] = None,
         type: Union[str, None] = None,
-        filter: Union[Union[str, list[str]], None] = None,
         tract: Union[str, int, None] = None,
+        filter: Union[Union[str, list[str]], None] = None,
         ra: Union[str, float, None] = None,
         dec: Union[str, float, None] = None,
         sw: Union[str, float, None] = None,
