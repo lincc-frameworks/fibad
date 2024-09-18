@@ -140,13 +140,6 @@ class Downloader:
         """Prunes already downloaded rects using the manifest in `cutout_path`. `rects` passed in is
         mutated by this operation
 
-        Parameters
-        ----------
-        cutout_path : Path
-            Where on the filesystem to find the manifest
-        rects : list[dC.Rect]
-            List of rects from which we want to prune previously downloaded rects
-
         Returns
         -------
         list[dC.Rect]
