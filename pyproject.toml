@@ -17,6 +17,7 @@ dynamic = ["version"]
 requires-python = ">=3.9"
 dependencies = [
     "astropy", # Used to load fits files of sources to query HSC cutout server
+    "pytorch-ignite", # Used for distributed training, logging, etc.
     "toml", # Used to load configuration files as dictionaries
     "torch", # Used for CNN model and in train.py
     "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
