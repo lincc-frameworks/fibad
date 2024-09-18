@@ -135,6 +135,23 @@ class Fibad:
         formatter = logging.Formatter("[%(asctime)s %(name)s:%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
 
+    def raw_data_dimensions(self) -> tuple[list[int], list[int]]:
+        """Gives the dimensions of underlying data that forms input to the training, and inference
+        steps. This is the raw data that the data loader must normalize to the model
+
+        Returns
+        -------
+        tuple[list[int],list[int]]
+            widths and heights of all images available locally.
+        """
+        from .download import Downloader
+
+        downloader = Downloader(config=self.config)
+        manifest = downloader.get_manifest()
+        widths = [int(dim[0]) for dim in manifest["dim"]]
+        heights = [int(dim[1]) for dim in manifest["dim"]]
+        return widths, heights
+
     def train(self, **kwargs):
         """
         See Fibad.train.run()
@@ -149,7 +166,8 @@ class Fibad:
         """
         from .download import Downloader
 
-        return Downloader.run(config=self.config, **kwargs)
+        downloader = Downloader(config=self.config)
+        return downloader.run(**kwargs)
 
     def predict(self, **kwargs):
         """

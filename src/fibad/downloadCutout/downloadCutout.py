@@ -58,6 +58,8 @@ default_max_connections = 4
 
 export("ANYTRACT")
 ANYTRACT = -1
+export("NODIM")
+NODIM = (-1, -1)
 export("ALLFILTERS")
 ALLFILTERS = "all"
 
@@ -324,6 +326,8 @@ class Rect:
         File name format (without extension ".fits")
     lineno
         Line number in a list file.
+    dim
+        Dimensions of downloaded file
     """
 
     rerun: str = default_rerun
@@ -339,6 +343,7 @@ class Rect:
     variance: bool = default_get_variance
     name: str = default_name
     lineno: int = 0
+    dim: tuple[int, int] = NODIM
 
     @staticmethod
     def create(
@@ -355,6 +360,7 @@ class Rect:
         variance: Union[str, bool, None] = None,
         name: Union[str, None] = None,
         lineno: Union[int, None] = None,
+        dim: Union[tuple[int, int], None] = None,
         default: Union["Rect", None] = None,
     ) -> "Rect":
         """
@@ -401,6 +407,8 @@ class Rect:
             File name format (without extension ".fits")
         lineno
             Line number in a list file.
+        dim
+            Dimensions of the image in pixels.
         default
             Default value.
 
@@ -437,6 +445,8 @@ class Rect:
             rect.name = str(name)
         if lineno is not None:
             rect.lineno = int(lineno)
+        if dim is not None:
+            rect.dim = dim
 
         return rect
 
@@ -1204,7 +1214,8 @@ def _download_chunk(
     onmemory: bool,
     request_hook: Optional[
         Callable[[urllib.request.Request, datetime.datetime, datetime.datetime, int, int], Any]
-    ],
+    ] = None,
+    rect_hook: Optional[Callable[[Rect, str], Any]] = None,
     **kwargs_urlopen,
 ) -> Optional[list]:
     """
@@ -1231,6 +1242,9 @@ def _download_chunk(
     request_hook
         Function that is called with the response of all requests made
         Intended to support bandwidth instrumentation.
+    rect_hook
+        Function to be called on every rectangle downloaded. The callback recieves the rect and the filename
+        as arguments
     kwargs_urlopen
         Additional keyword args are passed through to urllib.request.urlopen
 
@@ -1312,6 +1326,8 @@ def _download_chunk(
                                 os.makedirs(dirname, exist_ok=True)
                             with open(filename, "wb") as fout:
                                 _splice(fitem, fout)
+                            if rect_hook:
+                                rect_hook(rect, filename)
                             if manifest is not None:
                                 manifest[rect] = filename
             if request_hook:
