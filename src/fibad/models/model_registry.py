@@ -36,7 +36,7 @@ def fetch_model_class(runtime_config: dict) -> type:
         If no model was specified in the runtime configuration.
     """
 
-    model_config = runtime_config.get("model", {})
+    model_config = runtime_config["model"]
     model_cls = None
 
     try:

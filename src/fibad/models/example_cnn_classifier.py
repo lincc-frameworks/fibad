@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @fibad_model
 class ExampleCNN(nn.Module):
-    def __init__(self, model_config, shape):
+    def __init__(self, config, shape):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -25,7 +25,7 @@ class ExampleCNN(nn.Module):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
-        self.config = model_config
+        self.config = config
 
         # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
         # but we define them as methods as a way to allow for more flexibility in the future.
@@ -71,4 +71,4 @@ class ExampleCNN(nn.Module):
         return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
 
     def save(self):
-        torch.save(self.state_dict(), self.config.get("weights_filepath", "example_cnn.pth"))
+        torch.save(self.state_dict(), self.config["model"]["weights_filepath"])

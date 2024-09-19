@@ -27,8 +27,8 @@ class Downloader:
     MANIFEST_FILE_NAME = "manifest.fits"
 
     def __init__(self, config):
-        self.config = config.get("download", {})
-        self.cutout_path = Path(self.config.get("cutout_dir")).resolve()
+        self.config = config
+        self.cutout_path = Path(config["general"]["data_dir"]).resolve()
         self.manifest_file = self.cutout_path / Downloader.MANIFEST_FILE_NAME
 
     def run(self):
@@ -43,16 +43,26 @@ class Downloader:
 
         logger.info("Download command Start")
 
-        fits_file = Path(self.config.get("fits_file", "")).resolve()
+        username = self.config["download"]["username"]
+        password = self.config["download"]["password"]
+
+        if not username or not password:
+            msg = "Please define a username and password to the HSC cutout service in your fibad config "
+            msg += "file to use the downloader. Accounts can be created at the following url: \n"
+            msg += " https://hsc-release.mtk.nao.ac.jp/datasearch/new_user/new "
+            raise RuntimeError(msg)
+
+        fits_file = Path(self.config["download"]["fits_file"]).resolve()
         logger.info(f"Reading in fits catalog: {fits_file}")
         # Filter the fits file for the fields we want
         column_names = ["object_id"] + Downloader.VARIABLE_FIELDS
         locations = Downloader.filterfits(fits_file, column_names)
 
         # If offet/length specified, filter to that length
-        offset = self.config.get("offset", 0)
-        end = offset + self.config.get("num_sources", None)
-        if end is not None:
+        offset = self.config["download"]["offset"]
+        num_sources = self.config["download"]["num_sources"]
+        if num_sources > 0:
+            end = offset + num_sources
             locations = locations[offset:end]
 
         logger.info(f"Downloading cutouts to {self.cutout_path}")
@@ -60,7 +70,7 @@ class Downloader:
         logger.info("Making a list of cutouts...")
         # Make a list of rects to pass to downloadCutout
         self.rects = Downloader.create_rects(
-            locations, offset=0, default=Downloader.rect_from_config(self.config), path=self.cutout_path
+            locations, offset=0, default=self._rect_from_config(), path=self.cutout_path
         )
 
         logger.info("Checking the list against currently downloaded cutouts...")
@@ -73,7 +83,7 @@ class Downloader:
             return
 
         # Create thread objects for each of our worker threads
-        num_threads = self.config.get("concurrent_connections", 10)
+        num_threads = self.config["download"]["concurrent_connections"]
 
         if num_threads > 10:
             RuntimeError("More than 10 concurrent connections to HSC is disallowed on a per-user basis")
@@ -86,15 +96,16 @@ class Downloader:
             This is a dodgy version of a new itertools function in Python 3.12 called itertools.batched()
             """
             if n < 1:
-                raise ValueError("n must be at least one")
+                raise ValueError(f"n must be at least one, it is {n}")
             iterator = iter(iterable)
             while batch := tuple(itertools.islice(iterator, n)):
                 yield batch
 
-        logger.info("Dividing cutouts among threads...")
+        num_threads = num_threads if len(self.rects) > num_threads else 1
+        logger.info(f"Dividing {len(self.rects)} sky locations among {num_threads} threads...")
         thread_rects = (
             list(_batched(self.rects, int(len(self.rects) / num_threads)))
-            if num_threads != 1
+            if num_threads != 1 and len(self.rects) > num_threads
             else [self.rects]
         )
 
@@ -102,16 +113,16 @@ class Downloader:
         self.thread_manifests = [dict() for _ in range(num_threads)]
 
         shared_thread_args = (
-            self.config["username"],
-            self.config["password"],
-            DownloadStats(print_interval_s=self.config.get("stats_print_interval", 60)),
+            username,
+            password,
+            DownloadStats(print_interval_s=self.config["download"]["stats_print_interval"]),
         )
 
         shared_thread_kwargs = {
-            "retrywait": self.config.get("retry_wait", 30),
-            "retries": self.config.get("retries", 3),
-            "timeout": self.config.get("timeout", 3600),
-            "chunksize": self.config.get("chunk_size", 990),
+            "retrywait": self.config["download"]["retry_wait"],
+            "retries": self.config["download"]["retries"],
+            "timeout": self.config["download"]["timeout"],
+            "chunksize": self.config["download"]["chunk_size"],
         }
 
         download_threads = [
@@ -396,15 +407,9 @@ resuming the correct download? Deleting the manifest and cutout files will start
         columns = [t[column] for column in column_names]
         return hstack(columns, uniq_col_name="{table_name}", table_names=column_names)
 
-    @staticmethod
-    def rect_from_config(config: dict) -> dC.Rect:
+    def _rect_from_config(self) -> dC.Rect:
         """Takes our runtime config and loads cutout config
         common to all cutouts into a prototypical Rect for downloading
-
-        Parameters
-        ----------
-        config : dict
-            Runtime config, only the download section
 
         Returns
         -------
@@ -412,14 +417,14 @@ resuming the correct download? Deleting the manifest and cutout files will start
             A single rectangle with fields `sw`, `sh`, `filter`, `rerun`, and `type` populated from the config
         """
         return dC.Rect.create(
-            sw=config["sw"],
-            sh=config["sh"],
-            filter=config["filter"],
-            rerun=config["rerun"],
-            type=config["type"],
-            image=config.get("image"),
-            mask=config.get("mask"),
-            variance=config.get("variance"),
+            sw=self.config["download"]["sw"],
+            sh=self.config["download"]["sh"],
+            filter=self.config["download"]["filter"],
+            rerun=self.config["download"]["rerun"],
+            type=self.config["download"]["type"],
+            image=self.config["download"]["image"],
+            mask=self.config["download"]["mask"],
+            variance=self.config["download"]["variance"],
         )
 
     @staticmethod

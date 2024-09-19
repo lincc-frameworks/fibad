@@ -9,8 +9,8 @@ from .data_loader_registry import fibad_data_loader
 
 @fibad_data_loader
 class CifarDataLoader:
-    def __init__(self, data_loader_config):
-        self.config = data_loader_config
+    def __init__(self, config):
+        self.config = config
 
     def shape(self):
         return (3, 32, 32)
@@ -31,13 +31,13 @@ class CifarDataLoader:
         )
 
         return torchvision.datasets.CIFAR10(
-            root=self.config.get("path", "./data"), train=True, download=True, transform=transform
+            root=self.config["general"]["data_dir"], train=True, download=True, transform=transform
         )
 
     def data_loader(self, data_set):
         return torch.utils.data.DataLoader(
             data_set,
-            batch_size=self.config.get("batch_size", 4),
-            shuffle=self.config.get("shuffle", True),
-            num_workers=self.config.get("num_workers", 2),
+            batch_size=self.config["data_loader"]["batch_size"],
+            shuffle=self.config["data_loader"]["shuffle"],
+            num_workers=self.config["data_loader"]["num_workers"],
         )
