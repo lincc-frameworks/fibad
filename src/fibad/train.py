@@ -30,6 +30,7 @@ def run(config):
 
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
+    logger.info(f"Training model class: {model_cls}")
     model = model_cls(model_config=config.get("model", {}), shape=data_loader.shape())
 
     # Create trainer, a pytorch-ignite `Engine` object

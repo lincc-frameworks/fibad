@@ -27,22 +27,22 @@ def get_or_load_class(config: dict, registry: dict) -> type:
         a `name` nor `external_cls` key was found in the config.
     """
 
-    # User specifies one of the built in classes by name
+    #! Once we have confidence in the config having default values, we can remove this check
     if "name" in config:
         class_name = config.get("name")
+        returned_class = None
 
-        if class_name not in registry:
-            raise ValueError(f"Could not find {class_name} in registry: {registry.keys()}")
+        # attempt to find the class in the registry
+        if class_name in registry:
+            returned_class = registry[class_name]
 
-        returned_class = registry[class_name]
-
-    # User provides an external class, attempt to import it with the module spec
-    elif "external_cls" in config:
-        returned_class = import_module_from_string(config["external_cls"])
+        # if the class is not in the registry, attempt to load it dynamically
+        else:
+            returned_class = import_module_from_string(class_name)
 
     # User failed to define a class to load
     else:
-        raise ValueError("No class requested. Specify a `name` or `external_cls` key in the runtime config.")
+        raise ValueError("No class requested. Specify a `name` key in the runtime config.")
 
     return returned_class
 
