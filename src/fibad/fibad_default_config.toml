@@ -16,16 +16,21 @@ log_destination = "stderr"
 log_level = "info"     # Emit informational messages, warnings and all errors
 # log_level = "debug"    # Very verbose, emit all log messages.
 
+data_dir = "./data"
+
 [download]
 sw = "22asec"
 sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
-concurrent_connections = 1
-stats_print_interval = 30
+username = false
+password = false
+num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
+offset = 0
+concurrent_connections = 4
+stats_print_interval = 60
 fits_file = "./catalog.fits"
-cutout_dir = "./data"
 
 # These control the downloader's HTTP requests and retries
 # `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
@@ -37,6 +42,13 @@ timeout = 3600
 # `chunksize` How many sky location rectangles should we request in a single request. Default is 990
 chunk_size = 990
 
+# Whether to retrieve the image layer
+image = true
+# Whether to retrieve the variance layer
+variance = false
+# Whether to retrieve the mask layer
+mask = false
+
 [model]
 name = "ExampleAutoencoder"
 
@@ -46,6 +58,9 @@ name = "ExampleAutoencoder"
 weights_filepath = "example_model.pth"
 epochs = 10
 
+base_channel_size = 32
+latent_dim =64
+
 [data_loader]
 # Name of data loader to use
 name = "HSCDataLoader"
@@ -53,27 +68,26 @@ name = "HSCDataLoader"
 # An example of requesting an external data loader class
 # external_class = "user_package.submodule.ExternalDataLoader"
 
-# Directory path where the data is stored
-path = "./data"
-
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
 #
-# If not provided, the default is to scan the directory for the smallest dimensioned files, and use 
-# those pixel dimensions as the crop size.
+# If not provided by user, the default of 'false' scans the directory for the smallest dimensioned files, and 
+# uses those pixel dimensions as the crop size.
 #
 #crop_to = [100,100]
+crop_to = false
 
 # Limit data loader to only particular filters when there are more in the data set.
 #
-# When not provided, the number of filters will be automatically gleaned from the data set.
-# Defaults to not provided.
+# When not provided by the user, the number of filters will be automatically gleaned from the data set.
+# Defaults behavior is produced by the false value.
 #
 #filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+filters = false
 
 # Default PyTorch DataLoader parameters
-batch_size = 500
+batch_size = 4
 shuffle = true
-num_workers = 10
+num_workers = 2
 
 [predict]
 batch_size = 32

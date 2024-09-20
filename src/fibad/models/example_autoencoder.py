@@ -18,15 +18,15 @@ from fibad.models.model_registry import fibad_model
 
 @fibad_model
 class ExampleAutoencoder(nn.Module):
-    def __init__(self, model_config, shape=(5, 250, 250)):
+    def __init__(self, config, shape=(5, 250, 250)):
         super().__init__()
-        self.config = model_config
+        self.config = config
 
         # TODO xcxc config-ize or get from data loader somehow
         self.num_input_channels, self.image_width, self.image_height = shape
 
-        self.c_hid = self.config.get("base_channel_size", 32)
-        self.latent_dim = self.config.get("latent_dim", 64)
+        self.c_hid = self.config["model"]["base_channel_size"]
+        self.latent_dim = self.config["model"]["latent_dim"]
 
         # Calculate how much our convolutional layers will affect the size of final convolution
         # Formula evaluated from: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
@@ -140,4 +140,4 @@ class ExampleAutoencoder(nn.Module):
         return optim.Adam(self.parameters(), lr=1e-3)
 
     def save(self):
-        torch.save(self.state_dict(), self.config.get("weights_filepath", "example_autoencoder.pth"))
+        torch.save(self.state_dict(), self.config["model"]["weights_filepath"])

@@ -29,7 +29,7 @@ def get_or_load_class(config: dict, registry: dict) -> type:
 
     # User specifies one of the built in classes by name
     if "name" in config:
-        class_name = config.get("name")
+        class_name = config["name"]
 
         if class_name not in registry:
             raise ValueError(f"Could not find {class_name} in registry: {registry.keys()}")

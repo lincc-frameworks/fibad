@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 @fibad_data_loader
 class HSCDataLoader:
-    def __init__(self, data_loader_config):
-        self.config = data_loader_config
+    def __init__(self, config):
+        self.config = config
         self._data_set = self.data_set()
 
     def get_data_loader(self):
@@ -37,27 +37,28 @@ class HSCDataLoader:
         if self.__dict__.get("_data_set", None) is not None:
             return self._data_set
 
-        self.config.get("path", "./data")
-
         # TODO: What will be a reasonable set of tranformations?
         # For now tanh all the values so they end up in [-1,1]
         # Another option might be sinh, but we'd need to mess with the example autoencoder module
         # Because it goes from unbounded NN output space -> [-1,1] with tanh in its decode step.
         transform = Lambda(lambd=np.tanh)
 
+        crop_to = self.config["data_loader"]["crop_to"]
+        filters = self.config["data_loader"]["filters"]
+
         return HSCDataSet(
-            self.config.get("path", "./data"),
+            self.config["general"]["data_dir"],
             transform=transform,
-            cutout_shape=self.config.get("crop_to", None),
-            filters=self.config.get("filters", None),
+            cutout_shape=crop_to if crop_to else None,
+            filters=filters if filters else None,
         )
 
     def data_loader(self, data_set):
         return torch.utils.data.DataLoader(
             data_set,
-            batch_size=self.config.get("batch_size", 4),
-            shuffle=self.config.get("shuffle", True),
-            num_workers=self.config.get("num_workers", 2),
+            batch_size=self.config["data_loader"]["batch_size"],
+            shuffle=self.config["data_loader"]["shuffle"],
+            num_workers=self.config["data_loader"]["num_workers"],
         )
 
     def shape(self):

@@ -22,21 +22,21 @@ def run(config):
 
     # Fetch data loader class specified in config and create an instance of it
     data_loader_cls = fetch_data_loader_class(config)
-    data_loader = data_loader_cls(config.get("data_loader", {}))
+    data_loader = data_loader_cls(config)
 
     # Get the pytorch.dataset from dataloader, and use it to create a distributed dataloader
     data_set = data_loader.data_set()
-    dist_data_loader = _train_data_loader(data_set, config.get("data_loader", {}))
+    dist_data_loader = _train_data_loader(data_set, config)
 
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
-    model = model_cls(model_config=config.get("model", {}), shape=data_loader.shape())
+    model = model_cls(config=config, shape=data_loader.shape())
 
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = _create_trainer(model)
 
     # Run the training process
-    trainer.run(dist_data_loader, max_epochs=config.get("model", {}).get("epochs", 2))
+    trainer.run(dist_data_loader, max_epochs=config["model"]["epochs"])
 
     # Save the trained model
     model.save()
@@ -51,9 +51,9 @@ def _train_data_loader(data_set, config):
     # ~ `data_loader = idist.auto_dataloader(data_set, **config)`
     data_loader = idist.auto_dataloader(
         data_set,
-        batch_size=config.get("batch_size", 4),
-        shuffle=config.get("shuffle", True),
-        num_workers=config.get("num_workers", 2),
+        batch_size=config["data_loader"]["batch_size"],
+        shuffle=config["data_loader"]["shuffle"],
+        num_workers=config["data_loader"]["num_workers"],
     )
 
     return data_loader

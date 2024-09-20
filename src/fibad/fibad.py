@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import Union
 
-from .config_utils import get_runtime_config
+from .config_utils import get_runtime_config, resolve_runtime_config, validate_runtime_config
 
 
 class Fibad:
@@ -44,6 +44,11 @@ class Fibad:
               environments.
         """
         self.config = get_runtime_config(runtime_config_filepath=config_file)
+
+        # TODO: For now this is part of Fibad.__init__() In future when external modules can define their own
+        # configuration keys and associated default values, this will need to occur after those external
+        # modules have been resolved and loaded. This is why it is separate from get_runtime_config()
+        validate_runtime_config(self.config)
 
         # Configure our logger. We do not use __name__ here because that would give us a "fibad.fibad" logger
         # which would not aggregate logs from fibad.downloadCutout which creates its own
@@ -87,14 +92,14 @@ class Fibad:
             # Setup our handlers from config
             self._initialize_log_handlers()
 
-        self.logger.info(f"Runtime Config read from: {config_file}")
+        self.logger.info(f"Runtime Config read from: {resolve_runtime_config(config_file)}")
 
     def _initialize_log_handlers(self):
         """Private initialization helper, Adds handlers and level setting sto the global self.logger object"""
 
-        general_config = self.config.get("general", {})
+        general_config = self.config["general"]
         # default to warning level
-        level = general_config.get("log_level", "warning")
+        level = general_config["log_level"]
         if not isinstance(level, str):
             level = logging.WARNING
         else:
@@ -116,7 +121,7 @@ class Fibad:
         self.logger.setLevel(level)
 
         # Default to stderr for destination
-        log_destination = general_config.get("log_destination", "stderr")
+        log_destination = general_config["log_destination"]
 
         if not isinstance(log_destination, str):
             # Default to stderr in cases where configured log_destination has a non string object

@@ -36,7 +36,7 @@ def fetch_data_loader_class(runtime_config: dict) -> type:
         If no data loader was specified in the runtime configuration.
     """
 
-    data_loader_config = runtime_config.get("data_loader", {})
+    data_loader_config = runtime_config["data_loader"]
     data_loader_cls = None
 
     try:
