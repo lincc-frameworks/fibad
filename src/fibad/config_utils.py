@@ -1,3 +1,4 @@
+import datetime
 import logging
 from pathlib import Path
 from typing import Union
@@ -203,9 +204,6 @@ def get_runtime_config(
     else:
         final_runtime_config = default_runtime_config
 
-    # ~ Uncomment when we have a better place to stash results.
-    # log_runtime_config(final_runtime_config)
-
     return final_runtime_config
 
 
@@ -236,16 +234,46 @@ def merge_configs(default_config: dict, user_config: dict) -> dict:
     return final_config
 
 
-def log_runtime_config(runtime_config: dict, output_filepath: str = "runtime_config.toml"):
+def create_results_dir(config: ConfigDict, prefix: Union[Path, str]) -> Path:
+    """Creates a results directory for this run.
+
+    Prefix is the verb name of the run e.g. (predict, train, etc)
+
+    The directory is created within the results dir (set with config results_dir)
+    and follows the pattern <prefix>-<timestamp>
+
+    The resulting directory is returned.
+
+    Parameters
+    ----------
+    config : ConfigDict
+        The full runtime configuration for this run
+    prefix : str
+        The verb name of the run.
+
+    Returns
+    -------
+    Path
+        The path created by this function
+    """
+    results_root = Path(config["general"]["results_dir"]).resolve()
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%m%S")
+    directory = results_root / f"{prefix}-{timestamp}"
+    directory.mkdir(parents=True, exist_ok=False)
+    return directory
+
+
+def log_runtime_config(runtime_config: dict, output_path: Path, file_name: str = "runtime_config.toml"):
     """Log a runtime configuration.
 
     Parameters
     ----------
     runtime_config : dict
         A dictionary containing runtime configuration values.
-    output_filepath : str
-        The path to the output configuration file
+    output_path : str
+        The path to put the config file
+    file_name : str, Optional
+        Optional name for the config file, defaults to "runtime_config.toml"
     """
-
-    with open(output_filepath, "w") as f:
+    with open(output_path / file_name, "w") as f:
         f.write(toml.dumps(runtime_config))

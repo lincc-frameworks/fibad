@@ -69,6 +69,3 @@ class ExampleCNN(nn.Module):
 
     def _optimizer(self):
         return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
-
-    def save(self):
-        torch.save(self.state_dict(), self.config["model"]["weights_filepath"])
