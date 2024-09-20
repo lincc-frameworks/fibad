@@ -5,11 +5,9 @@
 
 # The train function has been converted into train_step for use with pytorch-ignite.
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
-import torch.utils.data.dataloader
 from torchvision.transforms.v2 import CenterCrop
 
 # extra long import here to address a circular import issue
@@ -138,6 +136,3 @@ class ExampleAutoencoder(nn.Module):
 
     def _optimizer(self):
         return optim.Adam(self.parameters(), lr=1e-3)
-
-    def save(self):
-        torch.save(self.state_dict(), self.config["model"]["weights_filepath"])
