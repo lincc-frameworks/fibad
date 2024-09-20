@@ -101,7 +101,12 @@ class Downloader:
             while batch := tuple(itertools.islice(iterator, n)):
                 yield batch
 
-        num_threads = num_threads if len(self.rects) > num_threads else 1
+        if len(self.rects) > num_threads:
+            msg = f"Only {len(self.rects)} sky locations, which is less than the number of threads, so we "
+            msg += "will use only one thread."
+            logger.info(msg)
+            num_threads = 1
+
         logger.info(f"Dividing {len(self.rects)} sky locations among {num_threads} threads...")
         thread_rects = (
             list(_batched(self.rects, int(len(self.rects) / num_threads)))

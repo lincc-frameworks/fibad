@@ -108,6 +108,10 @@ def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigD
             raise RuntimeError(msg)
 
         if isinstance(runtime_config[key], dict):
+            if not isinstance(default_config[key], dict):
+                msg = f"Runtime config contains a section named {key} which is the name of a value in the "
+                msg += "default config. Please choose another name for this section."
+                raise RuntimeError(msg)
             _validate_runtime_config(runtime_config[key], default_config[key])
 
 
