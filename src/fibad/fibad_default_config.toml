@@ -17,6 +17,7 @@ log_level = "info"     # Emit informational messages, warnings and all errors
 # log_level = "debug"    # Very verbose, emit all log messages.
 
 data_dir = "./data"
+results_dir = "./results" # Results get named <verb>-<timestamp> under this directory
 
 [download]
 sw = "22asec"
@@ -87,4 +88,5 @@ shuffle = true
 num_workers = 2
 
 [predict]
+model_weights_file = false
 batch_size = 32

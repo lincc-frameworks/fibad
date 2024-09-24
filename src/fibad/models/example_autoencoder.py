@@ -5,11 +5,9 @@
 
 # The train function has been converted into train_step for use with pytorch-ignite.
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
 import torch.optim as optim
-import torch.utils.data.dataloader
 from torchvision.transforms.v2 import CenterCrop
 
 # extra long import here to address a circular import issue
@@ -102,10 +100,10 @@ class ExampleAutoencoder(nn.Module):
         x = CenterCrop(size=(self.image_width, self.image_height))(x)
         return x
 
-    def forward(self, x):
-        z = self._eval_encoder(x)
-        x_hat = self._eval_decoder(z)
-        return x_hat
+    def forward(self, batch):
+        # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
+        x = batch[0] if isinstance(batch, tuple) else batch
+        return self._eval_encoder(x)
 
     def train_step(self, batch):
         """This function contains the logic for a single training step. i.e. the
@@ -124,7 +122,8 @@ class ExampleAutoencoder(nn.Module):
         # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
         x = batch[0] if isinstance(batch, tuple) else batch
 
-        x_hat = self.forward(x)
+        z = self._eval_encoder(x)
+        x_hat = self._eval_decoder(z)
         loss = F.mse_loss(x, x_hat, reduction="none")
         loss = loss.sum(dim=[1, 2, 3]).mean(dim=[0])
 
@@ -138,6 +137,3 @@ class ExampleAutoencoder(nn.Module):
 
     def _optimizer(self):
         return optim.Adam(self.parameters(), lr=1e-3)
-
-    def save(self):
-        torch.save(self.state_dict(), self.config["model"]["weights_filepath"])
