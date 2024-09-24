@@ -51,7 +51,7 @@ def test_import_module_from_string_no_class():
 
 def test_fetch_model_class():
     """Test the fetch_model_class function."""
-    config = {"model": {"external_cls": "builtins.BaseException"}}
+    config = {"model": {"name": "builtins.BaseException"}}
 
     model_cls = fetch_model_class(config)
 
@@ -73,7 +73,7 @@ def test_fetch_model_class_no_model():
 def test_fetch_model_class_no_model_cls():
     """Test that an exception is raised when a non-existent model class is requested."""
 
-    config = {"model": {"external_cls": "builtins.Nonexistent"}}
+    config = {"model": {"name": "builtins.Nonexistent"}}
 
     with pytest.raises(AttributeError) as excinfo:
         fetch_model_class(config)

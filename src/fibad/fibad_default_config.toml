@@ -50,10 +50,9 @@ variance = false
 mask = false
 
 [model]
+# The name of the built-in model to use or the libpath to an external model
+# e.g. "user_package.submodule.ExternalModel" or "ExampleAutoencoder"
 name = "ExampleAutoencoder"
-
-# An example of requesting an external model class
-# external_class = "user_package.submodule.ExternalModel"
 
 weights_filepath = "example_model.pth"
 epochs = 10
@@ -62,11 +61,9 @@ base_channel_size = 32
 latent_dim =64
 
 [data_loader]
-# Name of data loader to use
+# Name of the built-in data loader to use or the libpath to an external data loader
+# e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
 name = "HSCDataLoader"
-
-# An example of requesting an external data loader class
-# external_class = "user_package.submodule.ExternalDataLoader"
 
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
 #

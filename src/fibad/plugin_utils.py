@@ -8,8 +8,7 @@ def get_or_load_class(config: dict, registry: dict) -> type:
     Parameters
     ----------
     config : dict
-        The configuration dictionary. Should at least one of the following two
-        keys: "name" or "external_cls".
+        The configuration dictionary. Must contain the key, "name".
     registry : dict
         The registry dictionary of <class name> : <class type> pairs.
 
@@ -21,28 +20,22 @@ def get_or_load_class(config: dict, registry: dict) -> type:
     Raises
     ------
     ValueError
-        User specified a `name` key in the config that doesn't match any keys in the registry.
-    ValueError
-        User failed to specify a class to load in the runtime configuration. Neither
-        a `name` nor `external_cls` key was found in the config.
+        User failed to specify a class to load in the runtime configuration. No
+        `name` key was found in the config.
     """
 
-    # User specifies one of the built in classes by name
+    #! Once we have confidence in the config having default values, we can remove this check
     if "name" in config:
         class_name = config["name"]
 
-        if class_name not in registry:
-            raise ValueError(f"Could not find {class_name} in registry: {registry.keys()}")
-
-        returned_class = registry[class_name]
-
-    # User provides an external class, attempt to import it with the module spec
-    elif "external_cls" in config:
-        returned_class = import_module_from_string(config["external_cls"])
+        if class_name in registry:
+            returned_class = registry[class_name]
+        else:
+            returned_class = import_module_from_string(class_name)
 
     # User failed to define a class to load
     else:
-        raise ValueError("No class requested. Specify a `name` or `external_cls` key in the runtime config.")
+        raise ValueError("No class requested. Specify a `name` key in the runtime config.")
 
     return returned_class
 
