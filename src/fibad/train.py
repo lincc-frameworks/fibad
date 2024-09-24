@@ -1,7 +1,7 @@
 import logging
 
 from fibad.config_utils import create_results_dir, log_runtime_config
-from fibad.pytorch_ignite import create_trainer, setup_model_and_dataloader
+from fibad.pytorch_ignite import create_trainer, dist_data_loader, setup_model_and_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,8 @@ def run(config):
     results_dir = create_results_dir(config, "train")
     log_runtime_config(config, results_dir)
 
-    model, data_loader = setup_model_and_dataloader(config)
+    model, data_set = setup_model_and_dataset(config)
+    data_loader = dist_data_loader(data_set, config)
 
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model)

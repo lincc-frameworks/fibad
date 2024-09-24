@@ -171,7 +171,7 @@ class HSCDataSet(Dataset):
         # Scan the filesystem to get the widths and heights of all images into a dict
         return {
             object_id: [self._fits_file_dims(filepath) for filepath in self._object_files(object_id)]
-            for object_id in self._all_object_ids()
+            for object_id in self.ids()
         }
 
     def _prune_objects(self, filters_ref: list[str]) -> list[str]:
@@ -356,7 +356,7 @@ class HSCDataSet(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def _all_object_ids(self):
+    def ids(self):
         """Private read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 
@@ -378,7 +378,7 @@ class HSCDataSet(Dataset):
         Path
             The path to the file.
         """
-        for object_id in self._all_object_ids():
+        for object_id in self.ids():
             for filename in self._object_files(object_id):
                 yield filename
 

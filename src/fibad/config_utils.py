@@ -257,7 +257,7 @@ def create_results_dir(config: ConfigDict, prefix: Union[Path, str]) -> Path:
         The path created by this function
     """
     results_root = Path(config["general"]["results_dir"]).resolve()
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%m%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     directory = results_root / f"{prefix}-{timestamp}"
     directory.mkdir(parents=True, exist_ok=False)
     return directory
