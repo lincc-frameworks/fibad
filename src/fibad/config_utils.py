@@ -234,13 +234,13 @@ def merge_configs(default_config: dict, user_config: dict) -> dict:
     return final_config
 
 
-def create_results_dir(config: ConfigDict, prefix: Union[Path, str]) -> Path:
+def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:
     """Creates a results directory for this run.
 
-    Prefix is the verb name of the run e.g. (predict, train, etc)
+    Postfix is the verb name of the run e.g. (predict, train, etc)
 
     The directory is created within the results dir (set with config results_dir)
-    and follows the pattern <prefix>-<timestamp>
+    and follows the pattern <timestamp>-<postfix>
 
     The resulting directory is returned.
 
@@ -248,7 +248,7 @@ def create_results_dir(config: ConfigDict, prefix: Union[Path, str]) -> Path:
     ----------
     config : ConfigDict
         The full runtime configuration for this run
-    prefix : str
+    postfix : str
         The verb name of the run.
 
     Returns
@@ -258,7 +258,7 @@ def create_results_dir(config: ConfigDict, prefix: Union[Path, str]) -> Path:
     """
     results_root = Path(config["general"]["results_dir"]).resolve()
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    directory = results_root / f"{prefix}-{timestamp}"
+    directory = results_root / f"{timestamp}-{postfix}"
     directory.mkdir(parents=True, exist_ok=False)
     return directory
 

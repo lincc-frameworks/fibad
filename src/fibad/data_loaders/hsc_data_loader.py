@@ -107,7 +107,7 @@ class HSCDataSet(Dataset):
 
         self.cutout_shape = cutout_shape
 
-        self.object_ids = self._prune_objects(filters_ref)
+        self._prune_objects(filters_ref)
 
         if self.cutout_shape is None:
             self.cutout_shape = self._check_file_dimensions()
@@ -174,12 +174,14 @@ class HSCDataSet(Dataset):
             for object_id in self.ids()
         }
 
-    def _prune_objects(self, filters_ref: list[str]) -> list[str]:
+    def _prune_objects(self, filters_ref: list[str]):
         """Class initialization helper. Prunes objects from the list of objects.
 
         1) Removes any objects which do not have all the filters specified in filters_ref
         2) If a cutout_shape was provided in the constructor, prunes files that are too small
            for the chosen cutout size
+
+        This function deletes from self.files and self.dims via _prune_object
 
         Parameters
         ----------
@@ -190,10 +192,6 @@ class HSCDataSet(Dataset):
         filters_ref : list[str]
             List of the filter names
 
-        Returns
-        -------
-        list[str]
-            List of all object IDs which survived the prune.
         """
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
@@ -357,7 +355,7 @@ class HSCDataSet(Dataset):
         return self._file_to_path(filters[filter])
 
     def ids(self):
-        """Private read-only iterator over all object_ids that enforces a strict total order across
+        """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 
         Yields
