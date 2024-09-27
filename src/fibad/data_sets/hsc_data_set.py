@@ -11,62 +11,31 @@ from astropy.io import fits
 from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
-from .data_loader_registry import fibad_data_loader
+from .data_set_registry import fibad_data_set
 
 logger = logging.getLogger(__name__)
 
 
-@fibad_data_loader
-class HSCDataLoader:
+@fibad_data_set
+class HSCDataSet(Dataset):
     def __init__(self, config):
-        self.config = config
-        self._data_set = self.data_set()
-
-    def get_data_loader(self):
-        """This is the primary method for this class.
-
-        Returns
-        -------
-        torch.utils.data.DataLoader
-            The dataloader to use for training.
-        """
-        return self.data_loader(self.data_set())
-
-    def data_set(self):
-        # Only construct a data set once per loader object, since it involves a filesystem scan.
-        if self.__dict__.get("_data_set", None) is not None:
-            return self._data_set
-
         # TODO: What will be a reasonable set of tranformations?
         # For now tanh all the values so they end up in [-1,1]
         # Another option might be sinh, but we'd need to mess with the example autoencoder module
         # Because it goes from unbounded NN output space -> [-1,1] with tanh in its decode step.
         transform = Lambda(lambd=np.tanh)
 
-        crop_to = self.config["data_loader"]["crop_to"]
-        filters = self.config["data_loader"]["filters"]
+        crop_to = config["data_loader"]["crop_to"]
+        filters = config["data_loader"]["filters"]
 
-        return HSCDataSet(
-            self.config["general"]["data_dir"],
+        self._init_from_path(
+            config["general"]["data_dir"],
             transform=transform,
             cutout_shape=crop_to if crop_to else None,
             filters=filters if filters else None,
         )
 
-    def data_loader(self, data_set):
-        return torch.utils.data.DataLoader(
-            data_set,
-            batch_size=self.config["data_loader"]["batch_size"],
-            shuffle=self.config["data_loader"]["shuffle"],
-            num_workers=self.config["data_loader"]["num_workers"],
-        )
-
-    def shape(self):
-        return self.data_set().shape()
-
-
-class HSCDataSet(Dataset):
-    def __init__(
+    def _init_from_path(
         self,
         path: Union[Path, str],
         *,
@@ -74,8 +43,8 @@ class HSCDataSet(Dataset):
         cutout_shape: Optional[tuple[int, int]] = None,
         filters: Optional[list[str]] = None,
     ):
-        """Initialize an HSC data set from a path. This involves several filesystem scan operations and will
-        ultimately open and read the header info of every fits file in the given directory
+        """__init__ helper. Initialize an HSC data set from a path. This involves several filesystem scan
+        operations and will ultimately open and read the header info of every fits file in the given directory
 
         Parameters
         ----------
