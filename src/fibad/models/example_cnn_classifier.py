@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @fibad_model
 class ExampleCNN(nn.Module):
-    def __init__(self, config, shape):
+    def __init__(self, config, _):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)

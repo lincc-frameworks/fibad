@@ -9,7 +9,7 @@ from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import Dataset
 
 from fibad.config_utils import ConfigDict
-from fibad.data_loaders.data_loader_registry import fetch_data_loader_class
+from fibad.data_sets.data_set_registry import fetch_data_set_class
 from fibad.models.model_registry import fetch_model_class
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def setup_model_and_dataset(config: ConfigDict) -> tuple:
     """
-    Construct the data loader and the model according to configuration.
+    Construct the dataset and the model according to configuration.
 
     Primarily exists so the train and predict actions do this the same way.
 
@@ -32,15 +32,12 @@ def setup_model_and_dataset(config: ConfigDict) -> tuple:
         (model object, data loader object)
     """
     # Fetch data loader class specified in config and create an instance of it
-    data_loader_cls = fetch_data_loader_class(config)
-    data_loader = data_loader_cls(config)
+    data_set_cls = fetch_data_set_class(config)
+    data_set = data_set_cls(config)
 
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
-    model = model_cls(config=config, shape=data_loader.shape())
-
-    # Get the pytorch.dataset from dataloader, and use it to create a distributed dataloader
-    data_set = data_loader.data_set()
+    model = model_cls(config=config, shape=data_set.shape())
 
     return model, data_set
 
