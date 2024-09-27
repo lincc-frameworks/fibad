@@ -17,7 +17,7 @@ from fibad.models.model_registry import fetch_model_class
 logger = logging.getLogger(__name__)
 
 
-def setup_model_and_dataset(config: ConfigDict) -> tuple:
+def setup_model_and_dataset(config: ConfigDict, split: str) -> tuple:
     """
     Construct the dataset and the model according to configuration.
 
@@ -27,6 +27,8 @@ def setup_model_and_dataset(config: ConfigDict) -> tuple:
     ----------
     config : ConfigDict
        The entire runtime config
+    split : str
+       The name of the split we want to use from the data set.
 
     Returns
     -------
@@ -35,7 +37,7 @@ def setup_model_and_dataset(config: ConfigDict) -> tuple:
     """
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
-    data_set = data_set_cls(config)
+    data_set = data_set_cls(config, split)
 
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
@@ -210,8 +212,8 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         greater_or_equal=True,
     )
 
-    if config["model"]["resume"]:
-        prev_checkpoint = torch.load(config["model"]["resume"], map_location=device)
+    if config["train"]["resume"]:
+        prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
 
     @trainer.on(Events.STARTED)

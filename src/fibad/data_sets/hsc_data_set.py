@@ -2,8 +2,9 @@
 
 import logging
 import re
+from copy import copy
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -18,6 +19,235 @@ logger = logging.getLogger(__name__)
 
 @fibad_data_set
 class HSCDataSet(Dataset):
+    """Interface object to allow simple access to splits on a corpus of HSC data files
+
+    f/s operations and management are handled in HSCDatSetContainer
+    splits on the dataset and their generation are handled by HSCDataSetSplit
+
+    """
+
+    def __init__(self, config, split: Union[str, None] = None):
+        # initialize the filesystem references
+        self.container = HSCDataSetContainer(config)
+
+        # initalize our splits from configuration
+        self._create_splits(config)
+
+        # Set the split to what was requested.
+        self._set_split(split)
+
+    def _create_splits(self, config):
+        seed = config["prepare"]["seed"] if config["prepare"]["seed"] else None
+
+        # Init the splits based on config values
+        train_size = config["prepare"]["train_size"] if config["prepare"]["train_size"] else None
+        test_size = config["prepare"]["test_size"] if config["prepare"]["test_size"] else None
+        validate_size = config["prepare"]["validate_size"] if config["prepare"]["validate_size"] else None
+
+        # Convert all values specified as counts into ratios of the underlying container
+        if isinstance(train_size, int):
+            train_size = train_size / len(self.container)
+        if isinstance(test_size, int):
+            test_size = test_size / len(self.container)
+        if isinstance(validate_size, int):
+            validate_size = validate_size / len(self.container)
+
+        # Fill in any values not provided
+        if test_size is None:
+            if train_size is None:
+                train_size = 0.25
+            test_size = 1.0 - train_size
+        elif train_size is None:
+            train_size = 1.0 - test_size
+        elif validate_size is None:
+            validate_size = 1.0 - (train_size + test_size)
+
+        # Generate splits
+        self.splits = {}
+        self.splits["test"] = HSCDataSetSplit(self.container, test_size, seed=seed)
+        rest = copy(self.splits["test"]).complement()
+        self.splits["train"] = HSCDataSetSplit(rest, train_size, seed=seed)
+
+        # Validate is only generated if it is provided, or if both test and train are provided.
+        if validate_size:
+            rest = rest.logical_and(copy(self.splits["train"]).complement())
+            self.splits["validate"] = HSCDataSetSplit(rest, validate_size, seed=seed)
+
+        logger.info("HSC Data Set Splits loaded are:")
+        for key, value in self.splits.items():
+            logger.info(f"{key} split contains {len(value)} items")
+
+    def _set_split(self, split: Union[str, None] = None):
+        self.current_split = self.splits.get(split, self.container)
+
+        if split is not None and self.current_split == self.container:
+            splits = list(self.splits.keys())
+            raise RuntimeError(f"Split {split} does not exist. valid split names are {splits}")
+
+    def shape(self) -> tuple[int, int, int]:
+        return self.container.shape()
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        return self.current_split[idx]
+
+    def __len__(self) -> int:
+        return len(self.current_split)
+
+
+class HSCDataSetSplit(Dataset):
+    def __init__(
+        self,
+        data: Union["HSCDataSetContainer", "HSCDataSetSplit"],
+        ratio: float,
+        seed: Union[int, None] = None,
+    ):
+        """
+        This class represents a split of an HSCDataset.
+
+        It should only get created by passing in an existing HSCDataSetContainer (or HSCDataSetSplit)
+        and splitting it according to the train_test_split like parameters. When you split a split,
+        all splits end up referring to the same uderlying HSCDataSetContainer object.
+
+        Each encodes a subset of the underlying HSCDataSetContainer by keeping a list of boolean values.
+
+        Parameters
+        ----------
+        data : Union[HSCDataSetContainer, &quot;HSCDataSetSplit&quot;]
+            The underlying HSCDataSet or split to operate on. Creating a split from an existing split ends up
+            referring to a subset of the data selected by the original split, but the new object only refers
+            to an underlying HSCDataSet object, not any other split object.
+        ratio : float
+            Ratio of the underlying data source to use for this split. This is expressed as a fraction of the
+            HSCDataSetContainer even when an HSCDataSetSplit is passed.
+        seed : Union[int, None] , optional
+            The seed value to provide to the random number generator, or None if you would like to use system
+            entropy to generate a seed. None by default.
+        shuffle : bool, optional
+            Whether to shuffle the order of the underlying data when accessing the split object, by default
+            True
+        """
+        self.rng = np.random.default_rng(seed)
+
+        if ratio > 1.0 or ratio < 0.0:
+            msg = f"Split provided for HSCDatSetSplit as a ratio is {ratio}, which is not between 0.0 and 1.0"
+            raise RuntimeError(msg)
+
+        self.data = data.data if isinstance(data, HSCDataSetSplit) else data
+
+        # The length of this split once constructed
+        length = int(np.round(len(self.data) * ratio))
+
+        if isinstance(data, HSCDataSetSplit):
+            # If we're splitting a split we need to modify the existing mask of the prior split
+            # Namely we switch some true values to false to more of the underlying dataset
+            split = data
+            self.mask = copy(split.mask)
+            remove_count = len(split) - length
+            self._flip_mask_values(remove_count, "true_to_false")
+
+        else:
+            # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
+            self.mask = np.zeros(len(data), dtype=np.bool)
+            self._flip_mask_values(length, "false_to_true")
+
+        self.indexes = np.nonzero(self.mask)[0]
+
+    def _flip_mask_values(self, num: int, mode: Literal["false_to_true", "true_to_false"]):
+        """
+        Private helper to flips some values of self.mask. The direction to flip is controlled by the
+        mode parameter. Either the function randomly finds `num` true values to flip to false, or `num` false
+        values to flip to true.
+
+        This function is used during object construction to create a set number of randomly selected true
+        values in the mask.
+
+        Parameters
+        ----------
+        num : int
+            The number of values to flip
+        mode : Literal[&quot;false_to_true&quot;, &quot;true_to_false&quot;]
+            The mode to work in, either flipping True values false or the reverse
+
+        Raises
+        ------
+        RuntimeError
+            It is a RuntimeError to try to flip more values than the mask has of that type.
+
+        """
+        mask_tmp = np.logical_not(self.mask) if mode == "false_to_true" else self.mask
+        target_val = mode == "false_to_true"
+        target_indexes = np.nonzero(mask_tmp)[0]
+
+        if num > len(target_indexes):
+            msg_mode = mode.replace("_", " ")
+            num_tgt = len(target_indexes)
+            msg = f"Cannot flip {num} values {msg_mode} when only {num_tgt} {target_val} values exist in mask"
+            raise RuntimeError(msg)
+
+        change_indexes = self.rng.permutation(target_indexes)[:num]
+        for i in change_indexes:
+            self.mask[i] = target_val
+
+    def complement(self) -> "HSCDataSetSplit":
+        """Mutates the split by inverting it with respect to the underlying dataset.
+
+        e.g. if you have an underlying dataset with 5 members, and indexes 1,2, and 4 are part of this split
+        The compliment would be a dataset selecting indexes 0 and 3.
+        """
+        self.mask = np.logical_not(self.mask)
+        self.indexes = np.nonzero(self.mask)[0]
+        return self
+
+    def logical_and(self, obj: "HSCDataSetSplit") -> "HSCDataSetSplit":
+        """Takes the logical and of this object and the passed in object. self is modified, the passed in
+        object is not
+
+        If the self object selects indicies 1,2 and 4 and the passed in object selects indicies 2, 4, and 0
+        the self object would be modified to select indicies 2, and 4 only.
+
+        It is a RuntimeError to and two split objects that do not reference the same underlying HSCDataSet
+
+        Parameters
+        ----------
+        obj : HSCDataSetSplit
+            The object to and with
+        """
+        if self.data != obj.data:
+            msg = "Tried to take logical and of two HSCDataSetSplits with different HSCDataSet objects"
+            raise RuntimeError(msg)
+
+        self.mask = np.logical_and(self.mask, obj.mask)
+        self.indexes = np.nonzero(self.mask)[0]
+        return self
+
+    def __copy__(self) -> "HSCDataSetSplit":
+        # Create a HSCDataSetSplit with no data selected, but the same data source as self
+        copy_object = HSCDataSetSplit(self.data, 0.0)
+
+        # Copy mask and indexes over
+        copy_object.mask = self.mask.copy()
+        copy_object.indexes = self.indexes.copy()
+
+        # Copy RNG state over.
+        copy_object.rng = copy(self.rng)
+
+        return copy_object
+
+    def __len__(self) -> int:
+        return len(self.indexes)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        return self.data[self.indexes[idx]]
+
+    def ids(self):
+        for obj_id, index in zip(self.data.ids(), range(len(self.data))):
+            if self.mask[index] is True:
+                yield obj_id
+            else:
+                continue
+
+
+class HSCDataSetContainer(Dataset):
     def __init__(self, config):
         # TODO: What will be a reasonable set of tranformations?
         # For now tanh all the values so they end up in [-1,1]
@@ -280,7 +510,7 @@ class HSCDataSet(Dataset):
         return self._object_id_to_tensor(object_id)
 
     def __contains__(self, object_id: str) -> bool:
-        """Allows you to do `object_id in dataset` queries
+        """Allows you to do `object_id in dataset` queries. Used by testing code.
 
         Parameters
         ----------
