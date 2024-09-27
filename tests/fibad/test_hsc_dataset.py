@@ -3,7 +3,7 @@ import unittest.mock as mock
 from pathlib import Path
 
 import numpy as np
-from fibad.data_loaders.hsc_data_loader import HSCDataSet
+from fibad.data_sets.hsc_data_set import HSCDataSet
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
@@ -29,7 +29,7 @@ class FakeFitsFS:
         self.test_files = test_files
 
         mock_paths = [Path(x) for x in list(test_files.keys())]
-        target = "fibad.data_loaders.hsc_data_loader.Path.glob"
+        target = "fibad.data_sets.hsc_data_set.Path.glob"
         self.patchers.append(mock.patch(target, return_value=mock_paths))
 
         mock_fits_open = mock.Mock(side_effect=self._open_file)
@@ -49,6 +49,19 @@ class FakeFitsFS:
     def __exit__(self, *exc):
         for patcher in self.patchers:
             patcher.stop()
+
+
+def mkconfig(crop_to=False, filters=False):
+    """Makes a configuration that points at nonexistent path so HSCDataSet.__init__ will create an object,
+    and our FakeFitsFS shim can be called.
+    """
+    return {
+        "general": {"data_dir": "thispathdoesnotexist"},
+        "data_loader": {
+            "crop_to": crop_to,
+            "filters": filters,
+        },
+    }
 
 
 def generate_files(
@@ -96,7 +109,7 @@ def test_load(caplog):
     caplog.set_level(logging.WARNING)
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         # 10 objects should load
         assert len(a) == 10
@@ -117,7 +130,7 @@ def test_load_duplicate(caplog):
     duplicate_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263), infill_str="duplicate")
     test_files.update(duplicate_files)
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         # Only 10 objects should load
         assert len(a) == 10
@@ -148,7 +161,7 @@ def test_prune_warn_1_percent(caplog):
     test_files["00000000000000101_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         # We should have the correct number of objects
         assert len(a) == 98
@@ -175,7 +188,7 @@ def test_prune_error_5_percent(caplog):
     test_files["00000000000000020_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         # We should have two objects, having dropped one.
         assert len(a) == 18
@@ -204,7 +217,7 @@ def test_crop(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(99, 99), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
@@ -230,7 +243,7 @@ def test_crop_warn_2px_larger(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(99, 99), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
@@ -256,7 +269,7 @@ def test_crop_warn_2px_smaller(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(98, 98), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist")
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 98, 98)
@@ -277,7 +290,7 @@ def test_prune_size(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(98, 98), offset=30))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist", cutout_shape=(99, 99))
+        a = HSCDataSet(mkconfig(crop_to=(99, 99)))
 
         assert len(a) == 20
         assert a.shape() == (5, 99, 99)
@@ -292,7 +305,7 @@ def test_partial_filter(caplog):
     caplog.set_level(logging.WARNING)
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist", filters=["HSC-G", "HSC-R"])
+        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R"]))
 
         # 10 objects should load
         assert len(a) == 10
@@ -317,7 +330,7 @@ def test_partial_filter_prune_warn_1_percent(caplog):
     test_files["00000000000000101_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet("thispathdoesnotexist", filters=["HSC-R", "HSC-I"])
+        a = HSCDataSet(mkconfig(filters=["HSC-R", "HSC-I"]))
 
         # We should have the correct number of objects
         assert len(a) == 98
