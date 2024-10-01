@@ -1,3 +1,4 @@
+
 repos:
     # Compare the local template version to the latest remote template version
     # This hook should always pass. It will print a message if the local version 
@@ -16,6 +17,7 @@ repos:
         name: Clear output from Jupyter notebooks
         description: Clear output from Jupyter notebooks.
         files: \.ipynb$
+        exclude: ^docs/pre_executed
         stages: [commit]
         language: system
         entry: jupyter nbconvert --clear-output
