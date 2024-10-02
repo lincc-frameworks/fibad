@@ -1,23 +1,26 @@
-# The .github directory
+# FIBAD
 
-This directory contains various configurations and .yml files that are used to
-define GitHub actions and behaviors.
+<hr>
 
-## Workflows
+## Quick Intro
+The **Framework for Image-Based Anomaly Detection** (FIBAD) is an efficient tool to hunt for rare and anomalous sources in large astronomical imaging surveys (e.g., Rubin-LSST, HSC, Euclid, NGRST, etc.). FIBAD is designed to support four primary steps in the anomaly detection workflow:-
 
-The .yml files in ``./workflows`` are used to define the various continuous 
-integration scripts that will be run on your behalf e.g. nightly as a smoke check,
-or when you create a new PR.
+* Downloading large numbers of cutouts from public data repositories
+* Building lower dimensional representations of downloaded images -- the latent space
+* Visualization and algorithmic exploration (e.g., clustering) of the latent space
+* Identification & rank-ordering of potential anomalous objects 
 
-For more information about CI and workflows, look here: https://lincc-ppt.readthedocs.io/en/latest/practices/ci.html
+FIBAD is not tied to a specific anomaly detection algorithm/model or a specific class of rare/anomalous objects; but rather intended to support any algorithm that the user may want to apply on imaging data. If the algorithm you want to use takes in tensors, outputs tensors, and can be impleneted in PyTorch; then chances are FIBAD is the right tool for you! 
 
-## Configurations
+## Getting Started 
+To get started with FIBAD:-
 
-Templates for various different issue types are defined in ``./ISSUE_TEMPLATE``
-and a pull request template is defined as ``pull_request_template.md``. Adding,
-removing, and modifying these templates to suit the needs of your project is encouraged.
-
-For more information about these templates, look here: https://lincc-ppt.readthedocs.io/en/latest/practices/issue_pr_templating.html
+* Clone the [FIBAD repository](https://github.com/lincc-frameworks/fibad)
+* Create a new `conda` environment using `conda create -n "fibad" python=3.10`
+* Set up the repository (for development) using `bash .setup_dev.sh`
 
 
-Or if you still have questions contact us: https://lincc-ppt.readthedocs.io/en/latest/source/contact.html
+## Additional Inforamtion
+FIBAD is under active development and has limited documentation at the moment. We aim to have v1 stability and more documentation in the first half of 2025. If you are an astronomer trying to use FIBAD before then, please get in touch with us! 
+
+This project started as a collaboration between different units within the [LSST Discovery Alliance](https://lsstdiscoveryalliance.org/) -- the [LINCC Frameworks Team](https://lsstdiscoveryalliance.org/programs/lincc-frameworks/) and LSST-DA Catalyst Fellow, [Aritra Ghosh](https://ghosharitra.com/).
