@@ -5,7 +5,7 @@
 
 <hr>
 
-## Quick Intro
+## Introduction
 The **Framework for Image-Based Anomaly Detection** (FIBAD) is an efficient tool to hunt for rare and anomalous sources in large astronomical imaging surveys (e.g., Rubin-LSST, HSC, Euclid, NGRST, etc.). FIBAD is designed to support four primary steps in the anomaly detection workflow:-
 
 * Downloading large numbers of cutouts from public data repositories
