@@ -104,7 +104,7 @@ def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigD
     """
     for key in runtime_config:
         if key not in default_config:
-            msg = f"Runtime config contains key or section {key} which has no default defined."
+            msg = f"Runtime config contains key or section {key} which has no default defined. "
             msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
             raise RuntimeError(msg)
 
@@ -138,7 +138,7 @@ def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = Non
     """Resolve a user-supplied runtime config to where we will actually pull config from.
 
     1) If a runtime config file is specified, we will use that file
-    2) If not file is specified and there is a file named "fibad_config.toml" in the cwd we will use that file
+    2) If no file is specified and there is a file named "fibad_config.toml" in the cwd we will use that file
     3) If no file is specified and there is no file named "fibad_config.toml" in the current working directory
        we will exclusively work off the configuration defaults in the packaged "fibad_default_config.toml"
        file.
