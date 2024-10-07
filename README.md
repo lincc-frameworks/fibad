@@ -24,12 +24,12 @@ implemented in PyTorch; then chances are FIBAD is the right tool for you!
 
 ## Getting Started 
 To get started with FIBAD, clone the repository and create a new virtual environment.
-If you plan to develop code, run the optional ``.setup_dev.sh`` script.
+If you plan to develop code, run the ``.setup_dev.sh`` script.
 
 ```
 >> git clone https://github.com/lincc-frameworks/fibad.git
 >> conda create -n fibad python=3.10
->> bash .setup_dev.sh (Optional)
+>> bash .setup_dev.sh (Optional, for developers)
 ```
 
 ## Additional Information
