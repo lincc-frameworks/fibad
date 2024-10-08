@@ -64,7 +64,7 @@ latent_dim =64
 [data_set]
 # Name of the built-in data loader to use or the libpath to an external data loader
 # e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
-name = "HSCDataLoader"
+name = "CifarDataSet"
 
 [data_loader]
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
