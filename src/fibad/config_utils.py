@@ -24,13 +24,13 @@ class ConfigDict(dict):
 
     __slots__ = ()  # we don't need __dict__ on this object at all.
 
-    def __init__(self, map: dict, **kwargs):
-        super().__init__(map, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # Replace all dictionary keys with values recursively.
-        for key in self:
-            if isinstance(self[key], dict) and not isinstance(self[key], ConfigDict):
-                self[key] = ConfigDict(map=self[key])
+        for key, val in self.items():
+            if isinstance(val, dict) and not isinstance(val, ConfigDict):
+                self[key] = ConfigDict(val)
 
     def __missing__(self, key):
         msg = f"Accessed configuration key/section {key} which has not been defined. "
