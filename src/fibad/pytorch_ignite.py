@@ -5,6 +5,7 @@ from typing import Any, Callable
 import ignite.distributed as idist
 import torch
 from ignite.engine import Engine, Events
+from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import Dataset
 
@@ -170,6 +171,34 @@ def create_trainer(model) -> Engine:
     model = idist.auto_model(model)
     trainer = create_engine("train_step", device, model)
 
+    to_save = {
+        'model': model,
+        'optimizer': model.optimizer,
+        'trainer': trainer,
+    }
+
+    latest_checkpoint = Checkpoint(
+        to_save,
+        DiskSaver('./results/checkpoints', create_dir=True, require_empty=False),
+        n_saved=1,
+        global_step_transform=global_step_from_engine(trainer),
+        filename_pattern="{name}.{ext}",
+    )
+
+    # neg_loss_score = Checkpoint.get_default_score_fn("loss", -1.0)
+    # best_checkpoint = Checkpoint(
+    #     to_save,
+    #     DiskSaver('./results/checkpoints', create_dir=True, require_empty=False),
+    #     n_saved=1,
+    #     global_step_transform=global_step_from_engine(trainer),
+    #     score_name="loss",
+    #     score_function=neg_loss_score,
+    # )
+
+
+    # prev_checkpoint = torch.load('./results/checkpoints/checkpoint.pt', map_location=device)
+    # Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
+
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
         logger.info(f"Training model on device: {device}")
@@ -183,6 +212,9 @@ def create_trainer(model) -> Engine:
     def log_training_loss(trainer):
         logger.info(f"Epoch {trainer.state.epoch} run time: {trainer.state.times['EPOCH_COMPLETED']:.2f}[s]")
         logger.info(f"Epoch {trainer.state.epoch} metrics: {trainer.state.output}")
+
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, latest_checkpoint)
+    # trainer.add_event_handler(Events.EPOCH_COMPLETED, best_checkpoint)
 
     @trainer.on(Events.COMPLETED)
     def log_total_time(trainer):
