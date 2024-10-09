@@ -23,7 +23,7 @@ def run(config):
     data_loader = dist_data_loader(data_set, config)
 
     # Create trainer, a pytorch-ignite `Engine` object
-    trainer = create_trainer(model)
+    trainer = create_trainer(model, config, results_dir)
 
     # Run the training process
     trainer.run(data_loader, max_epochs=config["model"]["epochs"])

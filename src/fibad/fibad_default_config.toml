@@ -59,7 +59,11 @@ weights_filepath = "example_model.pth"
 epochs = 10
 
 base_channel_size = 32
-latent_dim =64
+latent_dim = 64
+
+# Set this to the path of a checkpoint file to resume, or continue training,
+# from a checkpoint. Otherwise, set to false to start from scratch.
+resume = false
 
 [data_set]
 # Name of the built-in data loader to use or the libpath to an external data loader
@@ -84,7 +88,7 @@ crop_to = false
 filters = false
 
 # Default PyTorch DataLoader parameters
-batch_size = 4
+batch_size = 32
 shuffle = true
 num_workers = 2
 

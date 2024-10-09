@@ -1,5 +1,6 @@
 import functools
 import logging
+from pathlib import Path
 from typing import Any, Callable
 
 import ignite.distributed as idist
@@ -123,7 +124,7 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
         The model to evaluate
 
     save_function : Callable[[torch.Tensor], Any]
-        A function which will recieve Engine.state.output at the end of each iteration. The intent
+        A function which will receive Engine.state.output at the end of each iteration. The intent
         is for the results of evaluation to be saved.
 
     Returns
@@ -151,7 +152,7 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
     return evaluator
 
 
-def create_trainer(model) -> Engine:
+def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory: Path) -> Engine:
     """This function is originally copied from here:
     https://github.com/pytorch-ignite/examples/blob/main/tutorials/intermediate/cifar10-distributed.py#L164
 
@@ -160,7 +161,11 @@ def create_trainer(model) -> Engine:
     Parameters
     ----------
     model : torch.nn.Module
-        The model to train.
+        The model to train
+    config : ConfigDict
+        Fibad runtime configuration
+    results_directory : Path
+        The directory where training results will be saved
 
     Returns
     -------
@@ -172,32 +177,32 @@ def create_trainer(model) -> Engine:
     trainer = create_engine("train_step", device, model)
 
     to_save = {
-        'model': model,
-        'optimizer': model.optimizer,
-        'trainer': trainer,
+        "model": model,
+        "optimizer": model.optimizer,
+        "trainer": trainer,
     }
 
     latest_checkpoint = Checkpoint(
         to_save,
-        DiskSaver('./results/checkpoints', create_dir=True, require_empty=False),
+        DiskSaver(results_directory, require_empty=False),
         n_saved=1,
         global_step_transform=global_step_from_engine(trainer),
-        filename_pattern="{name}.{ext}",
+        filename_pattern="{name}_epoch_{global_step}.{ext}",
     )
 
     # neg_loss_score = Checkpoint.get_default_score_fn("loss", -1.0)
     # best_checkpoint = Checkpoint(
     #     to_save,
-    #     DiskSaver('./results/checkpoints', create_dir=True, require_empty=False),
+    #     DiskSaver(results_directory, require_empty=False),
     #     n_saved=1,
     #     global_step_transform=global_step_from_engine(trainer),
     #     score_name="loss",
     #     score_function=neg_loss_score,
     # )
 
-
-    # prev_checkpoint = torch.load('./results/checkpoints/checkpoint.pt', map_location=device)
-    # Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
+    if config["model"]["resume"]:
+        prev_checkpoint = torch.load(config["model"]["resume"], map_location=device)
+        Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
 
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
@@ -219,5 +224,10 @@ def create_trainer(model) -> Engine:
     @trainer.on(Events.COMPLETED)
     def log_total_time(trainer):
         logger.info(f"Total training time: {trainer.state.times['COMPLETED']:.2f}[s]")
+
+    def log_last_checkpoint_location(_, latest_checkpoint):
+        logger.info(f"Lates checkpoint saved as: {latest_checkpoint.last_checkpoint}")
+
+    trainer.add_event_handler(Events.COMPLETED, log_last_checkpoint_location, latest_checkpoint)
 
     return trainer
