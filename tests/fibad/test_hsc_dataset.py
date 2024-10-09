@@ -57,7 +57,7 @@ def mkconfig(crop_to=False, filters=False):
     """
     return {
         "general": {"data_dir": "thispathdoesnotexist"},
-        "data_loader": {
+        "data_set": {
             "crop_to": crop_to,
             "filters": filters,
         },

@@ -25,8 +25,8 @@ class HSCDataSet(Dataset):
         # Because it goes from unbounded NN output space -> [-1,1] with tanh in its decode step.
         transform = Lambda(lambd=np.tanh)
 
-        crop_to = config["data_loader"]["crop_to"]
-        filters = config["data_loader"]["filters"]
+        crop_to = config["data_set"]["crop_to"]
+        filters = config["data_set"]["filters"]
 
         self._init_from_path(
             config["general"]["data_dir"],
