@@ -57,10 +57,7 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict):
     Dataloader (or an ignite-wrapped equivalent)
         This is the distributed dataloader, formed by calling ignite.distributed.auto_dataloader
     """
-    return idist.auto_dataloader(
-        data_set,
-        **config["data_loader"]
-    )
+    return idist.auto_dataloader(data_set, **config["data_loader"])
 
 
 def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
