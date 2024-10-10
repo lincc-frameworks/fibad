@@ -190,15 +190,18 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         filename_pattern="{name}_epoch_{global_step}.{ext}",
     )
 
-    # neg_loss_score = Checkpoint.get_default_score_fn("loss", -1.0)
-    # best_checkpoint = Checkpoint(
-    #     to_save,
-    #     DiskSaver(results_directory, require_empty=False),
-    #     n_saved=1,
-    #     global_step_transform=global_step_from_engine(trainer),
-    #     score_name="loss",
-    #     score_function=neg_loss_score,
-    # )
+    def neg_loss_score(engine):
+        return -engine.state.output["loss"]
+
+    best_checkpoint = Checkpoint(
+        to_save,
+        DiskSaver(results_directory, require_empty=False),
+        n_saved=1,
+        global_step_transform=global_step_from_engine(trainer),
+        score_name="loss",
+        score_function=neg_loss_score,
+        greater_or_equal=True,
+    )
 
     if config["model"]["resume"]:
         prev_checkpoint = torch.load(config["model"]["resume"], map_location=device)
@@ -219,15 +222,19 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         logger.info(f"Epoch {trainer.state.epoch} metrics: {trainer.state.output}")
 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, latest_checkpoint)
-    # trainer.add_event_handler(Events.EPOCH_COMPLETED, best_checkpoint)
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, best_checkpoint)
 
     @trainer.on(Events.COMPLETED)
     def log_total_time(trainer):
         logger.info(f"Total training time: {trainer.state.times['COMPLETED']:.2f}[s]")
 
     def log_last_checkpoint_location(_, latest_checkpoint):
-        logger.info(f"Lates checkpoint saved as: {latest_checkpoint.last_checkpoint}")
+        logger.info(f"Latest checkpoint saved as: {latest_checkpoint.last_checkpoint}")
+
+    def log_best_checkpoint_location(_, best_checkpoint):
+        logger.info(f"Best metric checkpoint saved as: {best_checkpoint.last_checkpoint}")
 
     trainer.add_event_handler(Events.COMPLETED, log_last_checkpoint_location, latest_checkpoint)
+    trainer.add_event_handler(Events.COMPLETED, log_best_checkpoint_location, best_checkpoint)
 
     return trainer
