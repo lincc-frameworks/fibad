@@ -90,11 +90,6 @@ def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
         The Model the engine will be using
     """
 
-    def _extract_model_method(model, method_name):
-        # Extract `train_step` or `forward` from model, which can be wrapped after idist.auto_model(...)
-        wrapped = type(model) == DistributedDataParallel or type(model) == DataParallel
-        return getattr(model.module if wrapped else model, method_name)
-
     # This wraps a model-specific function (func) to move data to the appropriate device.
     def _inner_loop(func, device, engine, batch):
         #! This feels brittle, it would be worth revisiting this.
@@ -106,12 +101,32 @@ def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
         return func(batch)
 
     def _create_process_func(funcname, device, model):
-        inner_step = _extract_model_method(model, funcname)
+        inner_step = extract_model_method(model, funcname)
         inner_loop = functools.partial(_inner_loop, inner_step, device)
         return inner_loop
 
-    model = idist.auto_model(model)
     return Engine(_create_process_func(funcname, device, model))
+
+
+def extract_model_method(model, method_name):
+    """Extract a method from a model, which may be wrapped in a DistributedDataParallel
+     or DataParallel object. For instance, method_name could be `train_step` or
+    `forward`.
+
+    Parameters
+    ----------
+    model : nn.Module, DistributedDataParallel, or DataParallel
+        The model to extract the method from
+    method_name : str
+        Name of the method to extract
+
+    Returns
+    -------
+    Callable
+        The method extracted from the model
+    """
+    wrapped = type(model) == DistributedDataParallel or type(model) == DataParallel
+    return getattr(model.module if wrapped else model, method_name)
 
 
 def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tensor], Any]) -> Engine:
@@ -176,9 +191,11 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
     model = idist.auto_model(model)
     trainer = create_engine("train_step", device, model)
 
+    optimizer = extract_model_method(model, "optimizer")
+
     to_save = {
         "model": model,
-        "optimizer": model.optimizer,
+        "optimizer": optimizer,
         "trainer": trainer,
     }
 
