@@ -70,7 +70,6 @@ resume = false
 # e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
 name = "CifarDataSet"
 
-[data_loader]
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
 #
 # If not provided by user, the default of 'false' scans the directory for the smallest dimensioned files, and 
@@ -87,6 +86,7 @@ crop_to = false
 #filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 filters = false
 
+[data_loader]
 # Default PyTorch DataLoader parameters
 batch_size = 32
 shuffle = true

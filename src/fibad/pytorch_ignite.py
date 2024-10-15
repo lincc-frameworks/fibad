@@ -59,17 +59,7 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict):
     Dataloader (or an ignite-wrapped equivalent)
         This is the distributed dataloader, formed by calling ignite.distributed.auto_dataloader
     """
-    # ~ idist.auto_dataloader will accept a **kwargs parameter, and pass values
-    # ~ through to the underlying pytorch DataLoader.
-    # ~ Currently, our config includes unexpected keys like `name`, that cause
-    # ~ an exception. It would be nice to reduce this to:
-    # ~ `data_loader = idist.auto_dataloader(data_set, **config)`
-    return idist.auto_dataloader(
-        data_set,
-        batch_size=config["data_loader"]["batch_size"],
-        shuffle=config["data_loader"]["shuffle"],
-        num_workers=config["data_loader"]["num_workers"],
-    )
+    return idist.auto_dataloader(data_set, **config["data_loader"])
 
 
 def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
