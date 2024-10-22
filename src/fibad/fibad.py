@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import Union
 
-from .config_utils import get_runtime_config, resolve_runtime_config, validate_runtime_config
+from .config_utils import ConfigManager, resolve_runtime_config
 
 
 class Fibad:
@@ -43,12 +43,14 @@ class Fibad:
             - You have a single Fibad object in use at any time. This is true in most notebook like
               environments.
         """
-        self.config = get_runtime_config(runtime_config_filepath=config_file)
+        self.config_manager = ConfigManager(runtime_config_filepath=config_file)
+        self.config = self.config_manager.config
+        # self.config = get_runtime_config(runtime_config_filepath=config_file)
 
         # TODO: For now this is part of Fibad.__init__() In future when external modules can define their own
         # configuration keys and associated default values, this will need to occur after those external
         # modules have been resolved and loaded. This is why it is separate from get_runtime_config()
-        validate_runtime_config(self.config)
+        # validate_runtime_config(self.config)
 
         # Configure our logger. We do not use __name__ here because that would give us a "fibad.fibad" logger
         # which would not aggregate logs from fibad.downloadCutout which creates its own

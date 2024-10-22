@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import logging
 from pathlib import Path
 from typing import Union
@@ -60,6 +61,141 @@ class ConfigDict(dict):
     def clear(self):
         """Nonfunctional stub of dict.clear() which errors always"""
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
+
+
+class ConfigManager:
+    """A class to manage the runtime configuration for a Fibad object. This class
+    will contain all the logic and methods for reading, merging, and validating
+    the runtime configuration.
+    """
+
+    def __init__(self, runtime_config_filepath: Union[Path, str] = None):
+        self.config_file = runtime_config_filepath
+        self.fibad_default_config = self._read_runtime_config(DEFAULT_CONFIG_FILEPATH)
+        self.user_specific_config = self._read_runtime_config(self.config_file)
+
+        self.external_library_config_paths = self._find_external_library_default_config_paths(
+            self.user_specific_config
+        )
+
+        self.overall_default_config = {}
+        self._merge_defaults()
+
+        self.config = self._merge_configs(self.overall_default_config, self.user_specific_config)
+        self.is_valid_config = self._validate_runtime_config(self.config, self.overall_default_config)
+
+    def _read_runtime_config(self, config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
+        with open(config_filepath, "r") as f:
+            parsed_dict = toml.load(f)
+            return ConfigDict(parsed_dict)
+
+    def _find_external_library_default_config_paths(self, runtime_config: dict) -> set:
+        """Search for external libraries in the runtime configuration and gather the
+        libpath specifications so that we can load the default configs for the libraries.
+
+        Parameters
+        ----------
+        runtime_config : dict
+            The runtime configuration.
+        Returns
+        -------
+        set
+            A tuple containing the default configuration Paths for the external
+            libraries that are requested in the users configuration file.
+        """
+
+        default_configs = set()
+        for key, value in runtime_config.items():
+            if isinstance(value, dict):
+                default_configs |= self._find_external_library_default_config_paths(value)
+            else:
+                if key == "name" and "." in key:
+                    external_library = value.split(".")[0]
+                    if importlib.util.find_spec(external_library) is not None:
+                        try:
+                            lib = importlib.import_module(external_library)
+                            lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
+                            if lib_default_config_path.exists():
+                                default_configs.add(lib_default_config_path)
+                        except ModuleNotFoundError:
+                            logger.error(
+                                f"External library {lib} not found. Please install it before running."
+                            )
+                            raise
+
+        return default_configs
+
+    def _merge_defaults(self):
+        #! Might want to modify this such that all the external library configs are merged together first
+        #! then as a final step merge (fibad_default_config, external_library_config)
+
+        self.overall_default_config = self.fibad_default_config.copy()
+
+        for path in self.external_library_config_paths:
+            external_library_config = self._read_runtime_config(path)
+            self.overall_default_config = self._merge_configs(
+                self.overall_default_config, external_library_config
+            )
+
+    def _merge_configs(self, default_config: dict, overriding_config: dict) -> dict:
+        """Merge two configurations dictionaries with the overriding_config values
+        overriding the default_config values.
+
+        Parameters
+        ----------
+        default_config : dict
+            The default configuration.
+        overriding_config : dict
+            The user defined configuration.
+
+        Returns
+        -------
+        dict
+            The merged configuration.
+        """
+
+        final_config = default_config.copy()
+        for k, v in overriding_config.items():
+            if k in final_config and isinstance(final_config[k], dict) and isinstance(v, dict):
+                final_config[k] = merge_configs(default_config[k], v)
+            else:
+                final_config[k] = v
+
+        return final_config
+
+    def _validate_runtime_config(self, runtime_config: ConfigDict, default_config: ConfigDict):
+        """Recursive helper for validate_runtime_config.
+
+        The two arguments passed in must represent the same nesting level of the runtime config and all
+        default config parameters respectively.
+
+        Parameters
+        ----------
+        runtime_config : ConfigDict
+            Nested config dictionary representing the runtime config.
+        default_config : ConfigDict
+            Nested config dictionary representing the defaults
+
+        Raises
+        ------
+        RuntimeError
+            Raised if any config that exists in the runtime config does not have a default defined in
+            default_config
+        """
+        for key in runtime_config:
+            if key not in default_config:
+                msg = f"Runtime config contains key or section {key} which has no default defined. "
+                msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
+                raise RuntimeError(msg)
+
+            if isinstance(runtime_config[key], dict):
+                if not isinstance(default_config[key], dict):
+                    msg = (
+                        f"Runtime config contains a section named {key} which is the name of a value in the "
+                    )
+                    msg += "default config. Please choose another name for this section."
+                    raise RuntimeError(msg)
+                _validate_runtime_config(runtime_config[key], default_config[key])
 
 
 def validate_runtime_config(runtime_config: ConfigDict):
