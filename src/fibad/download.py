@@ -22,7 +22,11 @@ class Downloader:
     VARIABLE_FIELDS = ["tract", "ra", "dec"]
 
     # These are the column names we retain when writing a rect out to the manifest.fits file
-    RECT_COLUMN_NAMES = VARIABLE_FIELDS + ["filter", "sw", "sh", "rerun", "type", "dim"]
+    #
+    # The construction list(dict.fromkeys()) is to de-duplicate keys that exist in VARIBLE_FIELDS and
+    # dC.Rect.immutable_fields but keep the ordering of keys so that VARIABLE_FIELDS are first and all
+    # of the immutable fields that we rely on for hash checks are also included.
+    RECT_COLUMN_NAMES = list(dict.fromkeys(VARIABLE_FIELDS + dC.Rect.immutable_fields + ["dim"]))
 
     MANIFEST_FILE_NAME = "manifest.fits"
 
