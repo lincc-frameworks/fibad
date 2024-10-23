@@ -45,12 +45,6 @@ class Fibad:
         """
         self.config_manager = ConfigManager(runtime_config_filepath=config_file)
         self.config = self.config_manager.config
-        # self.config = get_runtime_config(runtime_config_filepath=config_file)
-
-        # TODO: For now this is part of Fibad.__init__() In future when external modules can define their own
-        # configuration keys and associated default values, this will need to occur after those external
-        # modules have been resolved and loaded. This is why it is separate from get_runtime_config()
-        # validate_runtime_config(self.config)
 
         # Configure our logger. We do not use __name__ here because that would give us a "fibad.fibad" logger
         # which would not aggregate logs from fibad.downloadCutout which creates its own
@@ -97,7 +91,7 @@ class Fibad:
         self.logger.info(f"Runtime Config read from: {resolve_runtime_config(config_file)}")
 
     def _initialize_log_handlers(self):
-        """Private initialization helper, Adds handlers and level setting sto the global self.logger object"""
+        """Private initialization helper, Adds handlers and level setting to the global self.logger object"""
 
         general_config = self.config["general"]
         # default to warning level

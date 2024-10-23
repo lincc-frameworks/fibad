@@ -69,10 +69,18 @@ class ConfigManager:
     the runtime configuration.
     """
 
-    def __init__(self, runtime_config_filepath: Union[Path, str] = None):
-        self.config_file = runtime_config_filepath
-        self.fibad_default_config = self._read_runtime_config(DEFAULT_CONFIG_FILEPATH)
-        self.user_specific_config = self._read_runtime_config(self.config_file)
+    def __init__(
+        self,
+        runtime_config_filepath: Union[Path, str] = None,
+        default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
+    ):
+        self.fibad_default_config = self._read_runtime_config(default_config_filepath)
+
+        self.runtime_config_filepath = runtime_config_filepath
+        if self.runtime_config_filepath is None:
+            self.user_specific_config = ConfigDict()
+        else:
+            self.user_specific_config = self._read_runtime_config(self.runtime_config_filepath)
 
         self.external_library_config_paths = self._find_external_library_default_config_paths(
             self.user_specific_config
@@ -81,15 +89,33 @@ class ConfigManager:
         self.overall_default_config = {}
         self._merge_defaults()
 
-        self.config = self._merge_configs(self.overall_default_config, self.user_specific_config)
-        self.is_valid_config = self._validate_runtime_config(self.config, self.overall_default_config)
+        self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
+        self._validate_runtime_config(self.config, self.overall_default_config)
 
-    def _read_runtime_config(self, config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
-        with open(config_filepath, "r") as f:
-            parsed_dict = toml.load(f)
-            return ConfigDict(parsed_dict)
+    @staticmethod
+    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
+        """Read a single toml file and return a ConfigDict
 
-    def _find_external_library_default_config_paths(self, runtime_config: dict) -> set:
+        Parameters
+        ----------
+        config_filepath : Union[Path, str], optional
+            The path to the config file, by default DEFAULT_CONFIG_FILEPATH
+
+        Returns
+        -------
+        ConfigDict
+            The contents of the toml file as a ConfigDict
+        """
+        config_filepath = Path(config_filepath)
+        parsed_dict = {}
+        if config_filepath.exists():
+            with open(config_filepath, "r") as f:
+                parsed_dict = toml.load(f)
+
+        return ConfigDict(parsed_dict)
+
+    @staticmethod
+    def _find_external_library_default_config_paths(runtime_config: dict) -> set:
         """Search for external libraries in the runtime configuration and gather the
         libpath specifications so that we can load the default configs for the libraries.
 
@@ -107,7 +133,7 @@ class ConfigManager:
         default_configs = set()
         for key, value in runtime_config.items():
             if isinstance(value, dict):
-                default_configs |= self._find_external_library_default_config_paths(value)
+                default_configs |= ConfigManager._find_external_library_default_config_paths(value)
             else:
                 if key == "name" and "." in key:
                     external_library = value.split(".")[0]
@@ -126,18 +152,22 @@ class ConfigManager:
         return default_configs
 
     def _merge_defaults(self):
-        #! Might want to modify this such that all the external library configs are merged together first
-        #! then as a final step merge (fibad_default_config, external_library_config)
+        """Merge the default configurations from the fibad and external libraries."""
 
-        self.overall_default_config = self.fibad_default_config.copy()
-
+        # Merge all external library default configurations first
         for path in self.external_library_config_paths:
             external_library_config = self._read_runtime_config(path)
-            self.overall_default_config = self._merge_configs(
+            self.overall_default_config = self.merge_configs(
                 self.overall_default_config, external_library_config
             )
 
-    def _merge_configs(self, default_config: dict, overriding_config: dict) -> dict:
+        # Merge the external library default configurations with the fibad default configuration
+        self.overall_default_config = self.merge_configs(
+            self.fibad_default_config, self.overall_default_config
+        )
+
+    @staticmethod
+    def merge_configs(default_config: dict, overriding_config: dict) -> dict:
         """Merge two configurations dictionaries with the overriding_config values
         overriding the default_config values.
 
@@ -157,17 +187,19 @@ class ConfigManager:
         final_config = default_config.copy()
         for k, v in overriding_config.items():
             if k in final_config and isinstance(final_config[k], dict) and isinstance(v, dict):
-                final_config[k] = merge_configs(default_config[k], v)
+                final_config[k] = ConfigManager.merge_configs(default_config[k], v)
             else:
                 final_config[k] = v
 
         return final_config
 
-    def _validate_runtime_config(self, runtime_config: ConfigDict, default_config: ConfigDict):
-        """Recursive helper for validate_runtime_config.
+    @staticmethod
+    def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
+        """Recursive helper to check that all keys in runtime_config have a default
+        in the merged default_config.
 
-        The two arguments passed in must represent the same nesting level of the runtime config and all
-        default config parameters respectively.
+        The two arguments passed in must represent the same nesting level of the
+        runtime config and all default config parameters respectively.
 
         Parameters
         ----------
@@ -195,79 +227,7 @@ class ConfigManager:
                     )
                     msg += "default config. Please choose another name for this section."
                     raise RuntimeError(msg)
-                _validate_runtime_config(runtime_config[key], default_config[key])
-
-
-def validate_runtime_config(runtime_config: ConfigDict):
-    """Validates that defaults exist for every config value before we begin to use a config.
-
-    This should be called at the moment the runtime config is fully baked for science calculations. Meaning
-    that all sources of config info have been combined in `runtime_config` and there are no further
-    config altering operations that will be performed.
-
-    Parameters
-    ----------
-    runtime_config : ConfigDict
-        The current runtime config dictionary.
-
-    Raises
-    ------
-    RuntimeError
-        Raised if any config that exists in the runtime config does not have a default defined
-    """
-    default_config = _read_runtime_config(DEFAULT_CONFIG_FILEPATH)
-    _validate_runtime_config(runtime_config, default_config)
-
-
-def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
-    """Recursive helper for validate_runtime_config.
-
-    The two arguments passed in must represent the same nesting level of the runtime config and all
-    default config parameters respectively.
-
-    Parameters
-    ----------
-    runtime_config : ConfigDict
-        Nested config dictionary representing the runtime config.
-    default_config : ConfigDict
-        Nested config dictionary representing the defaults
-
-    Raises
-    ------
-    RuntimeError
-        Raised if any config that exists in the runtime config does not have a default defined in
-        default_config
-    """
-    for key in runtime_config:
-        if key not in default_config:
-            msg = f"Runtime config contains key or section {key} which has no default defined. "
-            msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
-            raise RuntimeError(msg)
-
-        if isinstance(runtime_config[key], dict):
-            if not isinstance(default_config[key], dict):
-                msg = f"Runtime config contains a section named {key} which is the name of a value in the "
-                msg += "default config. Please choose another name for this section."
-                raise RuntimeError(msg)
-            _validate_runtime_config(runtime_config[key], default_config[key])
-
-
-def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
-    """Read a single toml file and return a config dictionary
-
-    Parameters
-    ----------
-    config_filepath : Union[Path, str], optional
-        What file is to be read, by default DEFAULT_CONFIG_FILEPATH
-
-    Returns
-    -------
-    ConfigDict
-        The contents of that toml file as nested ConfigDicts
-    """
-    with open(config_filepath, "r") as f:
-        parsed_dict = toml.load(f)
-        return ConfigDict(parsed_dict)
+                ConfigManager._validate_runtime_config(runtime_config[key], default_config[key])
 
 
 def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = None) -> Path:
@@ -301,73 +261,6 @@ def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = Non
         runtime_config_filepath = DEFAULT_CONFIG_FILEPATH
 
     return runtime_config_filepath
-
-
-def get_runtime_config(
-    runtime_config_filepath: Union[Path, str, None] = None,
-    default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
-) -> dict:
-    """This function will load the default runtime configuration file, as well
-    as the user defined runtime configuration file.
-
-    The two configurations will be merged with values in the user defined config
-    overriding the values of the default configuration.
-
-    The final merged config will be returned as a dictionary and saved as a file
-    in the results directory.
-
-    Parameters
-    ----------
-    runtime_config_filepath : Union[Path, str, None]
-        The path to the runtime configuration file.
-    default_config_filepath : Union[Path, str]
-        The path to the default runtime configuration file.
-
-    Returns
-    -------
-    dict
-        The parsed runtime configuration.
-    """
-
-    runtime_config_filepath = resolve_runtime_config(runtime_config_filepath)
-    default_runtime_config = _read_runtime_config(default_config_filepath)
-
-    if runtime_config_filepath is not DEFAULT_CONFIG_FILEPATH:
-        if not runtime_config_filepath.exists():
-            raise FileNotFoundError(f"Runtime configuration file not found: {runtime_config_filepath}")
-        users_runtime_config = _read_runtime_config(runtime_config_filepath)
-        final_runtime_config = merge_configs(default_runtime_config, users_runtime_config)
-    else:
-        final_runtime_config = default_runtime_config
-
-    return final_runtime_config
-
-
-def merge_configs(default_config: dict, user_config: dict) -> dict:
-    """Merge two configurations dictionaries with the user_config values overriding
-    the default_config values.
-
-    Parameters
-    ----------
-    default_config : dict
-        The default configuration.
-    user_config : dict
-        The user defined configuration.
-
-    Returns
-    -------
-    dict
-        The merged configuration.
-    """
-
-    final_config = default_config.copy()
-    for k, v in user_config.items():
-        if k in final_config and isinstance(final_config[k], dict) and isinstance(v, dict):
-            final_config[k] = merge_configs(default_config[k], v)
-        else:
-            final_config[k] = v
-
-    return final_config
 
 
 def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:
