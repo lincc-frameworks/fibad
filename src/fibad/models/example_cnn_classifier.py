@@ -55,6 +55,9 @@ class ExampleCNN(nn.Module):
         Current loss value
             The loss value for the current batch.
         """
+        # Set the model to train mode
+        self.train()
+
         inputs, labels = batch
 
         self.optimizer.zero_grad()
