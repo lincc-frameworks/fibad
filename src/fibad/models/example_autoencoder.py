@@ -119,9 +119,6 @@ class ExampleAutoencoder(nn.Module):
         Current loss value
             The loss value for the current batch.
         """
-        # Set the model to train mode
-        self.train()
-
         # When we run on a supervised dataset like CIFAR10, drop the labels given by the data loader
         x = batch[0] if isinstance(batch, tuple) else batch
 

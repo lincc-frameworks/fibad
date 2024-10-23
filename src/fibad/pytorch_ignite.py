@@ -138,6 +138,7 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
         Engine object which when run will evaluate the model.
     """
     device = idist.device()
+    model.eval()
     model = idist.auto_model(model)
     evaluator = create_engine("forward", device, model)
 
@@ -178,6 +179,7 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         Engine object that will be used to train the model.
     """
     device = idist.device()
+    model.train()
     model = idist.auto_model(model)
     trainer = create_engine("train_step", device, model)
 
