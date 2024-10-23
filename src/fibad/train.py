@@ -19,16 +19,16 @@ def run(config):
     results_dir = create_results_dir(config, "train")
     log_runtime_config(config, results_dir)
 
-    model, data_set = setup_model_and_dataset(config)
+    model, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
     data_loader = dist_data_loader(data_set, config)
 
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model, config, results_dir)
 
     # Run the training process
-    trainer.run(data_loader, max_epochs=config["model"]["epochs"])
+    trainer.run(data_loader, max_epochs=config["train"]["epochs"])
 
     # Save the trained model
-    model.save(results_dir / config["model"]["weights_filepath"])
+    model.save(results_dir / config["train"]["weights_filepath"])
 
     logger.info("Finished Training")

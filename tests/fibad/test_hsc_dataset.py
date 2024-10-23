@@ -61,6 +61,12 @@ def mkconfig(crop_to=False, filters=False):
             "crop_to": crop_to,
             "filters": filters,
         },
+        "prepare": {
+            "seed": False,
+            "train_size": 0.2,
+            "test_size": 0.6,
+            "validate_size": 0.2,
+        },
     }
 
 
@@ -145,7 +151,7 @@ def test_load_duplicate(caplog):
         assert "_duplicate_" in caplog.text
 
         # The duplicate files should not be in the data set
-        for filepath in a._all_files():
+        for filepath in a.container._all_files():
             assert "_duplicate_" not in str(filepath)
 
 
@@ -167,7 +173,7 @@ def test_prune_warn_1_percent(caplog):
         assert len(a) == 98
 
         # Object 2 should not be loaded
-        assert "00000000000000101" not in a
+        assert "00000000000000101" not in a.container
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
@@ -194,7 +200,7 @@ def test_prune_error_5_percent(caplog):
         assert len(a) == 18
 
         # Object 20 should not be loaded
-        assert "00000000000000020" not in a
+        assert "00000000000000020" not in a.container
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 5% of objects in the data directory were pruned." in caplog.text
@@ -336,7 +342,7 @@ def test_partial_filter_prune_warn_1_percent(caplog):
         assert len(a) == 98
 
         # Object 101 should not be loaded
-        assert "00000000000000101" not in a
+        assert "00000000000000101" not in a.container
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
