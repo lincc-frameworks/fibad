@@ -135,7 +135,7 @@ class ConfigManager:
             if isinstance(value, dict):
                 default_configs |= ConfigManager._find_external_library_default_config_paths(value)
             else:
-                if key == "name" and "." in key:
+                if key == "name" and "." in value:
                     external_library = value.split(".")[0]
                     if importlib.util.find_spec(external_library) is not None:
                         try:
