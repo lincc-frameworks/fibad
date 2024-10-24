@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import logging
 from pathlib import Path
 from typing import Union
@@ -62,76 +63,171 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
-def validate_runtime_config(runtime_config: ConfigDict):
-    """Validates that defaults exist for every config value before we begin to use a config.
-
-    This should be called at the moment the runtime config is fully baked for science calculations. Meaning
-    that all sources of config info have been combined in `runtime_config` and there are no further
-    config altering operations that will be performed.
-
-    Parameters
-    ----------
-    runtime_config : ConfigDict
-        The current runtime config dictionary.
-
-    Raises
-    ------
-    RuntimeError
-        Raised if any config that exists in the runtime config does not have a default defined
+class ConfigManager:
+    """A class to manage the runtime configuration for a Fibad object. This class
+    will contain all the logic and methods for reading, merging, and validating
+    the runtime configuration.
     """
-    default_config = _read_runtime_config(DEFAULT_CONFIG_FILEPATH)
-    _validate_runtime_config(runtime_config, default_config)
 
+    def __init__(
+        self,
+        runtime_config_filepath: Union[Path, str] = None,
+        default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
+    ):
+        self.fibad_default_config = self._read_runtime_config(default_config_filepath)
 
-def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
-    """Recursive helper for validate_runtime_config.
+        self.runtime_config_filepath = runtime_config_filepath
+        if self.runtime_config_filepath is None:
+            self.user_specific_config = ConfigDict()
+        else:
+            self.user_specific_config = self._read_runtime_config(self.runtime_config_filepath)
 
-    The two arguments passed in must represent the same nesting level of the runtime config and all
-    default config parameters respectively.
+        self.external_library_config_paths = self._find_external_library_default_config_paths(
+            self.user_specific_config
+        )
 
-    Parameters
-    ----------
-    runtime_config : ConfigDict
-        Nested config dictionary representing the runtime config.
-    default_config : ConfigDict
-        Nested config dictionary representing the defaults
+        self.overall_default_config = {}
+        self._merge_defaults()
 
-    Raises
-    ------
-    RuntimeError
-        Raised if any config that exists in the runtime config does not have a default defined in
-        default_config
-    """
-    for key in runtime_config:
-        if key not in default_config:
-            msg = f"Runtime config contains key or section {key} which has no default defined. "
-            msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
-            raise RuntimeError(msg)
+        self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
+        self._validate_runtime_config(self.config, self.overall_default_config)
 
-        if isinstance(runtime_config[key], dict):
-            if not isinstance(default_config[key], dict):
-                msg = f"Runtime config contains a section named {key} which is the name of a value in the "
-                msg += "default config. Please choose another name for this section."
-                raise RuntimeError(msg)
-            _validate_runtime_config(runtime_config[key], default_config[key])
+    @staticmethod
+    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
+        """Read a single toml file and return a ConfigDict
 
+        Parameters
+        ----------
+        config_filepath : Union[Path, str], optional
+            The path to the config file, by default DEFAULT_CONFIG_FILEPATH
 
-def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
-    """Read a single toml file and return a config dictionary
+        Returns
+        -------
+        ConfigDict
+            The contents of the toml file as a ConfigDict
+        """
+        config_filepath = Path(config_filepath)
+        parsed_dict = {}
+        if config_filepath.exists():
+            with open(config_filepath, "r") as f:
+                parsed_dict = toml.load(f)
 
-    Parameters
-    ----------
-    config_filepath : Union[Path, str], optional
-        What file is to be read, by default DEFAULT_CONFIG_FILEPATH
-
-    Returns
-    -------
-    ConfigDict
-        The contents of that toml file as nested ConfigDicts
-    """
-    with open(config_filepath, "r") as f:
-        parsed_dict = toml.load(f)
         return ConfigDict(parsed_dict)
+
+    @staticmethod
+    def _find_external_library_default_config_paths(runtime_config: dict) -> set:
+        """Search for external libraries in the runtime configuration and gather the
+        libpath specifications so that we can load the default configs for the libraries.
+
+        Parameters
+        ----------
+        runtime_config : dict
+            The runtime configuration.
+        Returns
+        -------
+        set
+            A tuple containing the default configuration Paths for the external
+            libraries that are requested in the users configuration file.
+        """
+
+        default_configs = set()
+        for key, value in runtime_config.items():
+            if isinstance(value, dict):
+                default_configs |= ConfigManager._find_external_library_default_config_paths(value)
+            else:
+                if key == "name" and "." in value:
+                    external_library = value.split(".")[0]
+                    if importlib.util.find_spec(external_library) is not None:
+                        try:
+                            lib = importlib.import_module(external_library)
+                            lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
+                            if lib_default_config_path.exists():
+                                default_configs.add(lib_default_config_path)
+                        except ModuleNotFoundError:
+                            logger.error(
+                                f"External library {lib} not found. Please install it before running."
+                            )
+                            raise
+
+        return default_configs
+
+    def _merge_defaults(self):
+        """Merge the default configurations from the fibad and external libraries."""
+
+        # Merge all external library default configurations first
+        for path in self.external_library_config_paths:
+            external_library_config = self._read_runtime_config(path)
+            self.overall_default_config = self.merge_configs(
+                self.overall_default_config, external_library_config
+            )
+
+        # Merge the external library default configurations with the fibad default configuration
+        self.overall_default_config = self.merge_configs(
+            self.fibad_default_config, self.overall_default_config
+        )
+
+    @staticmethod
+    def merge_configs(default_config: dict, overriding_config: dict) -> dict:
+        """Merge two configurations dictionaries with the overriding_config values
+        overriding the default_config values.
+
+        Parameters
+        ----------
+        default_config : dict
+            The default configuration.
+        overriding_config : dict
+            The user defined configuration.
+
+        Returns
+        -------
+        dict
+            The merged configuration.
+        """
+
+        final_config = default_config.copy()
+        for k, v in overriding_config.items():
+            if k in final_config and isinstance(final_config[k], dict) and isinstance(v, dict):
+                final_config[k] = ConfigManager.merge_configs(default_config[k], v)
+            else:
+                final_config[k] = v
+
+        return final_config
+
+    @staticmethod
+    def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
+        """Recursive helper to check that all keys in runtime_config have a default
+        in the merged default_config.
+
+        The two arguments passed in must represent the same nesting level of the
+        runtime config and all default config parameters respectively.
+
+        Parameters
+        ----------
+        runtime_config : ConfigDict
+            Nested config dictionary representing the runtime config.
+        default_config : ConfigDict
+            Nested config dictionary representing the defaults
+
+        Raises
+        ------
+        RuntimeError
+            Raised if any config that exists in the runtime config does not have a default defined in
+            default_config
+        """
+        for key in runtime_config:
+            if key not in default_config:
+                msg = f"Runtime config contains key or section {key} which has no default defined. "
+                msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
+                raise RuntimeError(msg)
+
+            if isinstance(runtime_config[key], dict):
+                if not isinstance(default_config[key], dict):
+                    msg = (
+                        f"Runtime config contains a section named {key} which is the name of a value in the "
+                    )
+                    msg += "default config. Please choose another name for this section."
+                    raise RuntimeError(msg)
+                ConfigManager._validate_runtime_config(runtime_config[key], default_config[key])
 
 
 def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = None) -> Path:
@@ -165,73 +261,6 @@ def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = Non
         runtime_config_filepath = DEFAULT_CONFIG_FILEPATH
 
     return runtime_config_filepath
-
-
-def get_runtime_config(
-    runtime_config_filepath: Union[Path, str, None] = None,
-    default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
-) -> dict:
-    """This function will load the default runtime configuration file, as well
-    as the user defined runtime configuration file.
-
-    The two configurations will be merged with values in the user defined config
-    overriding the values of the default configuration.
-
-    The final merged config will be returned as a dictionary and saved as a file
-    in the results directory.
-
-    Parameters
-    ----------
-    runtime_config_filepath : Union[Path, str, None]
-        The path to the runtime configuration file.
-    default_config_filepath : Union[Path, str]
-        The path to the default runtime configuration file.
-
-    Returns
-    -------
-    dict
-        The parsed runtime configuration.
-    """
-
-    runtime_config_filepath = resolve_runtime_config(runtime_config_filepath)
-    default_runtime_config = _read_runtime_config(default_config_filepath)
-
-    if runtime_config_filepath is not DEFAULT_CONFIG_FILEPATH:
-        if not runtime_config_filepath.exists():
-            raise FileNotFoundError(f"Runtime configuration file not found: {runtime_config_filepath}")
-        users_runtime_config = _read_runtime_config(runtime_config_filepath)
-        final_runtime_config = merge_configs(default_runtime_config, users_runtime_config)
-    else:
-        final_runtime_config = default_runtime_config
-
-    return final_runtime_config
-
-
-def merge_configs(default_config: dict, user_config: dict) -> dict:
-    """Merge two configurations dictionaries with the user_config values overriding
-    the default_config values.
-
-    Parameters
-    ----------
-    default_config : dict
-        The default configuration.
-    user_config : dict
-        The user defined configuration.
-
-    Returns
-    -------
-    dict
-        The merged configuration.
-    """
-
-    final_config = default_config.copy()
-    for k, v in user_config.items():
-        if k in final_config and isinstance(final_config[k], dict) and isinstance(v, dict):
-            final_config[k] = merge_configs(default_config[k], v)
-        else:
-            final_config[k] = v
-
-    return final_config
 
 
 def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:
