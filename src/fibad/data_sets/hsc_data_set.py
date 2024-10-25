@@ -2,7 +2,7 @@
 
 import logging
 import re
-from copy import copy
+from copy import copy, deepcopy
 from pathlib import Path
 from typing import Literal, Optional, Union
 
@@ -26,7 +26,7 @@ class HSCDataSet(Dataset):
 
     """
 
-    def __init__(self, config, split: Union[str, None] = None):
+    def __init__(self, config, split: Union[str, None]):
         # initialize the filesystem references
         self.container = HSCDataSetContainer(config)
 
@@ -229,7 +229,7 @@ class HSCDataSetSplit(Dataset):
         copy_object.indexes = self.indexes.copy()
 
         # Copy RNG state over.
-        copy_object.rng = copy(self.rng)
+        copy_object.rng = deepcopy(self.rng)
 
         return copy_object
 
