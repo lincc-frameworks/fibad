@@ -399,6 +399,35 @@ def test_split_no_validate_no_test():
             a = HSCDataSet(config, split="validate")
 
 
+def test_split_no_validate_no_train():
+    """Test splitting when validate and train are overridden"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=False)
+
+        a = HSCDataSet(config, split="test")
+        assert len(a) == 60
+
+        a = HSCDataSet(config, split="train")
+        assert len(a) == 40
+
+        with pytest.raises(RuntimeError):
+            a = HSCDataSet(config, split="validate")
+
+
+def test_split_invalid_ratio():
+    """Test that split RuntimeErrors when provided with an invalid ratio"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=1.1)
+        with pytest.raises(RuntimeError):
+            HSCDataSet(config, split=None)
+
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=-0.1)
+        with pytest.raises(RuntimeError):
+            HSCDataSet(config, split=None)
+
+
 def test_split_no_splits_configured():
     """Test splitting when all splits are overriden, and nothing is specified."""
     test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
@@ -446,6 +475,19 @@ def test_split_values_configured_no_validate():
 
         a = HSCDataSet(config, split="train")
         assert len(a) == 22
+
+
+def test_split_invalid_configured():
+    """Test that split RuntimeErrors when provided with an invalid datapoint count"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=120)
+        with pytest.raises(RuntimeError):
+            HSCDataSet(config, split=None)
+
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=-10)
+        with pytest.raises(RuntimeError):
+            HSCDataSet(config, split=None)
 
 
 def test_split_values_rng():
@@ -509,3 +551,16 @@ def test_split_and():
         and_mask = np.logical_and(test_split.mask, train_split.mask)
 
         assert all([a == b for a, b in zip(and_split.mask, and_mask)])
+
+
+def test_split_and_conflicting_datasets():
+    """Generate two splits from different data sets, and them together. Verify this RuntimeErrors"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, test_size=False)
+
+        a = HSCDataSet(config, split="test")
+        b = HSCDataSet(config, split="test")
+
+        with pytest.raises(RuntimeError):
+            a.current_split.logical_and(b.current_split)

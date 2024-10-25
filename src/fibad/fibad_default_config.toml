@@ -98,23 +98,15 @@ num_workers = 2
 # The semantics are borrowed from scikit-learn's train-test-split, and HF Dataset's train-test-split function
 # It is an error for these values to add to more than 1.0 as ratios or the size of the dataset if expressed
 # as integers.
-#
-# test_size: Size of the test split
-# If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
-# test split.
-# If `int`, represents the absolute number of test samples.
-# If `false`, the value is set to the complement of the train size.
-# If `train_size` is also `false`, it will be set to `0.25`.
-test_size = 0.6
 
 # train_size: Size of the train split
 # If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
 # train split.
 # If `int`, represents the absolute number of train samples.
 # If `false`, the value is automatically set to the complement of the test size.
-train_size = 0.2
+train_size = 0.6
 
-# validation_size: Size of the validation split
+# validate_size: Size of the validation split
 # If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
 # train split.
 # If `int`, represents the absolute number of train samples.
@@ -123,7 +115,15 @@ train_size = 0.2
 # If `false`, and only one of the other sizes is defined, no validate split is created
 validate_size = 0.2
 
-# Random number to seed with for generating a random split. False means the data will be seeded from
+# test_size: Size of the test split
+# If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
+# test split.
+# If `int`, represents the absolute number of test samples.
+# If `false`, the value is set to the complement of the train size.
+# If `train_size` is also `false`, it will be set to `0.25`.
+test_size = 0.6
+
+# Number to seed with for generating a random split. False means the data will be seeded from
 # a system source at runtime.
 seed = false
 

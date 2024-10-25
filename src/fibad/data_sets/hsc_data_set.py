@@ -147,7 +147,7 @@ class HSCDataSetSplit(Dataset):
 
         else:
             # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
-            self.mask = np.zeros(len(data), dtype=np.bool)
+            self.mask = np.zeros(len(data), dtype=bool)
             self._flip_mask_values(length, "false_to_true")
 
         self.indexes = np.nonzero(self.mask)[0]
@@ -238,13 +238,6 @@ class HSCDataSetSplit(Dataset):
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         return self.data[self.indexes[idx]]
-
-    def ids(self):
-        for obj_id, index in zip(self.data.ids(), range(len(self.data))):
-            if self.mask[index] is True:
-                yield obj_id
-            else:
-                continue
 
 
 class HSCDataSetContainer(Dataset):
