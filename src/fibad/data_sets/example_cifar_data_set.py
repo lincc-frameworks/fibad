@@ -11,11 +11,17 @@ class CifarDataSet(CIFAR10):
     FIBAD config with a transformation that works well for example code.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, split: str):
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
-        super().__init__(root=config["general"]["data_dir"], train=True, download=True, transform=transform)
+
+        if split not in ["train", "test"]:
+            RuntimeError("CIFAR10 dataset only supports 'train' and 'test' splits.")
+
+        train = split == "train"
+
+        super().__init__(root=config["general"]["data_dir"], train=train, download=True, transform=transform)
 
     def shape(self):
         return (3, 32, 32)

@@ -55,15 +55,16 @@ mask = false
 # e.g. "user_package.submodule.ExternalModel" or "ExampleAutoencoder"
 name = "ExampleAutoencoder"
 
-weights_filepath = "example_model.pth"
-epochs = 10
-
 base_channel_size = 32
 latent_dim = 64
 
+[train]
+weights_filepath = "example_model.pth"
+epochs = 10
 # Set this to the path of a checkpoint file to resume, or continue training,
 # from a checkpoint. Otherwise, set to false to start from scratch.
 resume = false
+split = "train"
 
 [data_set]
 # Name of the built-in data loader to use or the libpath to an external data loader
@@ -92,6 +93,41 @@ batch_size = 32
 shuffle = true
 num_workers = 2
 
+[prepare]
+# How to split the data between training and eval sets.
+# The semantics are borrowed from scikit-learn's train-test-split, and HF Dataset's train-test-split function
+# It is an error for these values to add to more than 1.0 as ratios or the size of the dataset if expressed
+# as integers.
+
+# train_size: Size of the train split
+# If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
+# train split.
+# If `int`, represents the absolute number of train samples.
+# If `false`, the value is automatically set to the complement of the test size.
+train_size = 0.6
+
+# validate_size: Size of the validation split
+# If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
+# train split.
+# If `int`, represents the absolute number of train samples.
+# If `false`, and both train_size and test_size are defined, the value is automatically set to the complement 
+# of the other two sizes summed.
+# If `false`, and only one of the other sizes is defined, no validate split is created
+validate_size = 0.2
+
+# test_size: Size of the test split
+# If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
+# test split.
+# If `int`, represents the absolute number of test samples.
+# If `false`, the value is set to the complement of the train size.
+# If `train_size` is also `false`, it will be set to `0.25`.
+test_size = 0.6
+
+# Number to seed with for generating a random split. False means the data will be seeded from
+# a system source at runtime.
+seed = false
+
 [predict]
 model_weights_file = false
 batch_size = 32
+split = "test"

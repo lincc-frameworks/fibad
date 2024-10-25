@@ -19,7 +19,8 @@ def run(config: ConfigDict):
         The parsed config file as a nested dict
     """
 
-    model, data_set = setup_model_and_dataset(config)
+    model, data_set = setup_model_and_dataset(config, split=config["predict"]["split"])
+    logger.info(f"data set has length {len(data_set)}")
     data_loader = dist_data_loader(data_set, config)
 
     # Create a results directory and dump our config there
