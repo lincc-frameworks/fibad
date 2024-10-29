@@ -1,5 +1,8 @@
 [general]
-use_gpu = true
+# Whether to run in development mode. When `true`, this will slightly modify the
+# behavior of Fibad to make development faster and easier. For example, it will
+# not check for the existance of default config values in external libraries.
+dev_mode = false
 
 # Destination of log messages
 # 'stderr' and 'stdout' specify the console.

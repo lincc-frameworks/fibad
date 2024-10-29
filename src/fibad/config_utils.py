@@ -40,7 +40,9 @@ class ConfigDict(dict):
         raise RuntimeError(msg)
 
     def get(self, key, default=None):
-        """Nonfunctional stub of dict.get() which errors always"""
+        """Nonfunctional stub of dict.get() which errors always. Overriding this
+        prevents the possibility of defining default values in code that conflict
+        with default values defined in the config file."""
         msg = f"ConfigDict.get({key},{default}) called. "
         msg += "Please index config dictionaries with [] or __getitem__() only. "
         msg += "Configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
@@ -90,7 +92,8 @@ class ConfigManager:
         self._merge_defaults()
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
-        self._validate_runtime_config(self.config, self.overall_default_config)
+        if not self.config["general"]["dev_mode"]:
+            self._validate_runtime_config(self.config, self.overall_default_config)
 
     @staticmethod
     def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:

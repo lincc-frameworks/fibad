@@ -1,5 +1,5 @@
 [general]
-use_gpu = false
+dev_mode = false
 
 [train.model]
 model_weights_filepath = "final_best.pth"
