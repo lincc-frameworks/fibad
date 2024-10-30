@@ -1,5 +1,5 @@
 [general]
-use_gpu = true
+dev_mode = true
 
 [train]
 model_name = "example_model" # Use a built-in FIBAD model

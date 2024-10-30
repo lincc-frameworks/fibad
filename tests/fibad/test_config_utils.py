@@ -1,6 +1,7 @@
 import os
 
-from fibad.config_utils import ConfigManager
+import pytest
+from fibad.config_utils import ConfigDict, ConfigManager
 
 
 def test_merge_configs():
@@ -49,7 +50,7 @@ def test_get_runtime_config():
     runtime_config = config_manager.config
 
     expected = {
-        "general": {"use_gpu": False},
+        "general": {"dev_mode": False},
         "train": {
             "model_name": "example_model",
             "model_class": "new_thing.cool_model.CoolModel",
@@ -59,3 +60,37 @@ def test_get_runtime_config():
     }
 
     assert runtime_config == expected
+
+
+def test_validate_runtime_config():
+    """Test that the validate_runtime_config function will raise a RuntimeError
+    if a user key is not defined in the default configuration dictionary.
+    """
+
+    default = {"general": {"dev_mode": False}, "train": {"model_name": "example_model"}}
+    default_config = ConfigDict(default)
+
+    user = {"general": {"dev_mode": False, "foo": "bar"}}
+    user_config = ConfigDict(user)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        ConfigManager._validate_runtime_config(user_config, default_config)
+
+    assert "Runtime config contains key" in str(excinfo.value)
+
+
+def test_validate_runtime_config_section():
+    """Test that the validate_runtime_config function will raise a RuntimeError
+    if a user section name conflicts with a default configuration key.
+    """
+
+    default = {"general": {"dev_mode": False}, "train": {"model_name": "example_model"}}
+    default_config = ConfigDict(default)
+
+    user = {"general": {"dev_mode": {"b": 2}}}
+    user_config = ConfigDict(user)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        ConfigManager._validate_runtime_config(user_config, default_config)
+
+    assert "Runtime config contains a section named dev_mode" in str(excinfo.value)
