@@ -8,7 +8,7 @@ dev_mode = false
 # 'stderr' and 'stdout' specify the console.
 log_destination = "stderr"
 # A path name specifies a file e.g.
-# log = "fibad_log.txt"
+# log_destination = "fibad_log.txt"
 
 # Lowest log level to emit.
 # As you go down the list, fibad will become more verbose in the log.
@@ -71,7 +71,7 @@ split = "train"
 
 [data_set]
 # Name of the built-in data loader to use or the libpath to an external data loader
-# e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataLoader"
+# e.g. "user_package.submodule.ExternalDataLoader" or "HSCDataSet"
 name = "CifarDataSet"
 
 # Pixel dimensions used to crop all images prior to loading. Will prune any images that are too small.
