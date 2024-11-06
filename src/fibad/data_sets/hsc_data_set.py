@@ -57,11 +57,20 @@ class HSCDataSet(Dataset):
         if test_size is None:
             if train_size is None:
                 train_size = 0.25
-            test_size = 1.0 - train_size
-        elif train_size is None:
-            train_size = 1.0 - test_size
-        elif validate_size is None:
+
+            test_size = 1.0 - train_size if validate_size is None else 1.0 - (train_size + validate_size)
+
+        if train_size is None:
+            train_size = 1.0 - test_size if validate_size is None else 1.0 - (test_size + validate_size)
+
+        if (validate_size is None) and (np.round(train_size + test_size) != 1.0):
             validate_size = 1.0 - (train_size + test_size)
+
+        if validate_size is None:
+            if np.round(train_size + test_size) > 1.0:
+                raise RuntimeError("Split fractions add up to more than 1.0")
+        elif np.round(train_size + test_size + validate_size) > 1.0:
+            raise RuntimeError("Split fractions add up to more than 1.0")
 
         # Generate splits
         self.splits = {}

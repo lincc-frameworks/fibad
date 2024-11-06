@@ -58,7 +58,7 @@ def mkconfig(
     filters=False,
     train_size=0.2,
     test_size=0.6,
-    validate_size=0,
+    validate_size=0.1,
     seed=False,
     filter_catalog=False,
 ):
@@ -367,7 +367,7 @@ def test_split():
     test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
     with FakeFitsFS(test_files):
         a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="validate")
-        assert len(a) == 20
+        assert len(a) == 10
 
         a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="test")
         assert len(a) == 60
@@ -388,8 +388,8 @@ def test_split_no_validate():
         a = HSCDataSet(config, split="train")
         assert len(a) == 20
 
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 20
+        with pytest.raises(RuntimeError):
+            a = HSCDataSet(config, split="validate")
 
 
 def test_split_no_validate_no_test():
