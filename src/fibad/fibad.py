@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import Union
 
-from .config_utils import ConfigManager, resolve_runtime_config
+from .config_utils import ConfigManager
 
 
 class Fibad:
@@ -14,7 +14,7 @@ class Fibad:
     CLI functions in fibad_cli are implemented by calling this class
     """
 
-    verbs = ["train", "predict", "download", "prepare"]
+    verbs = ["train", "predict", "download", "prepare", "rebuild_manifest"]
 
     def __init__(self, *, config_file: Union[Path, str] = None, setup_logging: bool = True):
         """Initialize fibad. Always applies the default config, and merges it with any provided config file.
@@ -88,7 +88,7 @@ class Fibad:
             # Setup our handlers from config
             self._initialize_log_handlers()
 
-        self.logger.info(f"Runtime Config read from: {resolve_runtime_config(config_file)}")
+        self.logger.info(f"Runtime Config read from: {ConfigManager.resolve_runtime_config(config_file)}")
 
     def _initialize_log_handlers(self):
         """Private initialization helper, Adds handlers and level setting to the global self.logger object"""
@@ -180,8 +180,16 @@ class Fibad:
 
     def prepare(self, **kwargs):
         """
-        See Fibad.predict.run()
+        See Fibad.prepare.run()
         """
         from .prepare import run
+
+        return run(config=self.config, **kwargs)
+
+    def rebuild_manifest(self, **kwargs):
+        """
+        See Fibad.rebuild_manifest.run()
+        """
+        from .rebuild_manifest import run
 
         return run(config=self.config, **kwargs)

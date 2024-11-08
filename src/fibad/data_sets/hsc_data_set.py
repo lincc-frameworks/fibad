@@ -13,6 +13,17 @@ from astropy.table import Table
 from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
+from fibad.download import Downloader
+from fibad.downloadCutout.downloadCutout import (
+    parse_bool,
+    parse_degree,
+    parse_latitude,
+    parse_longitude,
+    parse_rerun,
+    parse_tract_opt,
+    parse_type,
+)
+
 from .data_set_registry import fibad_data_set
 
 logger = logging.getLogger(__name__)
@@ -111,6 +122,9 @@ class HSCDataSet(Dataset):
 
     def __len__(self) -> int:
         return len(self.current_split)
+
+    def rebuild_manifest(self, config):
+        return self.container._rebuild_manifest(config)
 
 
 class HSCDataSetSplit(Dataset):
@@ -571,6 +585,88 @@ class HSCDataSetContainer(Dataset):
 
         return cutout_width, cutout_height
 
+    def _rebuild_manifest(self, config):
+        if self.filter_catalog:
+            raise RuntimeError("Cannot rebuild manifest. Set the filter_catalog=false and rerun")
+
+        logger.info("Reading in catalog file... ")
+        location_table = Downloader.filterfits(
+            Path(config["download"]["fits_file"]).resolve(), ["object_id", "ra", "dec"]
+        )
+
+        obj_to_ra = {
+            str(location_table["object_id"][index]): location_table["ra"][index]
+            for index in range(len(location_table))
+        }
+        obj_to_dec = {
+            str(location_table["object_id"][index]): location_table["dec"][index]
+            for index in range(len(location_table))
+        }
+
+        del location_table
+
+        logger.info("Assembling Manifest...")
+
+        # These are the column names expected in a manifest file by the downloader
+        column_names = Downloader.MANIFEST_COLUMN_NAMES
+        columns = {column_name: [] for column_name in column_names}
+
+        # These we vary every object and must be implemented below
+        dynamic_column_names = ["object_id", "filter", "dim", "tract", "ra", "dec", "filename"]
+        # These are pulled from config ("sw", "sh", "rerun", "type", "image", "mask", and "variance")
+        static_column_names = [name for name in column_names if name not in dynamic_column_names]
+
+        # Check that all column names we need for a manifest are either in static or dynamic columns
+        for column_name in column_names:
+            if column_name not in static_column_names and column_name not in dynamic_column_names:
+                raise RuntimeError(f"Error Assembling manifest {column_name} not implemented")
+
+        static_values = {
+            "sw": parse_degree(config["download"]["sw"]),
+            "sh": parse_degree(config["download"]["sh"]),
+            "rerun": parse_rerun(config["download"]["rerun"]),
+            "type": parse_type(config["download"]["type"]),
+            "image": parse_bool(config["download"]["image"]),
+            "mask": parse_bool(config["download"]["mask"]),
+            "variance": parse_bool(config["download"]["variance"]),
+        }
+
+        for object_id, filter, filename, dim in self._all_files_full():
+            for static_col in static_column_names:
+                columns[static_col].append(static_values[static_col])
+
+            for dynamic_col in dynamic_column_names:
+                if dynamic_col == "object_id":
+                    columns[dynamic_col].append(int(object_id))
+                elif dynamic_col == "filter":
+                    columns[dynamic_col].append(filter)
+                elif dynamic_col == "dim":
+                    columns[dynamic_col].append(dim)
+                elif dynamic_col == "tract":
+                    # There's value in pulling tract from the filename rather than the download catalog
+                    # in case The catalog had it wrong, the filename will have the value the cutout server
+                    # provided.
+                    tract = filename.split("_")[4]
+                    columns[dynamic_col].append(parse_tract_opt(tract))
+                elif dynamic_col == "ra":
+                    ra = obj_to_ra[object_id]
+                    columns[dynamic_col].append(parse_longitude(ra))
+                elif dynamic_col == "dec":
+                    dec = obj_to_dec[object_id]
+                    columns[dynamic_col].append(parse_latitude(dec))
+                elif dynamic_col == "filename":
+                    columns[dynamic_col].append(filename)
+                else:
+                    # The tower of if statements has been entirely to create this failure path.
+                    # which will be hit when someone alters dynamic column names above without also
+                    # writing an implementation.
+                    raise RuntimeError(f"No implementation to process column {dynamic_col}")
+
+        logger.info("Writing rebuilt manifest...")
+        manifest_table = Table(columns)
+        rebuilt_manifest_path = Path(config["general"]["data_dir"]) / "rebuilt_manifest.fits"
+        manifest_table.write(rebuilt_manifest_path, overwrite=True, format="fits")
+
     def shape(self) -> tuple[int, int, int]:
         """Shape of the individual cutouts this will give to a model
 
@@ -659,6 +755,25 @@ class HSCDataSetContainer(Dataset):
         for object_id in self.files:
             yield object_id
 
+    def _all_files_full(self):
+        """
+        Private read-only iterator over all files that enforces a strict total order across
+        objects and filters. Will not work prior to self.files, and self.path initialization in __init__
+
+        Yields
+        ------
+        Tuple[object_id, filter, filename, dim]
+            Members of this tuple are
+            - The object_id as a string
+            - The filter name as a string
+            - The filename relative to self.path
+            - A tuple containing the dimensions of the fits file in pixels.
+        """
+        for object_id in self.ids():
+            dims = self.dims[object_id]
+            for idx, (filter, filename) in enumerate(self._filter_filename(object_id)):
+                yield (object_id, filter, filename, dims[idx])
+
     def _all_files(self):
         """
         Private read-only iterator over all files that enforces a strict total order across
@@ -673,6 +788,22 @@ class HSCDataSetContainer(Dataset):
             for filename in self._object_files(object_id):
                 yield filename
 
+    def _filter_filename(self, object_id):
+        """
+        Private read-only iterator over all files for a given object. This enforces a strict total order
+        across filters. Will not work prior to self.files initialization in __init__
+
+        Yields
+        ------
+        filter_name, file name
+            The name of a filter and the file name for the fits file.
+            The file name is relative to self.path
+        """
+        filters = self.files[object_id]
+        filter_names = sorted(list(filters))
+        for filter_name in filter_names:
+            yield filter_name, filters[filter_name]
+
     def _object_files(self, object_id):
         """
         Private read-only iterator over all files for a given object. This enforces a strict total order
@@ -683,10 +814,8 @@ class HSCDataSetContainer(Dataset):
         Path
             The path to the file.
         """
-        filters = self.files[object_id]
-        filter_names = sorted(list(filters))
-        for filter in filter_names:
-            yield self._file_to_path(filters[filter])
+        for _, filename in self._filter_filename(object_id):
+            yield self._file_to_path(filename)
 
     def _file_to_path(self, filename: str) -> Path:
         """Turns a filename into a full path suitable for open. Equivalent to:
