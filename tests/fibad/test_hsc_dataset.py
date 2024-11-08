@@ -31,7 +31,7 @@ class FakeFitsFS:
         self.test_files = test_files
 
         mock_paths = [Path(x) for x in list(test_files.keys())]
-        target = "fibad.data_sets.hsc_data_set.Path.glob"
+        target = "fibad.data_sets.hsc_data_set.Path.iterdir"
         self.patchers.append(mock.patch(target, return_value=mock_paths))
 
         mock_fits_open = mock.Mock(side_effect=self._open_file)
@@ -53,7 +53,15 @@ class FakeFitsFS:
             patcher.stop()
 
 
-def mkconfig(crop_to=False, filters=False, train_size=0.2, test_size=0.6, validate_size=0, seed=False):
+def mkconfig(
+    crop_to=False,
+    filters=False,
+    train_size=0.2,
+    test_size=0.6,
+    validate_size=0,
+    seed=False,
+    filter_catalog=False,
+):
     """Makes a configuration that points at nonexistent path so HSCDataSet.__init__ will create an object,
     and our FakeFitsFS shim can be called.
     """
@@ -62,6 +70,7 @@ def mkconfig(crop_to=False, filters=False, train_size=0.2, test_size=0.6, valida
         "data_set": {
             "crop_to": crop_to,
             "filters": filters,
+            "filter_catalog": filter_catalog,
         },
         "prepare": {
             "seed": seed,

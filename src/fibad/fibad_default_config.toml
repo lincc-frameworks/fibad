@@ -90,6 +90,10 @@ crop_to = false
 #filters = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 filters = false
 
+# A fits file which specifies object IDs to filter a large dataset in [general].data_dir down
+# Implementation is dataset class dependent. Default is false meaning now filtering.
+filter_catalog = false
+
 [data_loader]
 # Default PyTorch DataLoader parameters
 batch_size = 32

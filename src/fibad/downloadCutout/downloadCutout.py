@@ -21,6 +21,8 @@ import urllib.response
 from collections.abc import Generator
 from typing import IO, Any, Callable, Optional, Union, cast
 
+import numpy as np
+
 __all__ = []
 
 
@@ -760,6 +762,9 @@ def parse_bool(s: Union[str, bool]) -> bool:
         True or False.
     """
     if isinstance(s, bool):
+        return s
+
+    if isinstance(s, np.bool):
         return s
 
     return {
