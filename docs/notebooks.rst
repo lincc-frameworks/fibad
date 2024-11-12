@@ -3,4 +3,4 @@ Notebooks
 
 .. toctree::
 
-    Introducing Jupyter Notebooks <notebooks/intro_notebook>
+    Training a simple model <notebooks/train_model>
