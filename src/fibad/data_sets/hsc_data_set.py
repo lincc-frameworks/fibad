@@ -358,6 +358,7 @@ class HSCDataSetContainer(Dataset):
 
         self.cutout_shape = cutout_shape
 
+        self.pruned_objects = {}
         self._prune_objects(filters_ref)
 
         if self.cutout_shape is None:
@@ -388,13 +389,15 @@ class HSCDataSetContainer(Dataset):
             filter_name -> file name. Corresponds to self.files
         """
 
+        logger.info(f"Scanning files in directory {self.path}")
+
         object_id_regex = r"[0-9]{17}"
         filter_regex = r"HSC-[GRIZY]" if filters is None else "|".join(filters)
         full_regex = f"({object_id_regex})_.*_({filter_regex}).fits"
 
         files = {}
         # Go scan the path for object ID's so we have a list.
-        for filepath in Path(self.path).iterdir():
+        for index, filepath in enumerate(Path(self.path).iterdir()):
             filename = filepath.name
 
             # If we are filtering based off a user-provided catalog of object ids, Filter out any
@@ -421,6 +424,11 @@ class HSCDataSetContainer(Dataset):
                 msg += f"File {filename} conflicts with already scanned file {files[object_id][filter]} "
                 msg += "and will not be included in the data set."
                 logger.error(msg)
+
+            if index != 0 and index % 100_000 == 0:
+                logger.info(f"Processed {index} files.")
+        else:
+            logger.info(f"Processed {index+1} files")
 
         return files
 
@@ -476,10 +484,16 @@ class HSCDataSetContainer(Dataset):
 
     def _scan_file_dimensions(self) -> dim_dict:
         # Scan the filesystem to get the widths and heights of all images into a dict
-        return {
-            object_id: [self._fits_file_dims(filepath) for filepath in self._object_files(object_id)]
-            for object_id in self.ids()
-        }
+        logger.info("Scanning for dimensions...")
+
+        retval = {}
+        for index, object_id in enumerate(self.ids()):
+            retval[object_id] = [self._fits_file_dims(filepath) for filepath in self._object_files(object_id)]
+            if index != 0 and index % 100_000 == 0:
+                logger.info(f"Scanned {index} objects for dimensions")
+        else:
+            logger.info(f"Scanned {index+1} objects for dimensions")
+        return retval
 
     def _prune_objects(self, filters_ref: list[str]):
         """Class initialization helper. Prunes objects from the list of objects.
@@ -502,12 +516,12 @@ class HSCDataSetContainer(Dataset):
         """
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
-        for object_id, filters in list(self.files.items()):
+        for index, (object_id, filters) in enumerate(self.files.items()):
             # Drop objects with missing filters
             filters = sorted(list(filters))
             if filters != filters_ref:
                 msg = f"HSCDataSet in {self.path} has the wrong group of filters for object {object_id}."
-                self._prune_object(object_id, msg)
+                self._mark_for_prune(object_id, msg)
                 logger.info(f"Filters for object {object_id} were {filters}")
                 logger.debug(f"Reference filters were {filters_ref}")
 
@@ -518,8 +532,16 @@ class HSCDataSetContainer(Dataset):
                         msg = f"A file for object {object_id} has shape ({shape[1]}px, {shape[1]}px)"
                         msg += " this is too small for the given cutout size of "
                         msg += f"({self.cutout_shape[0]}px, {self.cutout_shape[1]}px)"
-                        self._prune_object(object_id, msg)
+                        self._mark_for_prune(object_id, msg)
                         break
+            if index != 0 and index % 100_000 == 0:
+                logger.info(f"Processed {index} objects for pruning")
+        else:
+            logger.info(f"Processed {index + 1} objects for pruning")
+
+        # Prune marked objects
+        for object_id, reason in self.pruned_objects.items():
+            self._prune_object(object_id, reason)
 
         # Log about the pruning process
         pre_prune_object_count = len(self.files) + self.prune_count
@@ -529,6 +551,9 @@ class HSCDataSetContainer(Dataset):
         elif prune_fraction > 0.01:
             logger.warning("Greater than 1% of objects in the data directory were pruned.")
         logger.info(f"Pruned {self.prune_count} out of {pre_prune_object_count} objects")
+
+    def _mark_for_prune(self, object_id, reason):
+        self.pruned_objects[object_id] = reason
 
     def _prune_object(self, object_id, reason: str):
         logger.warning(reason)
@@ -560,6 +585,8 @@ class HSCDataSetContainer(Dataset):
             The minimum width and height in pixels of the entire dataset. In other words: the maximal image
             size in pixels that can be generated from ALL cutout images via cropping.
         """
+        logger.info("Checking file dimensions to determine standard cutout size...")
+
         # Find the maximal cutout size that all images can support
         all_widths = [shape[0] for shape_list in self.dims.values() for shape in shape_list]
         cutout_width = np.min(all_widths)
@@ -631,7 +658,7 @@ class HSCDataSetContainer(Dataset):
             "variance": parse_bool(config["download"]["variance"]),
         }
 
-        for object_id, filter, filename, dim in self._all_files_full():
+        for index, (object_id, filter, filename, dim) in enumerate(self._all_files_full()):
             for static_col in static_column_names:
                 columns[static_col].append(static_values[static_col])
 
@@ -661,6 +688,10 @@ class HSCDataSetContainer(Dataset):
                     # which will be hit when someone alters dynamic column names above without also
                     # writing an implementation.
                     raise RuntimeError(f"No implementation to process column {dynamic_col}")
+            if index != 0 and index % 100_000 == 0:
+                logger.info(f"Addeed {index} objects to manifest")
+        else:
+            logger.info(f"Addeed {index+1} objects to manifest")
 
         logger.info("Writing rebuilt manifest...")
         manifest_table = Table(columns)

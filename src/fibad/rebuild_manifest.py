@@ -17,6 +17,8 @@ def run(config):
 
     _, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
 
+    logger.info("Starting rebuild of manifest")
+
     data_set.rebuild_manifest(config)
 
-    logger.info("Finished Prepare")
+    logger.info("Finished Rebuild Manifest")
