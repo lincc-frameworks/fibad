@@ -21,6 +21,8 @@ dependencies = [
     "toml", # Used to load configuration files as dictionaries
     "torch", # Used for CNN model and in train.py
     "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
+    "tensorboardX", # Used to log training metrics
+    "tensorboard", # Used to log training metrics
 ]
 
 [project.scripts]

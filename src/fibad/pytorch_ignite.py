@@ -7,6 +7,10 @@ import ignite.distributed as idist
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
+from ignite.handlers.tensorboard_logger import (
+    GradsScalarHandler,
+    TensorboardLogger,
+)
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import Dataset
 
@@ -214,9 +218,15 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         greater_or_equal=True,
     )
 
+    tensorboard_logger = TensorboardLogger(log_dir=results_directory)
+
     if config["train"]["resume"]:
         prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
+
+    tensorboard_logger.attach(
+        trainer, log_handler=GradsScalarHandler(model), event_name=Events.ITERATION_COMPLETED(every=100)
+    )
 
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
