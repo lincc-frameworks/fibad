@@ -7,10 +7,7 @@ import ignite.distributed as idist
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
-from ignite.handlers.tensorboard_logger import (
-    GradsScalarHandler,
-    TensorboardLogger,
-)
+from ignite.handlers.tensorboard_logger import GradsScalarHandler, TensorboardLogger, WeightsHistHandler
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import Dataset
 
@@ -226,6 +223,20 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
 
     tensorboard_logger.attach(
         trainer, log_handler=GradsScalarHandler(model), event_name=Events.ITERATION_COMPLETED(every=100)
+    )
+
+    tensorboard_logger.attach(
+        trainer,
+        log_handler=WeightsHistHandler(model),
+        event_name=Events.ITERATION_COMPLETED(every=100),
+    )
+
+    tensorboard_logger.attach_output_handler(
+        trainer,
+        event_name=Events.ITERATION_COMPLETED(every=10),
+        tag="training",
+        output_transform=lambda loss: loss,
+        metric_names="all",
     )
 
     @trainer.on(Events.STARTED)
