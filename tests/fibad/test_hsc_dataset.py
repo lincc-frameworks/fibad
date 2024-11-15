@@ -519,7 +519,8 @@ def test_split_values_configured_no_validate():
         a = HSCDataSet(config, split="train")
         assert len(a) == 22
 
-        # Validate??
+        a = HSCDataSet(config, split="validate")
+        assert len(a) == 10
 
 
 def test_split_invalid_configured():
