@@ -488,9 +488,10 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-
-        with MultiPool() as pool:
-            args = ((object_id, list(self._object_files(object_id))) for object_id in self.ids())
+        with MultiPool(processes=10) as pool:
+            args = (
+                (object_id, list(self._object_files(object_id))) for object_id in self.ids(log_every=100_000)
+            )
             retval = dict(pool.map(self._scan_file_dimension, args))
         return retval
 
@@ -779,7 +780,7 @@ class HSCDataSetContainer(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def ids(self):
+    def ids(self, log_every=None):
         """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 
@@ -788,8 +789,14 @@ class HSCDataSetContainer(Dataset):
         Iterator[str]
             Object IDs currently in the dataset
         """
-        for object_id in self.files:
+        log = log_every is not None and isinstance(log_every, int)
+        for index, object_id in enumerate(self.files):
+            if log and index != 0 and index % log_every == 0:
+                logger.info(f"Processed {index} objects")
             yield object_id
+        else:
+            if log:
+                logger.info(f"Processed {index} objects")
 
     def _all_files_full(self):
         """
