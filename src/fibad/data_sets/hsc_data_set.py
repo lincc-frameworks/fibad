@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from astropy.io import fits
 from astropy.table import Table
+from schwimmbad import MultiPool
 from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
@@ -487,13 +488,21 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        for index, object_id in enumerate(self.ids()):
-            retval[object_id] = [self._fits_file_dims(filepath) for filepath in self._object_files(object_id)]
-            if index != 0 and index % 100_000 == 0:
-                logger.info(f"Scanned {index} objects for dimensions")
-        else:
-            logger.info(f"Scanned {index+1} objects for dimensions")
+
+        with MultiPool() as pool:
+            args = ((object_id, list(self._object_files(object_id))) for object_id in self.ids())
+            retval = dict(pool.map(self._scan_file_dimension, args))
         return retval
+
+    @staticmethod
+    def _scan_file_dimension(processing_unit: tuple[str, list[str]]) -> list[tuple[int, int]]:
+        object_id, filenames = processing_unit
+        return (object_id, [HSCDataSetContainer._fits_file_dims(filepath) for filepath in filenames])
+
+    @staticmethod
+    def _fits_file_dims(filepath):
+        with fits.open(filepath) as hdul:
+            return hdul[1].shape
 
     def _prune_objects(self, filters_ref: list[str]):
         """Class initialization helper. Prunes objects from the list of objects.
@@ -563,10 +572,6 @@ class HSCDataSetContainer(Dataset):
         del self.dims[object_id]
         self.prune_count += 1
 
-    def _fits_file_dims(self, filepath):
-        with fits.open(filepath) as hdul:
-            return hdul[1].shape
-
     def _check_file_dimensions(self) -> tuple[int, int]:
         """Class initialization helper. Find the maximal pixel size that all images can support
 
@@ -589,10 +594,10 @@ class HSCDataSetContainer(Dataset):
 
         # Find the maximal cutout size that all images can support
         all_widths = [shape[0] for shape_list in self.dims.values() for shape in shape_list]
-        cutout_width = np.min(all_widths)
-
         all_heights = [shape[1] for shape_list in self.dims.values() for shape in shape_list]
-        cutout_height = np.min(all_heights)
+        all_dimensions = all_widths + all_heights
+        cutout_height = np.min(all_dimensions)
+        cutout_width = cutout_height
 
         if (
             np.abs(cutout_width - np.mean(all_widths)) > 1
