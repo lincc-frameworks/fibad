@@ -426,6 +426,24 @@ def test_split_with_validate_no_test_no_train():
         assert len(a) == 20
 
 
+def test_split_with_validate_with_test_no_train():
+    """Test splitting when validate is provided by test size is not"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(
+            filters=["HSC-G", "HSC-R", "HSC-I"], test_size=0.6, train_size=False, validate_size=0.2
+        )
+
+        a = HSCDataSet(config, split="test")
+        assert len(a) == 60
+
+        a = HSCDataSet(config, split="train")
+        assert len(a) == 20
+
+        a = HSCDataSet(config, split="validate")
+        assert len(a) == 20
+
+
 def test_split_no_validate_no_test():
     """Test splitting when validate and test are overridden"""
     test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
