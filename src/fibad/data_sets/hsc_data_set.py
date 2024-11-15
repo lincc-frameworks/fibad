@@ -57,11 +57,18 @@ class HSCDataSet(Dataset):
         if test_size is None:
             if train_size is None:
                 train_size = 0.25
-            test_size = 1.0 - train_size if validate_size is None else 1.0 - (train_size + validate_size)
+
+            if validate_size is None:  # noqa: SIM108
+                test_size = 1.0 - train_size
+            else:
+                test_size = 1.0 - (train_size + validate_size)
 
         # Initialize train size when not provided, and can be inferred from test_size and validate_size.
         if train_size is None:
-            train_size = 1.0 - test_size if validate_size is None else 1.0 - (test_size + validate_size)
+            if validate_size is None:  # noqa: SIM108
+                train_size = 1.0 - test_size
+            else:
+                train_size = 1.0 - (test_size + validate_size)
 
         # If we still don't have a validate size, decide whether we will infer a validate size
         if (validate_size is None) and (np.round(train_size + test_size) != 1.0):
