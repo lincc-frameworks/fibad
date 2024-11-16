@@ -502,8 +502,11 @@ class HSCDataSetContainer(Dataset):
 
     @staticmethod
     def _fits_file_dims(filepath):
-        with fits.open(filepath) as hdul:
-            return hdul[1].shape
+        try:
+            with fits.open(filepath) as hdul:
+                return hdul[1].shape
+        except OSError:
+            return (0, 0)
 
     def _prune_objects(self, filters_ref: list[str]):
         """Class initialization helper. Prunes objects from the list of objects.
