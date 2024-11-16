@@ -426,7 +426,7 @@ class HSCDataSetContainer(Dataset):
                 msg += "and will not be included in the data set."
                 logger.error(msg)
 
-            if index != 0 and index % 100_000 == 0:
+            if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Processed {index} files.")
         else:
             logger.info(f"Processed {index+1} files")
@@ -488,11 +488,11 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        with MultiPool(processes=10) as pool:
+        with MultiPool(processes=150) as pool:
             args = (
-                (object_id, list(self._object_files(object_id))) for object_id in self.ids(log_every=100_000)
+                (object_id, list(self._object_files(object_id))) for object_id in self.ids(log_every=1_000_000)
             )
-            retval = dict(pool.map(self._scan_file_dimension, args))
+            retval = dict(pool.imap(self._scan_file_dimension, args, chunksize=1000))
         return retval
 
     @staticmethod
@@ -544,7 +544,7 @@ class HSCDataSetContainer(Dataset):
                         msg += f"({self.cutout_shape[0]}px, {self.cutout_shape[1]}px)"
                         self._mark_for_prune(object_id, msg)
                         break
-            if index != 0 and index % 100_000 == 0:
+            if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Processed {index} objects for pruning")
         else:
             logger.info(f"Processed {index + 1} objects for pruning")
@@ -694,7 +694,7 @@ class HSCDataSetContainer(Dataset):
                     # which will be hit when someone alters dynamic column names above without also
                     # writing an implementation.
                     raise RuntimeError(f"No implementation to process column {dynamic_col}")
-            if index != 0 and index % 100_000 == 0:
+            if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Addeed {index} objects to manifest")
         else:
             logger.info(f"Addeed {index+1} objects to manifest")
