@@ -644,7 +644,7 @@ class HSCDataSetContainer(Dataset):
         column_names = Downloader.MANIFEST_COLUMN_NAMES
         columns = {column_name: [] for column_name in column_names}
 
-        # These we vary every object and must be implemented below
+        # These will vary every object and must be implemented below
         dynamic_column_names = ["object_id", "filter", "dim", "tract", "ra", "dec", "filename"]
         # These are pulled from config ("sw", "sh", "rerun", "type", "image", "mask", and "variance")
         static_column_names = [name for name in column_names if name not in dynamic_column_names]
