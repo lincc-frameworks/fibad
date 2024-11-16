@@ -7,7 +7,6 @@ import ignite.distributed as idist
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
-from ignite.handlers.tensorboard_logger import GradsScalarHandler, TensorboardLogger, WeightsHistHandler
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import Dataset
 
@@ -47,7 +46,7 @@ def setup_model_and_dataset(config: ConfigDict, split: str) -> tuple:
     return model, data_set
 
 
-def dist_data_loader(data_set: Dataset, config: ConfigDict):
+def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):
     """Create a Pytorch Ignite distributed data loader
 
     Parameters
@@ -56,13 +55,26 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict):
         A Pytorch Dataset object
     config : ConfigDict
         Fibad runtime configuration
+    split : str
+        The name of the split we want to use from the data set.
 
     Returns
     -------
     Dataloader (or an ignite-wrapped equivalent)
         This is the distributed dataloader, formed by calling ignite.distributed.auto_dataloader
     """
-    return idist.auto_dataloader(data_set, **config["data_loader"])
+
+    #! Here we are allowing `train_sampler` and `validation_sampler` to become magic words.
+    #! It would be nice to find a way to do this that doesn't require external libraries to
+    #! know about these.
+    if hasattr(data_set, "train_sampler") and split == "train":
+        sampler = data_set.train_sampler
+    elif hasattr(data_set, "validation_sampler") and split == "validate":
+        sampler = data_set.validation_sampler
+    else:
+        sampler = None
+
+    return idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
 
 
 def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
@@ -161,6 +173,44 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
     return evaluator
 
 
+#! There will likely be a significant amount of code duplication between the
+#! `create_trainer` and `create_validator` functions. We should find a way to
+#! refactor this code to reduce duplication.
+def create_validator(model: torch.nn.Module, config: ConfigDict, results_directory: Path) -> Engine:
+    """This function creates a Pytorch Ignite engine object that will be used to
+    validate the model.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The model to train
+    config : ConfigDict
+        Fibad runtime configuration
+    results_directory : Path
+        The directory where training results will be saved
+
+    Returns
+    -------
+    pytorch-ignite.Engine
+        Engine object that will be used to train the model.
+    """
+
+    device = idist.device()
+    model = idist.auto_model(model)
+
+    #! Need to figure out the appropriate way to switch the model between .train()
+    #! and .eval() mode. We aren't doing that here - so the model is being trained
+    #! during validation!
+    validator = create_engine("train_step", device, model)
+
+    @validator.on(Events.EPOCH_COMPLETED)
+    def log_training_loss(trainer):
+        logger.info(f"Validation run time: {validator.state.times['EPOCH_COMPLETED']:.2f}[s]")
+        logger.info(f"Validation metrics: {validator.state.output}")
+
+    return validator
+
+
 def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory: Path) -> Engine:
     """This function is originally copied from here:
     https://github.com/pytorch-ignite/examples/blob/main/tutorials/intermediate/cifar10-distributed.py#L164
@@ -194,6 +244,9 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         "trainer": trainer,
     }
 
+    #! We may want to move the checkpointing logic over to the `validator`.
+    #! It was created here initially because this was the only place where the
+    #! model training was happening.
     latest_checkpoint = Checkpoint(
         to_save,
         DiskSaver(results_directory, require_empty=False),
@@ -215,29 +268,9 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         greater_or_equal=True,
     )
 
-    tensorboard_logger = TensorboardLogger(log_dir=results_directory)
-
     if config["train"]["resume"]:
         prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
-
-    tensorboard_logger.attach(
-        trainer, log_handler=GradsScalarHandler(model), event_name=Events.ITERATION_COMPLETED(every=100)
-    )
-
-    tensorboard_logger.attach(
-        trainer,
-        log_handler=WeightsHistHandler(model),
-        event_name=Events.ITERATION_COMPLETED(every=100),
-    )
-
-    tensorboard_logger.attach_output_handler(
-        trainer,
-        event_name=Events.ITERATION_COMPLETED(every=10),
-        tag="training",
-        output_transform=lambda loss: loss,
-        metric_names="all",
-    )
 
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):

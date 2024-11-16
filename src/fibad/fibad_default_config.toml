@@ -94,10 +94,19 @@ filters = false
 # Implementation is dataset class dependent. Default is false meaning now filtering.
 filter_catalog = false
 
+#??? Maybe these values belong here, instead of a separate [prepare] section???
+train_size = 0.6
+validate_size = 0.2
+test_size = 0.6
+sampling_seed = 42
+
 [data_loader]
 # Default PyTorch DataLoader parameters
 batch_size = 32
-shuffle = true
+
+# We could remove this potentially - pytorch-ignite will default to shuffle=True
+# If the user wanted to explicitly require no shuffling, they could set this to false.
+shuffle = false
 num_workers = 2
 
 [prepare]

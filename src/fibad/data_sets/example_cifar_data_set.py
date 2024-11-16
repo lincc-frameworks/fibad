@@ -1,5 +1,7 @@
 # ruff: noqa: D101, D102
+import numpy as np
 import torchvision.transforms as transforms
+from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision.datasets import CIFAR10
 
 from .data_set_registry import fibad_data_set
@@ -16,12 +18,30 @@ class CifarDataSet(CIFAR10):
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
 
-        if split not in ["train", "test"]:
+        if split not in ["train", "validate", "test"]:
             RuntimeError("CIFAR10 dataset only supports 'train' and 'test' splits.")
 
-        train = split == "train"
+        train = split != "test"
 
         super().__init__(root=config["general"]["data_dir"], train=train, download=True, transform=transform)
+
+        if train:
+            num_train = len(self)
+            indices = list(range(num_train))
+            split = int(np.floor(config["data_set"]["validate_size"] * num_train))
+
+        np.random.seed(config["data_set"]["sampling_seed"])
+        np.random.shuffle(indices)
+
+        train_idx, valid_idx = indices[split:], indices[:split]
+
+        #! These two "samplers" are used by PyTorch's DataLoader to split the
+        #! dataset into training and validation sets. Using Samplers is mutually
+        #! exclusive with using "shuffle" in the DataLoader.
+        #! If a user doesn't define a Sampler, the default behavior of pytorch-ignite
+        #! is to shuffle the data unless `shuffle = False` in the config.
+        self.train_sampler = SubsetRandomSampler(train_idx)
+        self.validation_sampler = SubsetRandomSampler(valid_idx)
 
     def shape(self):
         return (3, 32, 32)
