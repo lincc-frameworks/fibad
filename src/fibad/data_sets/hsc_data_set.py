@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 @fibad_data_set
 class HSCDataSet(Dataset):
+    _called_from_test = False
+
     """Interface object to allow simple access to splits on a corpus of HSC data files
 
     f/s operations and management are handled in HSCDatSetContainer
@@ -288,7 +290,13 @@ class HSCDataSetContainer(Dataset):
 
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
-        filter_catalog = config["data_set"]["filter_catalog"]
+
+        if config["data_set"]["filter_catalog"]:
+            filter_catalog = Path(config["data_set"]["filter_catalog"])
+        else:
+            filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
+            if not filter_catalog.exists():
+                filter_catalog = False
 
         self._init_from_path(
             config["general"]["data_dir"],
@@ -488,9 +496,27 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        with MultiPool(processes=150) as pool:
+        # TODO
+        # It's fiendishly difficult in an HPC environment to get the real number of CPUS the scheduler has
+        # granted you, which is critical here because we're using the number of CPUS
+        # primarily to max out i/o bandwidth. The ideal value for us on UW Hyak is around 150.
+        #
+        # This should probably be:
+        # 1) A horribly obscure tunable parameter in the config. This is likely to generate the worst kinds
+        #    of user confusion.
+        # 2) If we could know ncpus, ~75*ncpus based on hyak. 75 is probably a similar value on other
+        #    clusters, we can tune over time.
+        # 3) A subsystem that looks at the pool of processes and sees how many we need to launch
+        #    before around 1/4-1/3 of the total process pool is marked runnable on average,
+        #    while gracefully backing off from process/filehandle limits. Such a scheme would equilibrate
+        #    near the optimal process number to max out i/o bandwidth no matter the CPU count.
+        # 4) We parallelize with something process-bound like asyncio, but we will need to make
+        #    astropy.io.fits.open support asyncio in that case, probably via fsspec.
+        numproc = 1 if HSCDataSet._called_from_test else 150
+        with MultiPool(processes=numproc) as pool:
             args = (
-                (object_id, list(self._object_files(object_id))) for object_id in self.ids(log_every=1_000_000)
+                (object_id, list(self._object_files(object_id)))
+                for object_id in self.ids(log_every=1_000_000)
             )
             retval = dict(pool.imap(self._scan_file_dimension, args, chunksize=1000))
         return retval

@@ -9,6 +9,8 @@ from fibad.data_sets.hsc_data_set import HSCDataSet, HSCDataSetSplit
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
+HSCDataSet._called_from_test = True
+
 
 class FakeFitsFS:
     """
