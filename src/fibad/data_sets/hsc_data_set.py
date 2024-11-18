@@ -1,6 +1,8 @@
 # ruff: noqa: D101, D102
 
 import logging
+import multiprocessing
+import os
 import re
 from copy import copy, deepcopy
 from pathlib import Path
@@ -28,6 +30,32 @@ from fibad.downloadCutout.downloadCutout import (
 from .data_set_registry import fibad_data_set
 
 logger = logging.getLogger(__name__)
+
+
+def num_cpus() -> int:
+    """
+    Checks both os.sched_getaffinity and multiprocessing.cpu_count()
+    to find the number of CPUs we have runtime access to.
+
+    Note borrowed from: https://github.com/pylint-dev/pylint/pull/6098/files
+    But we don't check for cgroup-based cpu time limits.
+
+    Returns
+    -------
+    int
+        Number of CPUs
+    """
+    cpu_count = None
+    sched_getaffinity = getattr(os, "sched_getaffinity", None)
+
+    if sched_getaffinity:
+        cpu_count = len(sched_getaffinity(0))
+    elif multiprocessing:
+        cpu_count = multiprocessing.cpu_count()
+    else:
+        cpu_count = 1
+
+    return cpu_count
 
 
 @fibad_data_set
@@ -496,23 +524,7 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        # TODO
-        # It's fiendishly difficult in an HPC environment to get the real number of CPUS the scheduler has
-        # granted you, which is critical here because we're using the number of CPUS
-        # primarily to max out i/o bandwidth. The ideal value for us on UW Hyak is around 150.
-        #
-        # This should probably be:
-        # 1) A horribly obscure tunable parameter in the config. This is likely to generate the worst kinds
-        #    of user confusion.
-        # 2) If we could know ncpus, ~75*ncpus based on hyak. 75 is probably a similar value on other
-        #    clusters, we can tune over time.
-        # 3) A subsystem that looks at the pool of processes and sees how many we need to launch
-        #    before around 1/4-1/3 of the total process pool is marked runnable on average,
-        #    while gracefully backing off from process/filehandle limits. Such a scheme would equilibrate
-        #    near the optimal process number to max out i/o bandwidth no matter the CPU count.
-        # 4) We parallelize with something process-bound like asyncio, but we will need to make
-        #    astropy.io.fits.open support asyncio in that case, probably via fsspec.
-        numproc = 1 if HSCDataSet._called_from_test else 150
+        numproc = 1 if HSCDataSet._called_from_test else 75 * num_cpus()
         with MultiPool(processes=numproc) as pool:
             args = (
                 (object_id, list(self._object_files(object_id)))
