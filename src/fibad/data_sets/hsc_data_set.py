@@ -4,6 +4,7 @@ import logging
 import multiprocessing
 import os
 import re
+import resource
 from copy import copy, deepcopy
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -321,10 +322,14 @@ class HSCDataSetContainer(Dataset):
 
         if config["data_set"]["filter_catalog"]:
             filter_catalog = Path(config["data_set"]["filter_catalog"])
-        else:
+        elif not config.get("rebuild_manifest", False):
+            # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
+            # to ensure we don't use the manifest we believe is corrupt.
             filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
             if not filter_catalog.exists():
                 filter_catalog = False
+        else:
+            filter_catalog = False
 
         self._init_from_path(
             config["general"]["data_dir"],
@@ -519,13 +524,62 @@ class HSCDataSetContainer(Dataset):
 
         return (filter_catalog, dim_catalog) if "dim" in colnames else filter_catalog
 
+    @staticmethod
+    def _determine_numprocs() -> int:
+        # Figure out how many CPUs we are allowed to use
+        cpu_count = None
+        sched_getaffinity = getattr(os, "sched_getaffinity", None)
+
+        if sched_getaffinity:
+            cpu_count = len(sched_getaffinity(0))
+        elif multiprocessing:
+            cpu_count = multiprocessing.cpu_count()
+        else:
+            cpu_count = 1
+
+        # Ideally we would use ~75 processes per CPU to attempt to saturate
+        # I/O bandwidth using a small number of CPUs.
+        numproc = 1 if HSCDataSet._called_from_test else 75 * cpu_count
+        numproc = HSCDataSetContainer._fixup_limit(
+            numproc,
+            resource.RLIMIT_NOFILE,
+            lambda proc: int(4 * proc + 10),
+            lambda nofile: int((nofile - 10) / 4),
+        )
+
+        numproc = HSCDataSetContainer._fixup_limit(
+            numproc, resource.RLIMIT_NPROC, lambda proc: proc, lambda proc: proc
+        )
+        return numproc
+
+    @staticmethod
+    def _fixup_limit(nproc, res, est_limit, est_procs) -> int:
+        # If launching this many processes would trigger other resource limits, work around them
+        limit_soft, limit_hard = resource.getrlimit(res)
+
+        # If we would violate the hard limit, calculate the number of processes that wouldn't
+        # violate the limit
+        if limit_hard < est_limit(nproc):
+            nproc = est_procs(limit_hard)
+
+        # If we would violate the soft limit, attempt to change it, leaving the hard limit alone
+        try:
+            if limit_soft < est_limit(nproc):
+                resource.setrlimit(res, (est_limit(nproc), limit_hard))
+        finally:
+            # If the change doesn't take, then reduce the number of processes again
+            limit_soft, limit_hard = resource.getrlimit(res)
+            if limit_soft < est_limit(nproc):
+                nproc = est_procs(limit_soft)
+
+        return nproc
+
     def _scan_file_dimensions(self) -> dim_dict:
         # Scan the filesystem to get the widths and heights of all images into a dict
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        numproc = 1 if HSCDataSet._called_from_test else 75 * num_cpus()
-        with MultiPool(processes=numproc) as pool:
+        with MultiPool(processes=HSCDataSetContainer._determine_numprocs()) as pool:
             args = (
                 (object_id, list(self._object_files(object_id)))
                 for object_id in self.ids(log_every=1_000_000)

@@ -15,6 +15,8 @@ def run(config):
         dict
     """
 
+    config["rebuild_manifest"] = True
+
     _, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
 
     logger.info("Starting rebuild of manifest")
