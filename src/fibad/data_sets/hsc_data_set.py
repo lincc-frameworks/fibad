@@ -33,32 +33,6 @@ from .data_set_registry import fibad_data_set
 logger = logging.getLogger(__name__)
 
 
-def num_cpus() -> int:
-    """
-    Checks both os.sched_getaffinity and multiprocessing.cpu_count()
-    to find the number of CPUs we have runtime access to.
-
-    Note borrowed from: https://github.com/pylint-dev/pylint/pull/6098/files
-    But we don't check for cgroup-based cpu time limits.
-
-    Returns
-    -------
-    int
-        Number of CPUs
-    """
-    cpu_count = None
-    sched_getaffinity = getattr(os, "sched_getaffinity", None)
-
-    if sched_getaffinity:
-        cpu_count = len(sched_getaffinity(0))
-    elif multiprocessing:
-        cpu_count = multiprocessing.cpu_count()
-    else:
-        cpu_count = 1
-
-    return cpu_count
-
-
 @fibad_data_set
 class HSCDataSet(Dataset):
     _called_from_test = False
