@@ -1,7 +1,10 @@
 # ruff: noqa: D101, D102
 
 import logging
+import multiprocessing
+import os
 import re
+import resource
 from copy import copy, deepcopy
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -10,8 +13,20 @@ import numpy as np
 import torch
 from astropy.io import fits
 from astropy.table import Table
+from schwimmbad import MultiPool
 from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
+
+from fibad.download import Downloader
+from fibad.downloadCutout.downloadCutout import (
+    parse_bool,
+    parse_degree,
+    parse_latitude,
+    parse_longitude,
+    parse_rerun,
+    parse_tract_opt,
+    parse_type,
+)
 
 from .data_set_registry import fibad_data_set
 
@@ -20,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 @fibad_data_set
 class HSCDataSet(Dataset):
+    _called_from_test = False
+
     """Interface object to allow simple access to splits on a corpus of HSC data files
 
     f/s operations and management are handled in HSCDatSetContainer
@@ -111,6 +128,9 @@ class HSCDataSet(Dataset):
 
     def __len__(self) -> int:
         return len(self.current_split)
+
+    def rebuild_manifest(self, config):
+        return self.container._rebuild_manifest(config)
 
 
 class HSCDataSetSplit(Dataset):
@@ -273,7 +293,17 @@ class HSCDataSetContainer(Dataset):
 
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
-        filter_catalog = config["data_set"]["filter_catalog"]
+
+        if config["data_set"]["filter_catalog"]:
+            filter_catalog = Path(config["data_set"]["filter_catalog"])
+        elif not config.get("rebuild_manifest", False):
+            # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
+            # to ensure we don't use the manifest we believe is corrupt.
+            filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
+            if not filter_catalog.exists():
+                filter_catalog = False
+        else:
+            filter_catalog = False
 
         self._init_from_path(
             config["general"]["data_dir"],
@@ -344,6 +374,7 @@ class HSCDataSetContainer(Dataset):
 
         self.cutout_shape = cutout_shape
 
+        self.pruned_objects = {}
         self._prune_objects(filters_ref)
 
         if self.cutout_shape is None:
@@ -374,13 +405,15 @@ class HSCDataSetContainer(Dataset):
             filter_name -> file name. Corresponds to self.files
         """
 
+        logger.info(f"Scanning files in directory {self.path}")
+
         object_id_regex = r"[0-9]{17}"
         filter_regex = r"HSC-[GRIZY]" if filters is None else "|".join(filters)
         full_regex = f"({object_id_regex})_.*_({filter_regex}).fits"
 
         files = {}
         # Go scan the path for object ID's so we have a list.
-        for filepath in Path(self.path).iterdir():
+        for index, filepath in enumerate(Path(self.path).iterdir()):
             filename = filepath.name
 
             # If we are filtering based off a user-provided catalog of object ids, Filter out any
@@ -407,6 +440,11 @@ class HSCDataSetContainer(Dataset):
                 msg += f"File {filename} conflicts with already scanned file {files[object_id][filter]} "
                 msg += "and will not be included in the data set."
                 logger.error(msg)
+
+            if index != 0 and index % 1_000_000 == 0:
+                logger.info(f"Processed {index} files.")
+        else:
+            logger.info(f"Processed {index+1} files")
 
         return files
 
@@ -460,12 +498,81 @@ class HSCDataSetContainer(Dataset):
 
         return (filter_catalog, dim_catalog) if "dim" in colnames else filter_catalog
 
+    @staticmethod
+    def _determine_numprocs() -> int:
+        # Figure out how many CPUs we are allowed to use
+        cpu_count = None
+        sched_getaffinity = getattr(os, "sched_getaffinity", None)
+
+        if sched_getaffinity:
+            cpu_count = len(sched_getaffinity(0))
+        elif multiprocessing:
+            cpu_count = multiprocessing.cpu_count()
+        else:
+            cpu_count = 1
+
+        # Ideally we would use ~75 processes per CPU to attempt to saturate
+        # I/O bandwidth using a small number of CPUs.
+        numproc = 1 if HSCDataSet._called_from_test else 75 * cpu_count
+        numproc = HSCDataSetContainer._fixup_limit(
+            numproc,
+            resource.RLIMIT_NOFILE,
+            lambda proc: int(4 * proc + 10),
+            lambda nofile: int((nofile - 10) / 4),
+        )
+
+        numproc = HSCDataSetContainer._fixup_limit(
+            numproc, resource.RLIMIT_NPROC, lambda proc: proc, lambda proc: proc
+        )
+        return numproc
+
+    @staticmethod
+    def _fixup_limit(nproc, res, est_limit, est_procs) -> int:
+        # If launching this many processes would trigger other resource limits, work around them
+        limit_soft, limit_hard = resource.getrlimit(res)
+
+        # If we would violate the hard limit, calculate the number of processes that wouldn't
+        # violate the limit
+        if limit_hard < est_limit(nproc):
+            nproc = est_procs(limit_hard)
+
+        # If we would violate the soft limit, attempt to change it, leaving the hard limit alone
+        try:
+            if limit_soft < est_limit(nproc):
+                resource.setrlimit(res, (est_limit(nproc), limit_hard))
+        finally:
+            # If the change doesn't take, then reduce the number of processes again
+            limit_soft, limit_hard = resource.getrlimit(res)
+            if limit_soft < est_limit(nproc):
+                nproc = est_procs(limit_soft)
+
+        return nproc
+
     def _scan_file_dimensions(self) -> dim_dict:
         # Scan the filesystem to get the widths and heights of all images into a dict
-        return {
-            object_id: [self._fits_file_dims(filepath) for filepath in self._object_files(object_id)]
-            for object_id in self.ids()
-        }
+        logger.info("Scanning for dimensions...")
+
+        retval = {}
+        with MultiPool(processes=HSCDataSetContainer._determine_numprocs()) as pool:
+            args = (
+                (object_id, list(self._object_files(object_id)))
+                for object_id in self.ids(log_every=1_000_000)
+            )
+            retval = dict(pool.imap(self._scan_file_dimension, args, chunksize=1000))
+        return retval
+
+    @staticmethod
+    def _scan_file_dimension(processing_unit: tuple[str, list[str]]) -> list[tuple[int, int]]:
+        object_id, filenames = processing_unit
+        return (object_id, [HSCDataSetContainer._fits_file_dims(filepath) for filepath in filenames])
+
+    @staticmethod
+    def _fits_file_dims(filepath):
+        try:
+            with fits.open(filepath) as hdul:
+                return hdul[1].shape
+        except OSError:
+            return (0, 0)
 
     def _prune_objects(self, filters_ref: list[str]):
         """Class initialization helper. Prunes objects from the list of objects.
@@ -488,12 +595,12 @@ class HSCDataSetContainer(Dataset):
         """
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
-        for object_id, filters in list(self.files.items()):
+        for index, (object_id, filters) in enumerate(self.files.items()):
             # Drop objects with missing filters
             filters = sorted(list(filters))
             if filters != filters_ref:
                 msg = f"HSCDataSet in {self.path} has the wrong group of filters for object {object_id}."
-                self._prune_object(object_id, msg)
+                self._mark_for_prune(object_id, msg)
                 logger.info(f"Filters for object {object_id} were {filters}")
                 logger.debug(f"Reference filters were {filters_ref}")
 
@@ -504,8 +611,16 @@ class HSCDataSetContainer(Dataset):
                         msg = f"A file for object {object_id} has shape ({shape[1]}px, {shape[1]}px)"
                         msg += " this is too small for the given cutout size of "
                         msg += f"({self.cutout_shape[0]}px, {self.cutout_shape[1]}px)"
-                        self._prune_object(object_id, msg)
+                        self._mark_for_prune(object_id, msg)
                         break
+            if index != 0 and index % 1_000_000 == 0:
+                logger.info(f"Processed {index} objects for pruning")
+        else:
+            logger.info(f"Processed {index + 1} objects for pruning")
+
+        # Prune marked objects
+        for object_id, reason in self.pruned_objects.items():
+            self._prune_object(object_id, reason)
 
         # Log about the pruning process
         pre_prune_object_count = len(self.files) + self.prune_count
@@ -516,6 +631,9 @@ class HSCDataSetContainer(Dataset):
             logger.warning("Greater than 1% of objects in the data directory were pruned.")
         logger.info(f"Pruned {self.prune_count} out of {pre_prune_object_count} objects")
 
+    def _mark_for_prune(self, object_id, reason):
+        self.pruned_objects[object_id] = reason
+
     def _prune_object(self, object_id, reason: str):
         logger.warning(reason)
         logger.warning(f"Dropping object {object_id} from the dataset")
@@ -523,10 +641,6 @@ class HSCDataSetContainer(Dataset):
         del self.files[object_id]
         del self.dims[object_id]
         self.prune_count += 1
-
-    def _fits_file_dims(self, filepath):
-        with fits.open(filepath) as hdul:
-            return hdul[1].shape
 
     def _check_file_dimensions(self) -> tuple[int, int]:
         """Class initialization helper. Find the maximal pixel size that all images can support
@@ -546,12 +660,14 @@ class HSCDataSetContainer(Dataset):
             The minimum width and height in pixels of the entire dataset. In other words: the maximal image
             size in pixels that can be generated from ALL cutout images via cropping.
         """
+        logger.info("Checking file dimensions to determine standard cutout size...")
+
         # Find the maximal cutout size that all images can support
         all_widths = [shape[0] for shape_list in self.dims.values() for shape in shape_list]
-        cutout_width = np.min(all_widths)
-
         all_heights = [shape[1] for shape_list in self.dims.values() for shape in shape_list]
-        cutout_height = np.min(all_heights)
+        all_dimensions = all_widths + all_heights
+        cutout_height = np.min(all_dimensions)
+        cutout_width = cutout_height
 
         if (
             np.abs(cutout_width - np.mean(all_widths)) > 1
@@ -570,6 +686,92 @@ class HSCDataSetContainer(Dataset):
                 logger.warning(msg)
 
         return cutout_width, cutout_height
+
+    def _rebuild_manifest(self, config):
+        if self.filter_catalog:
+            raise RuntimeError("Cannot rebuild manifest. Set the filter_catalog=false and rerun")
+
+        logger.info("Reading in catalog file... ")
+        location_table = Downloader.filterfits(
+            Path(config["download"]["fits_file"]).resolve(), ["object_id", "ra", "dec"]
+        )
+
+        obj_to_ra = {
+            str(location_table["object_id"][index]): location_table["ra"][index]
+            for index in range(len(location_table))
+        }
+        obj_to_dec = {
+            str(location_table["object_id"][index]): location_table["dec"][index]
+            for index in range(len(location_table))
+        }
+
+        del location_table
+
+        logger.info("Assembling Manifest...")
+
+        # These are the column names expected in a manifest file by the downloader
+        column_names = Downloader.MANIFEST_COLUMN_NAMES
+        columns = {column_name: [] for column_name in column_names}
+
+        # These will vary every object and must be implemented below
+        dynamic_column_names = ["object_id", "filter", "dim", "tract", "ra", "dec", "filename"]
+        # These are pulled from config ("sw", "sh", "rerun", "type", "image", "mask", and "variance")
+        static_column_names = [name for name in column_names if name not in dynamic_column_names]
+
+        # Check that all column names we need for a manifest are either in static or dynamic columns
+        for column_name in column_names:
+            if column_name not in static_column_names and column_name not in dynamic_column_names:
+                raise RuntimeError(f"Error Assembling manifest {column_name} not implemented")
+
+        static_values = {
+            "sw": parse_degree(config["download"]["sw"]),
+            "sh": parse_degree(config["download"]["sh"]),
+            "rerun": parse_rerun(config["download"]["rerun"]),
+            "type": parse_type(config["download"]["type"]),
+            "image": parse_bool(config["download"]["image"]),
+            "mask": parse_bool(config["download"]["mask"]),
+            "variance": parse_bool(config["download"]["variance"]),
+        }
+
+        for index, (object_id, filter, filename, dim) in enumerate(self._all_files_full()):
+            for static_col in static_column_names:
+                columns[static_col].append(static_values[static_col])
+
+            for dynamic_col in dynamic_column_names:
+                if dynamic_col == "object_id":
+                    columns[dynamic_col].append(int(object_id))
+                elif dynamic_col == "filter":
+                    columns[dynamic_col].append(filter)
+                elif dynamic_col == "dim":
+                    columns[dynamic_col].append(dim)
+                elif dynamic_col == "tract":
+                    # There's value in pulling tract from the filename rather than the download catalog
+                    # in case The catalog had it wrong, the filename will have the value the cutout server
+                    # provided.
+                    tract = filename.split("_")[4]
+                    columns[dynamic_col].append(parse_tract_opt(tract))
+                elif dynamic_col == "ra":
+                    ra = obj_to_ra[object_id]
+                    columns[dynamic_col].append(parse_longitude(ra))
+                elif dynamic_col == "dec":
+                    dec = obj_to_dec[object_id]
+                    columns[dynamic_col].append(parse_latitude(dec))
+                elif dynamic_col == "filename":
+                    columns[dynamic_col].append(filename)
+                else:
+                    # The tower of if statements has been entirely to create this failure path.
+                    # which will be hit when someone alters dynamic column names above without also
+                    # writing an implementation.
+                    raise RuntimeError(f"No implementation to process column {dynamic_col}")
+            if index != 0 and index % 1_000_000 == 0:
+                logger.info(f"Addeed {index} objects to manifest")
+        else:
+            logger.info(f"Addeed {index+1} objects to manifest")
+
+        logger.info("Writing rebuilt manifest...")
+        manifest_table = Table(columns)
+        rebuilt_manifest_path = Path(config["general"]["data_dir"]) / "rebuilt_manifest.fits"
+        manifest_table.write(rebuilt_manifest_path, overwrite=True, format="fits")
 
     def shape(self) -> tuple[int, int, int]:
         """Shape of the individual cutouts this will give to a model
@@ -647,7 +849,7 @@ class HSCDataSetContainer(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def ids(self):
+    def ids(self, log_every=None):
         """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 
@@ -656,8 +858,33 @@ class HSCDataSetContainer(Dataset):
         Iterator[str]
             Object IDs currently in the dataset
         """
-        for object_id in self.files:
+        log = log_every is not None and isinstance(log_every, int)
+        for index, object_id in enumerate(self.files):
+            if log and index != 0 and index % log_every == 0:
+                logger.info(f"Processed {index} objects")
             yield object_id
+        else:
+            if log:
+                logger.info(f"Processed {index} objects")
+
+    def _all_files_full(self):
+        """
+        Private read-only iterator over all files that enforces a strict total order across
+        objects and filters. Will not work prior to self.files, and self.path initialization in __init__
+
+        Yields
+        ------
+        Tuple[object_id, filter, filename, dim]
+            Members of this tuple are
+            - The object_id as a string
+            - The filter name as a string
+            - The filename relative to self.path
+            - A tuple containing the dimensions of the fits file in pixels.
+        """
+        for object_id in self.ids():
+            dims = self.dims[object_id]
+            for idx, (filter, filename) in enumerate(self._filter_filename(object_id)):
+                yield (object_id, filter, filename, dims[idx])
 
     def _all_files(self):
         """
@@ -673,6 +900,22 @@ class HSCDataSetContainer(Dataset):
             for filename in self._object_files(object_id):
                 yield filename
 
+    def _filter_filename(self, object_id):
+        """
+        Private read-only iterator over all files for a given object. This enforces a strict total order
+        across filters. Will not work prior to self.files initialization in __init__
+
+        Yields
+        ------
+        filter_name, file name
+            The name of a filter and the file name for the fits file.
+            The file name is relative to self.path
+        """
+        filters = self.files[object_id]
+        filter_names = sorted(list(filters))
+        for filter_name in filter_names:
+            yield filter_name, filters[filter_name]
+
     def _object_files(self, object_id):
         """
         Private read-only iterator over all files for a given object. This enforces a strict total order
@@ -683,10 +926,8 @@ class HSCDataSetContainer(Dataset):
         Path
             The path to the file.
         """
-        filters = self.files[object_id]
-        filter_names = sorted(list(filters))
-        for filter in filter_names:
-            yield self._file_to_path(filters[filter])
+        for _, filename in self._filter_filename(object_id):
+            yield self._file_to_path(filename)
 
     def _file_to_path(self, filename: str) -> Path:
         """Turns a filename into a full path suitable for open. Equivalent to:

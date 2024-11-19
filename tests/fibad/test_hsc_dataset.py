@@ -9,6 +9,8 @@ from fibad.data_sets.hsc_data_set import HSCDataSet, HSCDataSetSplit
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
+HSCDataSet._called_from_test = True
+
 
 class FakeFitsFS:
     """
@@ -131,8 +133,8 @@ def test_load(caplog):
         # 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (5, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (5, 262, 262)
 
         # No warnings should be printed
         assert caplog.text == ""
@@ -152,8 +154,8 @@ def test_load_duplicate(caplog):
         # Only 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (5, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (5, 262, 262)
 
         # We should get duplicate object errors
         assert "Duplicate object ID" in caplog.text
@@ -327,8 +329,8 @@ def test_partial_filter(caplog):
         # 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (2, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (2, 262, 262)
 
         # No warnings should be printed
         assert caplog.text == ""

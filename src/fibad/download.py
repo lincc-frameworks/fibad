@@ -28,6 +28,8 @@ class Downloader:
     # of the immutable fields that we rely on for hash checks are also included.
     RECT_COLUMN_NAMES = list(dict.fromkeys(VARIABLE_FIELDS + dC.Rect.immutable_fields + ["dim"]))
 
+    MANIFEST_COLUMN_NAMES = RECT_COLUMN_NAMES + ["filename", "object_id"]
+
     MANIFEST_FILE_NAME = "manifest.fits"
 
     def __init__(self, config):
@@ -280,9 +282,8 @@ resuming the correct download? Deleting the manifest and cutout files will start
         logger.info(f"Writing out download manifest with {len(combined_manifest)} entries.")
 
         # Convert the combined manifest into an astropy table by building a dict of {column_name: column_data}
-        # for all the fields in a rect, plus our object_id and filename.
-        column_names = Downloader.RECT_COLUMN_NAMES + ["filename", "object_id"]
-        columns = {column_name: [] for column_name in column_names}
+        # for all the fields we require in a manifest
+        columns = {column_name: [] for column_name in Downloader.MANIFEST_COLUMN_NAMES}
 
         for rect, msg in combined_manifest.items():
             # This parsing relies on the name format set up in create_rects to work properly
