@@ -358,7 +358,6 @@ class HSCDataSetContainer(Dataset):
         if isinstance(self.filter_catalog, tuple):
             self.files = self.filter_catalog[0]
             self.dims = self.filter_catalog[1]
-            print(self.dims)
         elif isinstance(self.filter_catalog, dict):
             self.files = self.filter_catalog
             self.dims = self._scan_file_dimensions()
