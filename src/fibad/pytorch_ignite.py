@@ -218,6 +218,14 @@ def create_validator(
     #! during validation!
     validator = create_engine("train_step", device, model)
 
+    @validator.on(Events.STARTED)
+    def set_model_to_eval_mode():
+        model.eval()
+
+    @validator.on(Events.COMPLETED)
+    def set_model_to_train_mode():
+        model.train()
+
     @validator.on(Events.EPOCH_COMPLETED)
     def log_training_loss():
         logger.info(f"Validation run time: {validator.state.times['EPOCH_COMPLETED']:.2f}[s]")
