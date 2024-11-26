@@ -71,8 +71,6 @@ def mkconfig(
             "crop_to": crop_to,
             "filters": filters,
             "filter_catalog": filter_catalog,
-        },
-        "prepare": {
             "seed": seed,
             "train_size": train_size,
             "test_size": test_size,

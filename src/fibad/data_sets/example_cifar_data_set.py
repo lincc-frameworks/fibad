@@ -31,8 +31,8 @@ class CifarDataSet(CIFAR10):
             split = int(np.floor(config["data_set"]["validate_size"] * num_train))
 
         random_seed = None
-        if config["data_set"]["sampling_seed"]:
-            random_seed = config["data_set"]["sampling_seed"]
+        if config["data_set"]["seed"]:
+            random_seed = config["data_set"]["seed"]
         np.random.seed(random_seed)
         np.random.shuffle(indices)
 

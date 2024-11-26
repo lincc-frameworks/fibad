@@ -94,25 +94,6 @@ filters = false
 # Implementation is dataset class dependent. Default is false meaning now filtering.
 filter_catalog = false
 
-#??? Maybe these values belong here, instead of a separate [prepare] section???
-train_size = 0.6
-validate_size = 0.2
-test_size = 0.6
-
-# False means the data will be seeded from a system source at runtime.
-# Set this as an integer for reproducible results.
-sampling_seed = false
-
-[data_loader]
-# Default PyTorch DataLoader parameters
-batch_size = 32
-
-# We could remove this potentially - pytorch-ignite will default to shuffle=True
-# If the user wanted to explicitly require no shuffling, they could set this to false.
-shuffle = false
-num_workers = 2
-
-[prepare]
 # How to split the data between training and eval sets.
 # The semantics are borrowed from scikit-learn's train-test-split, and HF Dataset's train-test-split function
 # It is an error for these values to add to more than 1.0 as ratios or the size of the dataset if expressed
@@ -145,6 +126,15 @@ test_size = 0.6
 # Number to seed with for generating a random split. False means the data will be seeded from
 # a system source at runtime.
 seed = false
+
+[data_loader]
+# Default PyTorch DataLoader parameters
+batch_size = 32
+
+# We could remove this potentially - pytorch-ignite will default to shuffle=True
+# If the user wanted to explicitly require no shuffling, they could set this to false.
+shuffle = false
+num_workers = 2
 
 [predict]
 model_weights_file = false

@@ -38,12 +38,12 @@ class HSCDataSet(Dataset):
         self._set_split(split)
 
     def _create_splits(self, config):
-        seed = config["prepare"]["seed"] if config["prepare"]["seed"] else None
+        seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
 
         # Init the splits based on config values
-        train_size = config["prepare"]["train_size"] if config["prepare"]["train_size"] else None
-        test_size = config["prepare"]["test_size"] if config["prepare"]["test_size"] else None
-        validate_size = config["prepare"]["validate_size"] if config["prepare"]["validate_size"] else None
+        train_size = config["data_set"]["train_size"] if config["data_set"]["train_size"] else None
+        test_size = config["data_set"]["test_size"] if config["data_set"]["test_size"] else None
+        validate_size = config["data_set"]["validate_size"] if config["data_set"]["validate_size"] else None
 
         # Convert all values specified as counts into ratios of the underlying container
         if isinstance(train_size, int):
