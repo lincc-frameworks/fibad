@@ -76,15 +76,15 @@ class ConfigManager:
         runtime_config_filepath: Union[Path, str] = None,
         default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
     ):
-        self.fibad_default_config = self._read_runtime_config(default_config_filepath)
+        self.fibad_default_config = ConfigManager._read_runtime_config(default_config_filepath)
 
-        self.runtime_config_filepath = runtime_config_filepath
-        if self.runtime_config_filepath is None:
+        self.runtime_config_filepath = ConfigManager.resolve_runtime_config(runtime_config_filepath)
+        if self.runtime_config_filepath is DEFAULT_CONFIG_FILEPATH:
             self.user_specific_config = ConfigDict()
         else:
-            self.user_specific_config = self._read_runtime_config(self.runtime_config_filepath)
+            self.user_specific_config = ConfigManager._read_runtime_config(self.runtime_config_filepath)
 
-        self.external_library_config_paths = self._find_external_library_default_config_paths(
+        self.external_library_config_paths = ConfigManager._find_external_library_default_config_paths(
             self.user_specific_config
         )
 
@@ -93,7 +93,7 @@ class ConfigManager:
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
         if not self.config["general"]["dev_mode"]:
-            self._validate_runtime_config(self.config, self.overall_default_config)
+            ConfigManager._validate_runtime_config(self.config, self.overall_default_config)
 
     @staticmethod
     def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
@@ -232,38 +232,37 @@ class ConfigManager:
                     raise RuntimeError(msg)
                 ConfigManager._validate_runtime_config(runtime_config[key], default_config[key])
 
+    @staticmethod
+    def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = None) -> Path:
+        """Resolve a user-supplied runtime config to where we will actually pull config from.
 
-def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = None) -> Path:
-    """Resolve a user-supplied runtime config to where we will actually pull config from.
+        1) If a runtime config file is specified, we will use that file.
+        2) If no file is specified and there is a file named "fibad_config.toml" in the cwd we will use it.
+        3) If no file is specified and there is no file named "fibad_config.toml" in the cwd we will
+        exclusively work off the configuration defaults in the packaged "fibad_default_config.toml" file.
 
-    1) If a runtime config file is specified, we will use that file
-    2) If no file is specified and there is a file named "fibad_config.toml" in the cwd we will use that file
-    3) If no file is specified and there is no file named "fibad_config.toml" in the current working directory
-       we will exclusively work off the configuration defaults in the packaged "fibad_default_config.toml"
-       file.
+        Parameters
+        ----------
+        runtime_config_filepath : Union[Path, str, None], optional
+            Location of the supplied config file, by default None
 
-    Parameters
-    ----------
-    runtime_config_filepath : Union[Path, str, None], optional
-        Location of the supplied config file, by default None
+        Returns
+        -------
+        Path
+            Path to the configuration file ultimately used for config resolution. When we fall back to the
+            package supplied default config file, the Path to that file is returned.
+        """
+        if isinstance(runtime_config_filepath, str):
+            runtime_config_filepath = Path(runtime_config_filepath)
 
-    Returns
-    -------
-    Path
-        Path to the configuration file ultimately used for config resolution. When we fall back to the
-        package supplied default config file, the Path to that file is returned.
-    """
-    if isinstance(runtime_config_filepath, str):
-        runtime_config_filepath = Path(runtime_config_filepath)
+        # If a named config exists in cwd, and no config specified on cmdline, use cwd.
+        if runtime_config_filepath is None and DEFAULT_USER_CONFIG_FILEPATH.exists():
+            runtime_config_filepath = DEFAULT_USER_CONFIG_FILEPATH
 
-    # If a named config exists in cwd, and no config specified on cmdline, use cwd.
-    if runtime_config_filepath is None and DEFAULT_USER_CONFIG_FILEPATH.exists():
-        runtime_config_filepath = DEFAULT_USER_CONFIG_FILEPATH
+        if runtime_config_filepath is None:
+            runtime_config_filepath = DEFAULT_CONFIG_FILEPATH
 
-    if runtime_config_filepath is None:
-        runtime_config_filepath = DEFAULT_CONFIG_FILEPATH
-
-    return runtime_config_filepath
+        return runtime_config_filepath
 
 
 def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:

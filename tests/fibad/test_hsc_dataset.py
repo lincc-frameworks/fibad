@@ -9,6 +9,8 @@ from fibad.data_sets.hsc_data_set import HSCDataSet, HSCDataSetSplit
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
+HSCDataSet._called_from_test = True
+
 
 class FakeFitsFS:
     """
@@ -58,7 +60,7 @@ def mkconfig(
     filters=False,
     train_size=0.2,
     test_size=0.6,
-    validate_size=0,
+    validate_size=0.1,
     seed=False,
     filter_catalog=False,
 ):
@@ -129,8 +131,8 @@ def test_load(caplog):
         # 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (5, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (5, 262, 262)
 
         # No warnings should be printed
         assert caplog.text == ""
@@ -150,8 +152,8 @@ def test_load_duplicate(caplog):
         # Only 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (5, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (5, 262, 262)
 
         # We should get duplicate object errors
         assert "Duplicate object ID" in caplog.text
@@ -325,8 +327,8 @@ def test_partial_filter(caplog):
         # 10 objects should load
         assert len(a) == 10
 
-        # The number of filters, and image dimensions should be correct
-        assert a.shape() == (2, 262, 263)
+        # The number of filters, and image dimensions should be correct and square
+        assert a.shape() == (2, 262, 262)
 
         # No warnings should be printed
         assert caplog.text == ""
@@ -365,7 +367,7 @@ def test_split():
     test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
     with FakeFitsFS(test_files):
         a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="validate")
-        assert len(a) == 20
+        assert len(a) == 10
 
         a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="test")
         assert len(a) == 60
@@ -379,6 +381,58 @@ def test_split_no_validate():
     test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
     with FakeFitsFS(test_files):
         config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False)
+
+        a = HSCDataSet(config, split="test")
+        assert len(a) == 60
+
+        a = HSCDataSet(config, split="train")
+        assert len(a) == 20
+
+        with pytest.raises(RuntimeError):
+            a = HSCDataSet(config, split="validate")
+
+
+def test_split_with_validate_no_test():
+    """Test splitting when validate is provided by test size is not"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], test_size=False, validate_size=0.2)
+
+        a = HSCDataSet(config, split="test")
+        assert len(a) == 60
+
+        a = HSCDataSet(config, split="train")
+        assert len(a) == 20
+
+        a = HSCDataSet(config, split="validate")
+        assert len(a) == 20
+
+
+def test_split_with_validate_no_test_no_train():
+    """Test splitting when validate is provided by test size is not"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(
+            filters=["HSC-G", "HSC-R", "HSC-I"], test_size=False, train_size=False, validate_size=0.2
+        )
+
+        a = HSCDataSet(config, split="test")
+        assert len(a) == 55
+
+        a = HSCDataSet(config, split="train")
+        assert len(a) == 25
+
+        a = HSCDataSet(config, split="validate")
+        assert len(a) == 20
+
+
+def test_split_with_validate_with_test_no_train():
+    """Test splitting when validate is provided by test size is not"""
+    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
+    with FakeFitsFS(test_files):
+        config = mkconfig(
+            filters=["HSC-G", "HSC-R", "HSC-I"], test_size=0.6, train_size=False, validate_size=0.2
+        )
 
         a = HSCDataSet(config, split="test")
         assert len(a) == 60
@@ -482,6 +536,9 @@ def test_split_values_configured_no_validate():
 
         a = HSCDataSet(config, split="train")
         assert len(a) == 22
+
+        a = HSCDataSet(config, split="validate")
+        assert len(a) == 10
 
 
 def test_split_invalid_configured():
