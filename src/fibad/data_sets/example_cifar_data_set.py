@@ -30,7 +30,10 @@ class CifarDataSet(CIFAR10):
             indices = list(range(num_train))
             split = int(np.floor(config["data_set"]["validate_size"] * num_train))
 
-        np.random.seed(config["data_set"]["sampling_seed"])
+        random_seed = None
+        if config["data_set"]["sampling_seed"]:
+            random_seed = config["data_set"]["sampling_seed"]
+        np.random.seed(random_seed)
         np.random.shuffle(indices)
 
         train_idx, valid_idx = indices[split:], indices[:split]

@@ -98,7 +98,10 @@ filter_catalog = false
 train_size = 0.6
 validate_size = 0.2
 test_size = 0.6
-sampling_seed = 42
+
+# False means the data will be seeded from a system source at runtime.
+# Set this as an integer for reproducible results.
+sampling_seed = false
 
 [data_loader]
 # Default PyTorch DataLoader parameters

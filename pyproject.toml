@@ -23,6 +23,7 @@ dependencies = [
     "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
     "tensorboardX", # Used to log training metrics
     "tensorboard", # Used to log training metrics
+    "GPUtil", # Used to gather GPU usage information
 ]
 
 [project.scripts]
