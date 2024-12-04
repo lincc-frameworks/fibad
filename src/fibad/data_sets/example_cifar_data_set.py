@@ -28,7 +28,9 @@ class CifarDataSet(CIFAR10):
         if train:
             num_train = len(self)
             indices = list(range(num_train))
-            split = int(np.floor(config["data_set"]["validate_size"] * num_train))
+            split = 0
+            if config["data_set"]["validate_size"]:
+                split = int(np.floor(config["data_set"]["validate_size"] * num_train))
 
         random_seed = None
         if config["data_set"]["seed"]:

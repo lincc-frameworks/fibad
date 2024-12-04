@@ -15,6 +15,7 @@ from astropy.io import fits
 from astropy.table import Table
 from schwimmbad import MultiPool
 from torch.utils.data import Dataset
+from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
 from fibad.download import Downloader
@@ -48,7 +49,7 @@ class HSCDataSet(Dataset):
         # initialize the filesystem references
         self.container = HSCDataSetContainer(config)
 
-        # initalize our splits from configuration
+        # initialize our splits from configuration
         self._create_splits(config)
 
         # Set the split to what was requested.
@@ -113,6 +114,41 @@ class HSCDataSet(Dataset):
         for key, value in self.splits.items():
             logger.info(f"{key} split contains {len(value)} items")
 
+        num_samples = len(self.container)
+        indices = list(range(num_samples))
+
+        # shuffle the indices
+        np.random.seed(seed)
+        np.random.shuffle(indices)
+
+        # Given the number of samples in the dataset and the ratios of the splits
+        # we can calculate the number of samples in each split.
+        num_test = int(np.round(len(self.container) * test_size))
+        num_train = int(np.round(len(self.container) * train_size))
+
+        # split the indices
+        test_idx = indices[:num_test]
+        train_idx = indices[num_test : num_test + num_train]
+
+        # assume that validate gets all the remaining indices
+        if validate_size:
+            valid_idx = indices[num_test + num_train :]
+
+        logger.info(f"Test split contains {len(test_idx)} items")
+        logger.info(f"Train split contains {len(train_idx)} items")
+        if validate_size:
+            logger.info(f"Validation split contains {len(valid_idx)} items")
+
+        # create the samplers
+        self.train_sampler = SubsetRandomSampler(train_idx)
+        self.test_sampler = SubsetRandomSampler(test_idx)
+        if validate_size:
+            self.validation_sampler = SubsetRandomSampler(valid_idx)
+
+        self.split_inds = {"train": train_idx, "test": test_idx}
+        if validate_size:
+            self.split_inds["validate"] = valid_idx
+
     def _set_split(self, split: Union[str, None] = None):
         self.current_split = self.splits.get(split, self.container)
 
@@ -124,7 +160,8 @@ class HSCDataSet(Dataset):
         return self.container.shape()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        return self.current_split[idx]
+        # return self.current_split[idx]
+        return self.container[idx]
 
     def __len__(self) -> int:
         return len(self.current_split)
@@ -595,6 +632,11 @@ class HSCDataSetContainer(Dataset):
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
         for index, (object_id, filters) in enumerate(self.files.items()):
+            # Drop objects that failed to download
+            if any("Attempted" in v for v in filters.items()):
+                msg = f"Attempted to download {object_id} but failed. Pruning."
+                self._mark_for_prune(object_id, msg)
+
             # Drop objects with missing filters
             filters = sorted(list(filters))
             if filters != filters_ref:
