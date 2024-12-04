@@ -7,8 +7,9 @@ import ignite.distributed as idist
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
+from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 
 from fibad.config_utils import ConfigDict
 from fibad.data_sets.data_set_registry import fetch_data_set_class
@@ -46,7 +47,7 @@ def setup_model_and_dataset(config: ConfigDict, split: str) -> tuple:
     return model, data_set
 
 
-def dist_data_loader(data_set: Dataset, config: ConfigDict):
+def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):
     """Create a Pytorch Ignite distributed data loader
 
     Parameters
@@ -55,13 +56,26 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict):
         A Pytorch Dataset object
     config : ConfigDict
         Fibad runtime configuration
+    split : str
+        The name of the split we want to use from the data set.
 
     Returns
     -------
     Dataloader (or an ignite-wrapped equivalent)
         This is the distributed dataloader, formed by calling ignite.distributed.auto_dataloader
     """
-    return idist.auto_dataloader(data_set, **config["data_loader"])
+
+    #! Here we are allowing `train_sampler` and `validation_sampler` to become magic words.
+    #! It would be nice to find a way to do this that doesn't require external libraries to
+    #! know about these.
+    if hasattr(data_set, "train_sampler") and split == "train":
+        sampler = data_set.train_sampler
+    elif hasattr(data_set, "validation_sampler") and split == "validate":
+        sampler = data_set.validation_sampler
+    else:
+        sampler = None
+
+    return idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
 
 
 def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
@@ -160,7 +174,79 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
     return evaluator
 
 
-def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory: Path) -> Engine:
+#! There will likely be a significant amount of code duplication between the
+#! `create_trainer` and `create_validator` functions. We should find a way to
+#! refactor this code to reduce duplication.
+def create_validator(
+    model: torch.nn.Module,
+    config: ConfigDict,
+    results_directory: Path,
+    tensorboardx_logger: SummaryWriter,
+    validation_data_loader: DataLoader,
+    trainer: Engine,
+) -> Engine:
+    """This function creates a Pytorch Ignite engine object that will be used to
+    validate the model.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        The model to train
+    config : ConfigDict
+        Fibad runtime configuration
+    results_directory : Path
+        The directory where training results will be saved
+    tensorboardx_logger : SummaryWriter
+        The tensorboard logger object
+    validation_data_loader : DataLoader
+        The data loader for the validation data
+    trainer : Engine
+        The engine object that will be used to train the model. We will use specific
+        hooks in the trainer to determine when to run the validation engine.
+
+    Returns
+    -------
+    pytorch-ignite.Engine
+        Engine object that will be used to train the model.
+    """
+
+    device = idist.device()
+    model = idist.auto_model(model)
+
+    #! Need to figure out the appropriate way to switch the model between .train()
+    #! and .eval() mode. We aren't doing that here - so the model is being trained
+    #! during validation!
+    validator = create_engine("train_step", device, model)
+
+    @validator.on(Events.STARTED)
+    def set_model_to_eval_mode():
+        model.eval()
+
+    @validator.on(Events.COMPLETED)
+    def set_model_to_train_mode():
+        model.train()
+
+    @validator.on(Events.EPOCH_COMPLETED)
+    def log_training_loss():
+        logger.info(f"Validation run time: {validator.state.times['EPOCH_COMPLETED']:.2f}[s]")
+        logger.info(f"Validation metrics: {validator.state.output}")
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def run_validation():
+        validator.run(validation_data_loader)
+
+    def log_validation_loss(validator, trainer):
+        step = trainer.state.get_event_attrib_value(Events.EPOCH_COMPLETED)
+        tensorboardx_logger.add_scalar("training/validation/loss", validator.state.output["loss"], step)
+
+    validator.add_event_handler(Events.EPOCH_COMPLETED, log_validation_loss, trainer)
+
+    return validator
+
+
+def create_trainer(
+    model: torch.nn.Module, config: ConfigDict, results_directory: Path, tensorboardx_logger: SummaryWriter
+) -> Engine:
     """This function is originally copied from here:
     https://github.com/pytorch-ignite/examples/blob/main/tutorials/intermediate/cifar10-distributed.py#L164
 
@@ -174,6 +260,8 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         Fibad runtime configuration
     results_directory : Path
         The directory where training results will be saved
+    tensorboardx_logger : SummaryWriter
+        The tensorboard logger object
 
     Returns
     -------
@@ -193,6 +281,9 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
         "trainer": trainer,
     }
 
+    #! We may want to move the checkpointing logic over to the `validator`.
+    #! It was created here initially because this was the only place where the
+    #! model training was happening.
     latest_checkpoint = Checkpoint(
         to_save,
         DiskSaver(results_directory, require_empty=False),
@@ -226,6 +317,11 @@ def create_trainer(model: torch.nn.Module, config: ConfigDict, results_directory
     @trainer.on(Events.EPOCH_STARTED)
     def log_epoch_start(trainer):
         logger.debug(f"Starting epoch {trainer.state.epoch}")
+
+    @trainer.on(Events.ITERATION_COMPLETED(every=10))
+    def log_training_loss_tensorboard(trainer):
+        step = trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED)
+        tensorboardx_logger.add_scalar("training/training/loss", trainer.state.output["loss"], step)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_loss(trainer):
