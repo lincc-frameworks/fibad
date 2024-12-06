@@ -520,17 +520,24 @@ class HSCDataSetContainer(Dataset):
             object_id = row["object_id"]
             filter = row["filter"]
             filename = row["filename"]
+            if "dim" in colnames:
+                dim = tuple(row["dim"])
 
+            # Skip over any files that are marked as didn't download.
+            # or have a dimension listed less than 1px x 1px
+            if filename == "Attempted" or min(dim) < 1:
+                continue
+
+            # Insert into the filter catalog.
             if object_id not in filter_catalog:
                 filter_catalog[object_id] = {}
-
             filter_catalog[object_id][filter] = filename
 
-            # Dimension is optional
+            # Dimension is optional, insert into dimension catalog.
             if "dim" in colnames:
                 if object_id not in dim_catalog:
                     dim_catalog[object_id] = []
-                dim_catalog[object_id].append(tuple(row["dim"]))
+                dim_catalog[object_id].append(dim)
 
         return (filter_catalog, dim_catalog) if "dim" in colnames else filter_catalog
 
@@ -632,11 +639,6 @@ class HSCDataSetContainer(Dataset):
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
         for index, (object_id, filters) in enumerate(self.files.items()):
-            # Drop objects that failed to download
-            if any("Attempted" in v for v in filters.items()):
-                msg = f"Attempted to download {object_id} but failed. Pruning."
-                self._mark_for_prune(object_id, msg)
-
             # Drop objects with missing filters
             filters = sorted(list(filters))
             if filters != filters_ref:
@@ -725,6 +727,13 @@ class HSCDataSetContainer(Dataset):
                 msg += f"See {min_height_file} for an example image of height {cutout_height}px"
             finally:
                 logger.warning(msg)
+
+        if min(cutout_height, cutout_width) < 1:
+            msg = "Automatic determination found an absurd dimension of "
+            msg += f"({cutout_width}px, {cutout_height}px)\n"
+            msg += "Please either correct the data source or set a static cutout side with the \n"
+            msg += "crop_to configuration in the dataset section of the fibad config.\n"
+            raise RuntimeError(msg)
 
         return cutout_width, cutout_height
 
