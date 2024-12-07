@@ -7,7 +7,6 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F  # noqa N812
-import torch.optim as optim
 
 from .model_registry import fibad_model
 
@@ -63,9 +62,3 @@ class ExampleCNN(nn.Module):
         loss.backward()
         self.optimizer.step()
         return {"loss": loss.item()}
-
-    def _criterion(self):
-        return nn.CrossEntropyLoss()
-
-    def _optimizer(self):
-        return optim.SGD(self.parameters(), lr=0.001, momentum=0.9)
