@@ -71,7 +71,7 @@ name = "torch.optim.SGD"
 
 # Default PyTorch optimizer parameters. The keys match the names of the parameters
 lr = 0.01
-momentum = 0.9
+#momentum = 0.9
 
 [train]
 weights_filepath = "example_model.pth"
