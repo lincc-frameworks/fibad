@@ -23,6 +23,20 @@ def _torch_load(self: nn.Module, load_path: Path):
     self.load_state_dict(state_dict, assign=True)
 
 
+def _torch_criterion(self: nn.Module):
+    criterion_function_cls = get_or_load_class(self.config["criterion"])
+    arguments = dict(self.config["criterion"])
+    del arguments["name"]
+    return criterion_function_cls(**arguments)
+
+
+def _torch_optimizer(self: nn.Module):
+    optimizer_cls = get_or_load_class(self.config["optimizer"])
+    arguments = dict(self.config["optimizer"])
+    del arguments["name"]
+    return optimizer_cls(self.parameters(), **arguments)
+
+
 def fibad_model(cls):
     """Decorator to register a model with the model registry, and to add common interface functions
 
@@ -35,6 +49,8 @@ def fibad_model(cls):
     if issubclass(cls, nn.Module):
         cls.save = _torch_save
         cls.load = _torch_load
+        cls._criterion = _torch_criterion if not hasattr(cls, "_criterion") else cls._criterion
+        cls._optimizer = _torch_optimizer if not hasattr(cls, "_optimizer") else cls._optimizer
 
     required_methods = ["train_step", "forward", "__init__"]
     for name in required_methods:

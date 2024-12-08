@@ -1,7 +1,7 @@
 import importlib
 
 
-def get_or_load_class(config: dict, registry: dict) -> type:
+def get_or_load_class(config: dict, registry: dict = None) -> type:
     """Given a configuration dictionary and a registry dictionary, attempt to return
     the requested class either from the registry or by dynamically importing it.
 
@@ -28,7 +28,7 @@ def get_or_load_class(config: dict, registry: dict) -> type:
     if "name" in config:
         class_name = config["name"]
 
-        if class_name in registry:
+        if registry and class_name in registry:
             returned_class = registry[class_name]
         else:
             returned_class = import_module_from_string(class_name)
