@@ -5,7 +5,6 @@
 
 
 import torch.nn as nn
-import torch.optim as optim
 
 # extra long import here to address a circular import issue
 from fibad.models.model_registry import fibad_model
@@ -13,7 +12,7 @@ from fibad.models.model_registry import fibad_model
 
 @fibad_model
 class HSCAutoencoder(nn.Module):  # These shapes work with [3,262,262] inputs
-    def __init__(self):
+    def __init__(self, config, shape):
         super().__init__()
 
         # Encoder
@@ -25,6 +24,7 @@ class HSCAutoencoder(nn.Module):  # These shapes work with [3,262,262] inputs
             nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),  # [128, 66, 66] -> [256, 33, 33]
             nn.ReLU(),
         )
+
         # Decoder
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(
@@ -40,6 +40,14 @@ class HSCAutoencoder(nn.Module):  # These shapes work with [3,262,262] inputs
             ),  # [64, 131, 131] -> [3, 262, 262]
             nn.Sigmoid(),  # Output pixel values between 0 and 1
         )
+
+        self.config = config
+
+        self.optimizer = self._optimizer()
+        # self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+
+        self.criterion = self._criterion()
+        # self.criterion = nn.MSELoss()
 
     def forward(self, x):
         encoded = self.encoder(x)
@@ -61,23 +69,12 @@ class HSCAutoencoder(nn.Module):  # These shapes work with [3,262,262] inputs
             The loss value for the current batch.
         """
 
-        data = batch[0]  # Extract the data from the TensorDataset
+        data = batch[0]
         self.optimizer.zero_grad()
 
-        # model.train()  # THIS PROBABLY HAPPENS SOMEWHERE ELSE ALREADY
-        # outputs = model(data)  # THIS WON'T WORK
-
-        encoded = self._encoder(data)
-        decoded = self._decoder(encoded)
-
-        loss = self._loss_function(decoded, data)
+        decoded = self.forward(data)
+        loss = self.criterion(decoded, data)
         loss.backward()
         self.optimizer.step()
 
         return {"loss": loss.item()}
-
-    def _optimizer(self):
-        return optim.Adam(self.parameters(), lr=0.001)
-
-    def _loss_function(self):
-        return nn.MSELoss()
