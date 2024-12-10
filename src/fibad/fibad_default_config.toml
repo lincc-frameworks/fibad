@@ -61,6 +61,18 @@ name = "ExampleAutoencoder"
 base_channel_size = 32
 latent_dim = 64
 
+[criterion]
+# The name of the built-in criterion to use or the libpath to an external criterion
+name = "torch.nn.CrossEntropyLoss"
+
+[optimizer]
+# The name of the built-in optimizer to use or the libpath to an external optimizer
+name = "torch.optim.SGD"
+
+# Default PyTorch optimizer parameters. The keys match the names of the parameters
+lr = 0.01
+momentum = 0.9
+
 [train]
 weights_filepath = "example_model.pth"
 epochs = 10
