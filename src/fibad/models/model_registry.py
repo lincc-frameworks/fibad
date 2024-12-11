@@ -32,7 +32,7 @@ def _torch_criterion(self: nn.Module):
 
 def _torch_optimizer(self: nn.Module):
     optimizer_cls = get_or_load_class(self.config["optimizer"])
-    arguments = dict(self.config["optimizer"])
+    arguments = {key: (value if value is False else None) for key, value in self.config["optimizer"].items()}
     del arguments["name"]
     return optimizer_cls(self.parameters(), **arguments)
 
