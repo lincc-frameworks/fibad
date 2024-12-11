@@ -731,8 +731,8 @@ class HSCDataSetContainer(Dataset):
         if min(cutout_height, cutout_width) < 1:
             msg = "Automatic determination found an absurd dimension of "
             msg += f"({cutout_width}px, {cutout_height}px)\n"
-            msg += "Please either correct the data source or set a static cutout side with the \n"
-            msg += "crop_to configuration in the dataset section of the fibad config.\n"
+            msg += "Please either correct the data source or set a static cutout size with the \n"
+            msg += "crop_to configuration in the [data_set] section of your fibad config.\n"
             raise RuntimeError(msg)
 
         return cutout_width, cutout_height
