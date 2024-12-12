@@ -11,33 +11,27 @@ from fibad.models.model_registry import fibad_model
 
 
 @fibad_model
-class HSCAutoencoder(nn.Module):  # These shapes work with [3,262,262] inputs
+class HSCAutoencoder(nn.Module):  # These shapes work with [3,258,258] inputs
     def __init__(self, config, shape):
         super().__init__()
 
         # Encoder
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),  # [3, 262, 262] -> [64, 131, 131]
+            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),  # [64, 131, 131] -> [128, 66, 66]
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),  # [128, 66, 66] -> [256, 33, 33]
+            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
         )
 
         # Decoder
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(
-                256, 128, kernel_size=3, stride=2, padding=1, output_padding=1
-            ),  # [256, 33, 33] -> [128, 66, 66]
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(
-                128, 64, kernel_size=3, stride=2, padding=1, output_padding=1
-            ),  # [128, 66, 66] -> [64, 131, 131]
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(
-                64, 3, kernel_size=2, stride=2, padding=1, output_padding=0
-            ),  # [64, 131, 131] -> [3, 262, 262]
+            nn.ConvTranspose2d(64, 3, kernel_size=3, stride=2, padding=4, output_padding=1),
             nn.Sigmoid(),  # Output pixel values between 0 and 1
         )
 
