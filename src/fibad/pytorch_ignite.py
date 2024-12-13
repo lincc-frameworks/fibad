@@ -1,7 +1,7 @@
 import functools
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 import ignite.distributed as idist
 import torch
@@ -18,33 +18,51 @@ from fibad.models.model_registry import fetch_model_class
 logger = logging.getLogger(__name__)
 
 
-def setup_model_and_dataset(config: ConfigDict, split: str) -> tuple:
-    """
-    Construct the dataset and the model according to configuration.
-
-    Primarily exists so the train and predict actions do this the same way.
+def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Dataset:
+    """Create a dataset object based on the configuration.
 
     Parameters
     ----------
     config : ConfigDict
-       The entire runtime config
-    split : str
-       The name of the split we want to use from the data set.
+        The entire runtime configuration
+    split : Union[str,bool], optional
+        The name of the split that we want to use. If False, use the entire
+        dataset, by default False
 
     Returns
     -------
-    tuple
-        (model object, data loader object)
+    Dataset
+        An instance of the dataset class specified in the configuration
     """
+
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
     data_set = data_set_cls(config, split)
 
+    return data_set
+
+
+def setup_model(config: ConfigDict, dataset: Dataset) -> torch.nn.Module:
+    """Create a model object based on the configuration.
+
+    Parameters
+    ----------
+    config : ConfigDict
+        The entire runtime configuration
+    dataset : Dataset
+        Only used to determine the input shape of the data
+
+    Returns
+    -------
+    torch.nn.Module
+        An instance of the model class specified in the configuration
+    """
+
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
-    model = model_cls(config=config, shape=data_set.shape())
+    model = model_cls(config=config, shape=dataset.shape())
 
-    return model, data_set
+    return model
 
 
 def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):

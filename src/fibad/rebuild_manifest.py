@@ -1,6 +1,6 @@
 import logging
 
-from fibad.pytorch_ignite import setup_model_and_dataset
+from fibad.pytorch_ignite import setup_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def run(config):
 
     config["rebuild_manifest"] = True
 
-    _, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config, split=config["train"]["split"])
 
     logger.info("Starting rebuild of manifest")
 
