@@ -5,7 +5,12 @@ import numpy as np
 from torch import Tensor
 
 from fibad.config_utils import ConfigDict, create_results_dir, log_runtime_config
-from fibad.pytorch_ignite import create_evaluator, dist_data_loader, setup_model_and_dataset
+from fibad.pytorch_ignite import (
+    create_evaluator,
+    dist_data_loader,
+    setup_dataset,
+    setup_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +24,8 @@ def run(config: ConfigDict):
         The parsed config file as a nested dict
     """
 
-    model, data_set = setup_model_and_dataset(config, split=config["predict"]["split"])
+    data_set = setup_dataset(config, split=config["predict"]["split"])
+    model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")
     data_loader = dist_data_loader(data_set, config)
 

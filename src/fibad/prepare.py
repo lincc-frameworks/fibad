@@ -1,6 +1,6 @@
 import logging
 
-from fibad.pytorch_ignite import setup_model_and_dataset
+from fibad.pytorch_ignite import setup_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def run(config):
         dict
     """
 
-    _, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config, split=config["train"]["split"])
 
     logger.info("Finished Prepare")
     return data_set

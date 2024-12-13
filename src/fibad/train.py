@@ -4,7 +4,13 @@ from tensorboardX import SummaryWriter
 
 from fibad.config_utils import create_results_dir, log_runtime_config
 from fibad.gpu_monitor import GpuMonitor
-from fibad.pytorch_ignite import create_trainer, create_validator, dist_data_loader, setup_model_and_dataset
+from fibad.pytorch_ignite import (
+    create_trainer,
+    create_validator,
+    dist_data_loader,
+    setup_dataset,
+    setup_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +32,8 @@ def run(config):
     tensorboardx_logger = SummaryWriter(log_dir=results_dir)
 
     # Instantiate the model and dataset
-    model, data_set = setup_model_and_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config, split=config["train"]["split"])
+    model = setup_model(config, data_set)
 
     # Create a data loader for the training set
     train_data_loader = dist_data_loader(data_set, config, "train")
