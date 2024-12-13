@@ -56,7 +56,7 @@ def test_get_runtime_config():
             "model_class": "new_thing.cool_model.CoolModel",
             "model": {"model_weights_filepath": "final_best.pth", "layers": 3},
         },
-        "predict": {"batch_size": 8},
+        "infer": {"batch_size": 8},
     }
 
     assert runtime_config == expected

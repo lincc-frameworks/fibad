@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(config: ConfigDict):
-    """Run Prediction
+    """Run inference on a model using a dataset
 
     Parameters
     ----------
@@ -24,13 +24,13 @@ def run(config: ConfigDict):
         The parsed config file as a nested dict
     """
 
-    data_set = setup_dataset(config, split=config["predict"]["split"])
+    data_set = setup_dataset(config, split=config["infer"]["split"])
     model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")
     data_loader = dist_data_loader(data_set, config)
 
     # Create a results directory and dump our config there
-    results_dir = create_results_dir(config, "predict")
+    results_dir = create_results_dir(config, "infer")
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
 
@@ -69,13 +69,13 @@ def load_model_weights(config: ConfigDict, model):
         The model class to load weights into
 
     """
-    weights_file = config["predict"]["model_weights_file"]
+    weights_file = config["infer"]["model_weights_file"]
 
     if not weights_file:
-        # TODO: Look at the last predict run from the rundir
+        # TODO: Look at the last infer (or train) run from the rundir
         # use config["model"]["weights_filename"] to find the weights
         # Proceed with those weights
-        raise RuntimeError("Must define pretrained_model in the predict section of fibad config.")
+        raise RuntimeError("Must define model_weights_file in the [infer] section of fibad config.")
 
     weights_file = Path(weights_file)
 

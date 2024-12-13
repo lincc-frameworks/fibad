@@ -14,7 +14,7 @@ class Fibad:
     CLI functions in fibad_cli are implemented by calling this class
     """
 
-    verbs = ["train", "predict", "download", "prepare", "rebuild_manifest"]
+    verbs = ["train", "infer", "download", "prepare", "rebuild_manifest"]
 
     def __init__(self, *, config_file: Union[Path, str] = None, setup_logging: bool = True):
         """Initialize fibad. Always applies the default config, and merges it with any provided config file.
@@ -170,11 +170,11 @@ class Fibad:
         downloader = Downloader(config=self.config)
         return downloader.run(**kwargs)
 
-    def predict(self, **kwargs):
+    def infer(self, **kwargs):
         """
-        See Fibad.predict.run()
+        See Fibad.infer.run()
         """
-        from .predict import run
+        from .infer import run
 
         return run(config=self.config, **kwargs)
 

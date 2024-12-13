@@ -268,7 +268,7 @@ class ConfigManager:
 def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:
     """Creates a results directory for this run.
 
-    Postfix is the verb name of the run e.g. (predict, train, etc)
+    Postfix is the verb name of the run e.g. (infer, train, etc)
 
     The directory is created within the results dir (set with config results_dir)
     and follows the pattern <timestamp>-<postfix>
