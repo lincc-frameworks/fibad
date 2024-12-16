@@ -148,7 +148,7 @@ batch_size = 32
 shuffle = false
 num_workers = 2
 
-[predict]
+[infer]
 model_weights_file = false
 batch_size = 32
 split = "test"

@@ -5,5 +5,5 @@ dev_mode = false
 model_weights_filepath = "final_best.pth"
 layers = 3
 
-[predict]
+[infer]
 batch_size = 8
