@@ -19,22 +19,22 @@ log_destination = "stderr"
 log_level = "info"     # Emit informational messages, warnings and all errors
 # log_level = "debug"    # Very verbose, emit all log messages.
 
-data_dir = "./data"
+data_dir = "./data/hsc_example/hsc_8asec_1000"
 results_dir = "./results" # Results get named <verb>-<timestamp> under this directory
 
 [download]
 sw = "22asec"
 sh = "22asec"
-filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+filter = ["HSC-G", "HSC-R", "HSC-I"]
 type = "coadd"
 rerun = "pdr3_wide"
-username = false
-password = false
-num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
+username = "awoldag"
+password = "YdwqGto0L2wnuUbBAJ4nXd+OudPYo/HUhWet3eSU"
+num_sources = 220 # Values below 1 here indicate all sources in the catalog will be downloaded
 offset = 0
 concurrent_connections = 4
 stats_print_interval = 60
-fits_file = "./catalog.fits"
+fits_file = "./smallhsccat_z_0_025.fits"
 
 # These control the downloader's HTTP requests and retries
 # `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
@@ -61,18 +61,6 @@ name = "ExampleAutoencoder"
 base_channel_size = 32
 latent_dim = 64
 
-[criterion]
-# The name of the built-in criterion to use or the libpath to an external criterion
-name = "torch.nn.CrossEntropyLoss"
-
-[optimizer]
-# The name of the built-in optimizer to use or the libpath to an external optimizer
-name = "torch.optim.SGD"
-
-# Default PyTorch optimizer parameters. The keys match the names of the parameters
-lr = 0.01
-momentum = 0.9
-
 [train]
 weights_filepath = "example_model.pth"
 epochs = 10
@@ -92,7 +80,7 @@ name = "CifarDataSet"
 # uses those pixel dimensions as the crop size.
 #
 #crop_to = [100,100]
-crop_to = false
+crop_to = [96, 96]
 
 # Limit data loader to only particular filters when there are more in the data set.
 #
@@ -116,7 +104,7 @@ filter_catalog = false
 # train split.
 # If `int`, represents the absolute number of train samples.
 # If `false`, the value is automatically set to the complement of the test size.
-train_size = 0.6
+train_size = 0.8
 
 # validate_size: Size of the validation split
 # If `float`, should be between `0.0` and `1.0` and represent the proportion of the dataset to include in the 
@@ -133,7 +121,7 @@ validate_size = 0.2
 # If `int`, represents the absolute number of test samples.
 # If `false`, the value is set to the complement of the train size.
 # If `train_size` is also `false`, it will be set to `0.25`.
-test_size = 0.6
+test_size = 0.0
 
 # Number to seed with for generating a random split. False means the data will be seeded from
 # a system source at runtime.
