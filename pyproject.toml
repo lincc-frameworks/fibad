@@ -25,6 +25,7 @@ dependencies = [
     "tensorboard", # Used to log training metrics
     "GPUtil", # Used to gather GPU usage information
     "schwimmbad", # Used to speedup hsc data loader file scans
+    "chromadb", # Vector database for fast nearest neighbor searches
 ]
 
 [project.scripts]
