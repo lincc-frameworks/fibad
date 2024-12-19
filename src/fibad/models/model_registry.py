@@ -37,10 +37,6 @@ def _torch_optimizer(self: nn.Module):
     return optimizer_cls(self.parameters(), **arguments)
 
 
-def _train_step(self: nn.Module, batch):
-    pass
-
-
 def fibad_model(cls):
     """Decorator to register a model with the model registry, and to add common interface functions
 
@@ -55,14 +51,13 @@ def fibad_model(cls):
         cls.load = _torch_load
         cls._criterion = _torch_criterion if not hasattr(cls, "_criterion") else cls._criterion
         cls._optimizer = _torch_optimizer if not hasattr(cls, "_optimizer") else cls._optimizer
-        cls.train_step = _train_step if not hasattr(cls, "train_step") else cls.train_step
 
         original_init = cls.__init__
 
         def wrapped_init(self, *args, **kwargs):
             original_init(self, *args, **kwargs)
-            self._criterion = self._criterion()
-            self._optimizer = self._optimizer()
+            self.criterion = self._criterion()
+            self.optimizer = self._optimizer()
 
         cls.__init__ = wrapped_init
 
