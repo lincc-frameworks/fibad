@@ -102,7 +102,7 @@ def load_model_weights(config: ConfigDict, model):
 def prep_vdb():
     """Start up a VDB"""
 
-    path_to_vector_db = "/Users/drew/code/fibad/docs/notebooks/results/vdb"
+    path_to_vector_db = "/home/drew/code/fibad/docs/notebooks/results/vdb"
 
     client = chromadb.PersistentClient(path=path_to_vector_db)
 
