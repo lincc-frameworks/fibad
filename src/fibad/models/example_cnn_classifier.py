@@ -26,11 +26,6 @@ class ExampleCNN(nn.Module):
 
         self.config = config
 
-        # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
-        # but we define them as methods as a way to allow for more flexibility in the future.
-        self.optimizer = self._optimizer()
-        self.criterion = self._criterion()
-
     def forward(self, x):
         # This check is inefficient - we assume that the example CNN will be primarily
         # used with the CIFAR10 dataset. During training, the `train_step` method

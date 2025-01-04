@@ -37,12 +37,6 @@ class HSCAutoencoder(nn.Module):  # These shapes work with [3,258,258] inputs
 
         self.config = config
 
-        self.optimizer = self._optimizer()
-        # self.optimizer = optim.Adam(self.parameters(), lr=0.001)
-
-        self.criterion = self._criterion()
-        # self.criterion = nn.MSELoss()
-
     def forward(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)

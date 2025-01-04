@@ -52,6 +52,15 @@ def fibad_model(cls):
         cls._criterion = _torch_criterion if not hasattr(cls, "_criterion") else cls._criterion
         cls._optimizer = _torch_optimizer if not hasattr(cls, "_optimizer") else cls._optimizer
 
+    original_init = cls.__init__
+
+    def wrapped_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.criterion = self._criterion()
+        self.optimizer = self._optimizer()
+
+    cls.__init__ = wrapped_init
+
     required_methods = ["train_step", "forward", "__init__"]
     for name in required_methods:
         if not hasattr(cls, name):

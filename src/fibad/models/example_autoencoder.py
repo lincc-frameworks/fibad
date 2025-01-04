@@ -36,9 +36,6 @@ class ExampleAutoencoder(nn.Module):
         self._init_encoder()
         self._init_decoder()
 
-        # create this here for use in `train_step`, to avoid recreating at each step.
-        self.optimizer = self._optimizer()
-
     def conv2d_multi_layer(self, input_size, num_applications, **kwargs) -> int:
         for _ in range(num_applications):
             input_size = self.conv2d_output_size(input_size, **kwargs)
