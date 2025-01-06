@@ -231,9 +231,6 @@ def create_validator(
     device = idist.device()
     model = idist.auto_model(model)
 
-    #! Need to figure out the appropriate way to switch the model between .train()
-    #! and .eval() mode. We aren't doing that here - so the model is being trained
-    #! during validation!
     validator = create_engine("train_step", device, model)
 
     @validator.on(Events.STARTED)

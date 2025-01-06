@@ -27,7 +27,7 @@ def run(config: ConfigDict):
     data_set = setup_dataset(config, split=config["infer"]["split"])
     model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")
-    data_loader = dist_data_loader(data_set, config)
+    data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
     # Create a results directory and dump our config there
     results_dir = create_results_dir(config, "infer")

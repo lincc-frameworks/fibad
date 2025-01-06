@@ -26,12 +26,15 @@ class ExampleCNN(nn.Module):
 
         self.config = config
 
-        # Optimizer and criterion could be set directly, i.e. `self.optimizer = optim.SGD(...)`
-        # but we define them as methods as a way to allow for more flexibility in the future.
-        self.optimizer = self._optimizer()
-        self.criterion = self._criterion()
-
     def forward(self, x):
+        # This check is inefficient - we assume that the example CNN will be primarily
+        # used with the CIFAR10 dataset. During training, the `train_step` method
+        # will unpack the tuple and only pass the first element to the `forward` method.
+        # But for inference the entire tuple is passed in, so we need to handle
+        # both cases.
+        if isinstance(x, tuple):
+            x, _ = x
+
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = torch.flatten(x, 1)

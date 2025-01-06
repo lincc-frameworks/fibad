@@ -32,21 +32,21 @@ class CifarDataSet(CIFAR10):
             if config["data_set"]["validate_size"]:
                 split = int(np.floor(config["data_set"]["validate_size"] * num_train))
 
-        random_seed = None
-        if config["data_set"]["seed"]:
-            random_seed = config["data_set"]["seed"]
-        np.random.seed(random_seed)
-        np.random.shuffle(indices)
+            random_seed = None
+            if config["data_set"]["seed"]:
+                random_seed = config["data_set"]["seed"]
+            np.random.seed(random_seed)
+            np.random.shuffle(indices)
 
-        train_idx, valid_idx = indices[split:], indices[:split]
+            train_idx, valid_idx = indices[split:], indices[:split]
 
-        #! These two "samplers" are used by PyTorch's DataLoader to split the
-        #! dataset into training and validation sets. Using Samplers is mutually
-        #! exclusive with using "shuffle" in the DataLoader.
-        #! If a user doesn't define a Sampler, the default behavior of pytorch-ignite
-        #! is to shuffle the data unless `shuffle = False` in the config.
-        self.train_sampler = SubsetRandomSampler(train_idx)
-        self.validation_sampler = SubsetRandomSampler(valid_idx)
+            #! These two "samplers" are used by PyTorch's DataLoader to split the
+            #! dataset into training and validation sets. Using Samplers is mutually
+            #! exclusive with using "shuffle" in the DataLoader.
+            #! If a user doesn't define a Sampler, the default behavior of pytorch-ignite
+            #! is to shuffle the data unless `shuffle = False` in the config.
+            self.train_sampler = SubsetRandomSampler(train_idx)
+            self.validation_sampler = SubsetRandomSampler(valid_idx)
 
     def shape(self):
         return (3, 32, 32)
