@@ -265,7 +265,7 @@ class ConfigManager:
         return runtime_config_filepath
 
 
-def create_results_dir(config: ConfigDict, postfix: Union[Path, str]) -> Path:
+def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     """Creates a results directory for this run.
 
     Postfix is the verb name of the run e.g. (infer, train, etc)
