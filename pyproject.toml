@@ -46,6 +46,7 @@ dev = [
     "pytest",
     "pytest-cov", # Used to report total code coverage
     "ruff", # Used for static linting of files
+    "mypy", # Used for static type checking
 ]
 
 [build-system]
@@ -119,3 +120,23 @@ ignore = [
 
 [tool.coverage.run]
 omit=["src/fibad/_version.py"]
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = [
+    'torchvision',
+    'astropy',
+    'astropy.io',
+    'schwimmbad',
+    'torchvision.transforms',
+    'torchvision.datasets',
+    'torchvision.transforms.v2',
+    'tensorboardX',
+    'astropy.table',
+    'GPUtil',
+    'toml',
+    ]
+ignore_missing_imports = true

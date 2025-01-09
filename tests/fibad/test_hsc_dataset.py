@@ -28,7 +28,7 @@ class FakeFitsFS:
     """
 
     def __init__(self, test_files: dict):
-        self.patchers = []
+        self.patchers: list[mock._patch[mock.Mock]] = []
 
         self.test_files = test_files
 

@@ -37,7 +37,7 @@ def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Datase
 
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
-    data_set = data_set_cls(config, split)
+    data_set = data_set_cls(config, split)  # type: ignore[call-arg]
 
     return data_set
 
@@ -60,7 +60,7 @@ def setup_model(config: ConfigDict, dataset: Dataset) -> torch.nn.Module:
 
     # Fetch model class specified in config and create an instance of it
     model_cls = fetch_model_class(config)
-    model = model_cls(config=config, shape=dataset.shape())
+    model = model_cls(config=config, shape=dataset.shape())  # type: ignore[attr-defined]
 
     return model
 
@@ -96,7 +96,7 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):
     return idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
 
 
-def create_engine(funcname: str, device: torch.device, model: torch.nn.Module):
+def create_engine(funcname: str, device: torch.device, model: torch.nn.Module) -> Engine:
     """Unified creation of the pytorch engine object for either an evaluator or trainer.
 
     This function will automatically unwrap a distributed model to find the necessary function, and construct

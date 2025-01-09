@@ -552,15 +552,17 @@ def read_rects(
         type = ext.lstrip(".") or "txt"
 
     if type == "txt":
-        return read_rects_from_txt(file, default=default)
-    if type == "csv":
-        return read_rects_from_csv(file, default=default)
+        retval = read_rects_from_txt(file, default=default)
+    elif type == "csv":
+        retval = read_rects_from_csv(file, default=default)
+    else:
+        raise ValueError(f"Invalid file type: {type}")
 
-    raise ValueError(f"Invalid file type: {type}")
+    return retval
 
 
 @export
-def read_rects_from_txt(file, default=None):
+def read_rects_from_txt(file, default=None) -> list[Rect]:
     """
     Read a space-separated volume to get a list of `Rect` objects.
     The first line must contain column names.
@@ -580,16 +582,15 @@ def read_rects_from_txt(file, default=None):
         List of `Rect` objects.
     """
     allfields = set(field.name for field in dataclasses.fields(Rect))
-
+    rects: list[Rect] = []
     with open_inputfile(file) as f:
-        f = io.TextIOWrapper(f, encoding="utf-8")
+        f_io = io.TextIOWrapper(f, encoding="utf-8")
 
-        fieldnames = re.sub(r"^#\??\s*", "", f.readline().strip().lower()).split()
-        validfields = [(i, field) for i, field in enumerate(fieldnames) if field in allfields]
+        fieldnames = re.sub(r"^#\??\s*", "", f_io.readline().strip().lower()).split()
+        validfields = [(i, str(field)) for i, field in enumerate(fieldnames) if field in allfields]
         if not validfields:
             raise RuntimeError("No column has a valid name in the list.")
 
-        rects = []
         for lineno, line in enumerate(f, start=2):
             row = line.strip().split()
             if len(row) != len(fieldnames):
@@ -597,15 +598,15 @@ def read_rects_from_txt(file, default=None):
                     f"line {lineno}: number of fields ({len(row)}) "
                     f"does not agree with what expected ({len(fieldnames)})"
                 )
-            args = {"lineno": lineno}
+            args: dict[str, Any] = {"lineno": lineno}
             args.update((field, row[i]) for i, field in validfields)
             rects.append(Rect.create(default=default, **args))
 
-        return rects
+    return rects
 
 
 @export
-def read_rects_from_csv(file, default=None):
+def read_rects_from_csv(file, default=None) -> list[Rect]:
     """
     Read a comma-separated volume to get a list of `Rect` objects.
     The first line must contain column names.
@@ -626,6 +627,7 @@ def read_rects_from_csv(file, default=None):
     """
     allfields = set(field.name for field in dataclasses.fields(Rect))
 
+    rects: list[Rect] = []
     with open_inputfile(file) as f:
         reader = csv.reader(io.TextIOWrapper(f, encoding="utf-8", newline=""))
 
@@ -634,22 +636,21 @@ def read_rects_from_csv(file, default=None):
             fieldnames[0] = re.sub(r"^#\??\s*", "", fieldnames[0].strip())
         fieldnames = [field.strip().lower() for field in fieldnames]
 
-        validfields = [(i, field) for i, field in enumerate(fieldnames) if field in allfields]
+        validfields = [(i, str(field)) for i, field in enumerate(fieldnames) if field in allfields]
         if not validfields:
             raise RuntimeError("No column has a valid name in the list.")
 
-        rects = []
         for lineno, row in enumerate(reader, start=2):
             if len(row) != len(fieldnames):
                 raise RuntimeError(
                     f"line {lineno}: number of fields ({len(row)}) "
                     f"does not agree with what expected ({len(fieldnames)})"
                 )
-            args = {"lineno": lineno}
+            args: dict[str, Any] = {"lineno": lineno}
             args.update((field, row[i]) for i, field in validfields)
             rects.append(Rect.create(default=default, **args))
 
-        return rects
+    return rects
 
 
 @contextlib.contextmanager
@@ -1392,7 +1393,7 @@ def _tar_decompose_item_name(name: str) -> dict:
         name,
     )
     if m:
-        metadata: dict[str, Any] = m.groupdict()
+        metadata: dict[str, Any] = m.groupdict()  # type: ignore[no-redef]
         metadata["lineno"] = int(metadata["lineno"])
         metadata["type"] = "warp"
         metadata["tract"] = int(metadata["tract"])
@@ -1426,7 +1427,7 @@ def make_filename(metadata: dict) -> str:
         args["type"] = "coadd+bg"
 
     name = args.pop("name")
-    return name.format(**args) + ".fits"
+    return str(name.format(**args)) + ".fits"
 
 
 def _splice(fin: IO[bytes], fout: IO[bytes]):
@@ -1442,7 +1443,7 @@ def _splice(fin: IO[bytes], fout: IO[bytes]):
     """
     buffer = memoryview(bytearray(10485760))
     while True:
-        n = fin.readinto(buffer)
+        n = fin.readinto(buffer)  # type: ignore[attr-defined]
         if n <= 0:
             break
         fout.write(buffer[:n])
