@@ -88,7 +88,7 @@ class ConfigManager:
             self.user_specific_config
         )
 
-        self.overall_default_config = {}
+        self.overall_default_config = ConfigDict()
         self._merge_defaults()
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
@@ -118,13 +118,13 @@ class ConfigManager:
         return ConfigDict(parsed_dict)
 
     @staticmethod
-    def _find_external_library_default_config_paths(runtime_config: dict) -> set:
+    def _find_external_library_default_config_paths(runtime_config: ConfigDict) -> set:
         """Search for external libraries in the runtime configuration and gather the
         libpath specifications so that we can load the default configs for the libraries.
 
         Parameters
         ----------
-        runtime_config : dict
+        runtime_config : ConfigDict
             The runtime configuration.
         Returns
         -------
@@ -133,10 +133,10 @@ class ConfigManager:
             libraries that are requested in the users configuration file.
         """
 
-        default_configs = set()
+        default_config_paths = set()
         for key, value in runtime_config.items():
             if isinstance(value, dict):
-                default_configs |= ConfigManager._find_external_library_default_config_paths(value)
+                default_config_paths |= ConfigManager._find_external_library_default_config_paths(value)
             else:
                 if key == "name" and "." in value:
                     external_library = value.split(".")[0]
@@ -145,14 +145,14 @@ class ConfigManager:
                             lib = importlib.import_module(external_library)
                             lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
                             if lib_default_config_path.exists():
-                                default_configs.add(lib_default_config_path)
+                                default_config_paths.add(lib_default_config_path)
                         except ModuleNotFoundError:
                             logger.error(
                                 f"External library {lib} not found. Please install it before running."
                             )
                             raise
 
-        return default_configs
+        return default_config_paths
 
     def _merge_defaults(self):
         """Merge the default configurations from the fibad and external libraries."""
@@ -170,20 +170,20 @@ class ConfigManager:
         )
 
     @staticmethod
-    def merge_configs(default_config: dict, overriding_config: dict) -> dict:
-        """Merge two configurations dictionaries with the overriding_config values
-        overriding the default_config values.
+    def merge_configs(default_config: ConfigDict, overriding_config: ConfigDict) -> ConfigDict:
+        """Merge two ConfigDicts with the overriding_config values overriding
+        the default_config values.
 
         Parameters
         ----------
-        default_config : dict
+        default_config : ConfigDict
             The default configuration.
-        overriding_config : dict
-            The user defined configuration.
+        overriding_config : ConfigDict
+            The new configuration values to be merged into default_config.
 
         Returns
         -------
-        dict
+        ConfigDict
             The merged configuration.
         """
 
@@ -194,7 +194,7 @@ class ConfigManager:
             else:
                 final_config[k] = v
 
-        return final_config
+        return ConfigDict(final_config)
 
     @staticmethod
     def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
@@ -294,13 +294,13 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     return directory
 
 
-def log_runtime_config(runtime_config: dict, output_path: Path, file_name: str = "runtime_config.toml"):
+def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
     """Log a runtime configuration.
 
     Parameters
     ----------
-    runtime_config : dict
-        A dictionary containing runtime configuration values.
+    runtime_config : ConfigDict
+        A ConfigDict object containing runtime configuration values.
     output_path : str
         The path to put the config file
     file_name : str, Optional
