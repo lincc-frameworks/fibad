@@ -547,9 +547,11 @@ def read_rects(
     """
     if (not type) or type == "auto":
         isfileobj = hasattr(file, "read")
-        name = getattr(file, "name", "(file name not available)") if isfileobj else file
+        name = str(getattr(file, "name", "(file name not available)") if isfileobj else file)
         _, ext = os.path.splitext(name)
         type = ext.lstrip(".") or "txt"
+
+    retval: list[Rect] = []
 
     if type == "txt":
         retval = read_rects_from_txt(file, default=default)
@@ -673,7 +675,7 @@ def open_inputfile(file: Union[str, IO]) -> Generator[IO[bytes], None, None]:
         the file is closed if the file has been opened by this function.
         Otherwise, the file is kept open.
     """
-    if hasattr(file, "read"):
+    if not isinstance(file, str) and hasattr(file, "read"):
         # This is already a file object
         yield getattr(file, "buffer", file)
     else:
