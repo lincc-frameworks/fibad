@@ -42,11 +42,11 @@ dev = [
     "asv==0.6.4", # Used to compute performance benchmarks
     "jupyter", # Clears output from Jupyter notebooks
     "matplotlib", # For example notebooks
+    "mypy", # Used for static type checking of files
     "pre-commit", # Used to run checks before finalizing a git commit
     "pytest",
     "pytest-cov", # Used to report total code coverage
     "ruff", # Used for static linting of files
-    "mypy", # Used for static type checking
 ]
 
 [build-system]
@@ -117,6 +117,8 @@ ignore = [
     "UP015", # Allow redundant open parameters
     "UP028", # Allow yield in for loop
 ]
+[tool.setuptools.package-data]
+fibad = ["py.typed"]
 
 [tool.coverage.run]
 omit=["src/fibad/_version.py"]
