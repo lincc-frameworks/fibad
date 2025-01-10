@@ -88,10 +88,6 @@ class HSCDataSet(Dataset):
             else:
                 train_size = 1.0 - (test_size + validate_size)
 
-        # If we still don't have a validate size, decide whether we will infer a validate size
-        if (validate_size is None) and (np.round(train_size + test_size) != 1.0):
-            validate_size = 1.0 - (train_size + test_size)
-
         # If splits cover more than the entire dataset, error out.
         if validate_size is None:
             if np.round(train_size + test_size) > 1.0:
