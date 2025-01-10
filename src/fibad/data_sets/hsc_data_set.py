@@ -7,7 +7,7 @@ import re
 import resource
 from copy import copy, deepcopy
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -215,7 +215,7 @@ class HSCDataSetSplit(Dataset):
 
         if not isinstance(data, HSCDataSetSplit):
             # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
-            self.mask = np.zeros(len(data), dtype=bool)
+            self.mask: np.ndarray[tuple[int], np.dtype[Any]] = np.zeros(len(data), dtype=bool)
             self._flip_mask_values(length, "false_to_true")
         else:
             # If we're splitting a split we need to modify the existing mask of the prior split
@@ -292,7 +292,7 @@ class HSCDataSetSplit(Dataset):
             msg = "Tried to take logical and of two HSCDataSetSplits with different HSCDataSet objects"
             raise RuntimeError(msg)
 
-        self.mask = np.logical_and(self.mask, obj.mask)
+        np.logical_and(self.mask, obj.mask, out=self.mask)
         self.indexes = np.nonzero(self.mask)[0]
         return self
 
