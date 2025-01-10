@@ -94,9 +94,9 @@ class HSCDataSet(Dataset):
 
         # If splits cover more than the entire dataset, error out.
         if validate_size is None:
-            if np.round(train_size + test_size) > 1.0:
+            if np.round(train_size + test_size, decimals=5) > 1.0:
                 raise RuntimeError("Split fractions add up to more than 1.0")
-        elif np.round(train_size + test_size + validate_size) > 1.0:
+        elif np.round(train_size + test_size + validate_size, decimals=5) > 1.0:
             raise RuntimeError("Split fractions add up to more than 1.0")
 
         # Generate splits
@@ -223,7 +223,8 @@ class HSCDataSetSplit(Dataset):
             split = data
             self.mask = copy(split.mask)
             remove_count = len(split) - length
-            self._flip_mask_values(remove_count, "true_to_false")
+            if remove_count > 0:
+                self._flip_mask_values(remove_count, "true_to_false")
 
         self.indexes = np.nonzero(self.mask)[0]
 
@@ -631,6 +632,8 @@ class HSCDataSetContainer(Dataset):
         filters_ref : list[str]
             List of the filter names
 
+        cutout_shape: : tuple[int, int]
+            Cutout shape tuple provided from constructor
         """
         filters_ref = sorted(filters_ref)
         self.prune_count = 0

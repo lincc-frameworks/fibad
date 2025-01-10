@@ -65,7 +65,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (python files in src/ and tests/)
-        entry: mypy .
+        entry: mypy
         language: system
         types: [python]
         files: ^(src|tests)/
