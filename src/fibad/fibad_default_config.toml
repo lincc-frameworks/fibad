@@ -28,8 +28,21 @@ sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
+
+# Credentials for the downloader. Either provide username/password in a fibad config file
+# or with a credentials.ini file. The format for credentials.ini is as follows:
+#
+# username = "<your username>"
+# password = "<your password>"
+#
+# It is preferred to use a credentials.ini file to avoid sensitive user credentials being
+# committed to source control systems like git.
 username = false
 password = false
+# Location of the credentials.ini file. Defaults to credentials.ini in the current directory
+# but can be configured to a common location for batch processing.
+credentials_file = "./credentials.ini"
+
 num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
 offset = 0
 concurrent_connections = 4

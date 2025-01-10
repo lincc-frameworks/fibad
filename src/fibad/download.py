@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, Union
 
+import toml
 from astropy.io import fits
 from astropy.table import Table, hstack
 
@@ -49,12 +50,33 @@ class Downloader:
 
         logger.info("Download command Start")
 
-        username = self.config["download"]["username"]
-        password = self.config["download"]["password"]
+        credentials_file = self.config["download"]["credentials_file"]
+        credentials_file_path = Path(credentials_file) if credentials_file else None
+
+        credentials_configured = bool(
+            self.config["download"]["username"] or self.config["download"]["password"]
+        )
+
+        if credentials_file_path.exists() and credentials_configured:
+            msg = f"Credentials file {credentials_file} found in addition to username/password in your "
+            msg += "fibad config. Credentials must be provided in only one place."
+            raise RuntimeError(msg)
+
+        if credentials_file_path.exists():
+            credentials = toml.load(credentials_file_path)
+            username = credentials.get("username", False)
+            password = credentials.get("password", False)
+        else:
+            username = self.config["download"]["username"]
+            password = self.config["download"]["password"]
 
         if not username or not password:
-            msg = "Please define a username and password to the HSC cutout service in your fibad config "
-            msg += "file to use the downloader. Accounts can be created at the following url: \n"
+            msg = "Please define a username and password to the HSC cutout service in credentials "
+            msg += f"file: {credentials_file} to use the downloader. The format of the credentials file is:\n"
+            msg += '\nusername = "<your username>"\n'
+            msg += 'password = "<your password>"\n\n'
+            msg += "Please do not check your credentials into git or other version control systems.\n"
+            msg += "Accounts can be created at the following url: \n"
             msg += " https://hsc-release.mtk.nao.ac.jp/datasearch/new_user/new "
             raise RuntimeError(msg)
 
