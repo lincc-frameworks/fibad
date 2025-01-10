@@ -139,6 +139,10 @@ test_size = 0.6
 # a system source at runtime.
 seed = false
 
+#Controls whether images are cached during data loading. For training, this reduces runtimes
+#after the first epoch.
+use_cache = true
+
 [data_loader]
 # Default PyTorch DataLoader parameters
 batch_size = 32
