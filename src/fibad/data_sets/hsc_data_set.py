@@ -331,6 +331,8 @@ class HSCDataSetContainer(Dataset):
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
 
+        self.use_cache = config["data_set"]["use_cache"]
+
         if config["data_set"]["filter_catalog"]:
             filter_catalog = Path(config["data_set"]["filter_catalog"])
         elif not config.get("rebuild_manifest", False):
@@ -1021,9 +1023,10 @@ class HSCDataSetContainer(Dataset):
         torch.Tensor
             A tensor with dimension (self.num_filters, self.cutout_shape[0], self.cutout_shape[1])
         """
-        data_torch = self.tensors.get(object_id, None)
-        if data_torch is not None:
-            return data_torch
+        if self.use_cache is True:
+            data_torch = self.tensors.get(object_id, None)
+            if data_torch is not None:
+                return data_torch
 
         # Read all the files corresponding to this object
         data = []
@@ -1039,5 +1042,7 @@ class HSCDataSetContainer(Dataset):
         # Apply our transform stack
         data_torch = self.transform(data_torch) if self.transform is not None else data_torch
 
-        self.tensors[object_id] = data_torch
+        if self.use_cache is True:
+            self.tensors[object_id] = data_torch
+
         return data_torch
