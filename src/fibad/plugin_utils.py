@@ -1,7 +1,10 @@
 import importlib
+from typing import Any, Optional, TypeVar, Union
+
+T = TypeVar("T")
 
 
-def get_or_load_class(config: dict, registry: dict = None) -> type:
+def get_or_load_class(config: dict, registry: Optional[dict[str, T]] = None) -> Union[T, Any]:
     """Given a configuration dictionary and a registry dictionary, attempt to return
     the requested class either from the registry or by dynamically importing it.
 
@@ -40,7 +43,7 @@ def get_or_load_class(config: dict, registry: dict = None) -> type:
     return returned_class
 
 
-def import_module_from_string(module_path: str) -> type:
+def import_module_from_string(module_path: str) -> Any:
     """Dynamically import a module from a string.
 
     Parameters

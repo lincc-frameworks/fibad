@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier
-_commit: v2.0.3
+_commit: v2.0.5
 _src_path: gh:lincc-frameworks/python-project-template
 author_email: mtauraso@uw.edu
 author_name: LINCC Frameworks
@@ -12,7 +12,7 @@ failure_notification: []
 include_benchmarks: true
 include_docs: true
 include_notebooks: true
-mypy_type_checking: none
+mypy_type_checking: basic
 package_name: fibad
 project_license: MIT
 project_name: fibad

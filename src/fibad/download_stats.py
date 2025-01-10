@@ -115,7 +115,7 @@ class StatRecord:
         int
             The number of seconds
         """
-        return (self.received_at - self.data_start).total_seconds()
+        return int((self.received_at - self.data_start).total_seconds())
 
     def total_dur_s(self) -> int:
         """Total duration of time that a thread was doing data transfer. In the case of multiple threads
@@ -129,7 +129,7 @@ class StatRecord:
         int
             The number of seconds
         """
-        return (self.request_duration + self.response_duration).total_seconds()
+        return int((self.request_duration + self.response_duration).total_seconds())  # type: ignore[attr-defined]
 
     def resp_s(self) -> int:
         """The time spent receiving responses from the server, added across all threads.
@@ -139,7 +139,7 @@ class StatRecord:
         int
             A number of seconds
         """
-        return self.response_duration.total_seconds()
+        return int(self.response_duration.total_seconds())  # type: ignore[attr-defined]
 
     def data_down_mb(self) -> float:
         """The amount of data downloaded by all threads together.
@@ -149,7 +149,7 @@ class StatRecord:
         float
             A flooating point number of 1024-based megabytes
         """
-        return self.response_size_bytes / (1024**2)
+        return float(self.response_size_bytes) / (1024**2)  # type: ignore[attr-defined]
 
     def down_rate_mb_s(self) -> float:
         """The downstream data rate in megabytes per second experienced by the average thread.
@@ -183,7 +183,7 @@ class StatRecord:
         int
             A number of seconds
         """
-        return self.request_duration.total_seconds()
+        return int(self.request_duration.total_seconds())  # type: ignore[attr-defined]
 
     def data_up_mb(self) -> float:
         """The amount of data uploaded by all threads together.
@@ -193,7 +193,7 @@ class StatRecord:
         float
             A flooating point number of 1024-based megabytes
         """
-        return self.request_size_bytes / (1024**2)
+        return float(self.request_size_bytes) / (1024**2)  # type: ignore[attr-defined]
 
     def up_rate_mb_s(self) -> float:
         """The upstream data rate in megabytes per second experienced by the average thread.
@@ -217,7 +217,7 @@ class StatRecord:
         float
             A floating point number of snapshot images per day
         """
-        return StatRecord._div(self.snapshots, self.total_dur_s()) * 3600 * 24
+        return StatRecord._div(self.snapshots, self.total_dur_s()) * 3600 * 24  # type: ignore[attr-defined]
 
     def snapshot_rate_overall(self) -> float:
         """The rate of snapshots downloaded by all threads together.
@@ -229,9 +229,9 @@ class StatRecord:
         float
             A floating point number of snapshot images per day
         """
-        return StatRecord._div(self.snapshots, self.wall_clock_dur_s()) * 3600 * 24
+        return StatRecord._div(self.snapshots, self.wall_clock_dur_s()) * 3600 * 24  # type: ignore[attr-defined]
 
-    def log_summary(self, log_level: int = logging.info, num_threads: int = 1, prefix: str = ""):
+    def log_summary(self, log_level: int = logging.INFO, num_threads: int = 1, prefix: str = ""):
         """Log two lines of summary of this stats object at the given log level.
 
         The first line is an overall summary that treats all threads that gave the stats object data as
@@ -261,7 +261,7 @@ class StatRecord:
 
         stats_message = "Overall stats: "
         stats_message += f"Time: {self.wall_clock_dur_s():.2f} s, "
-        stats_message += f"Files: {self.snapshots}, "
+        stats_message += f"Files: {self.snapshots}, "  # type: ignore[attr-defined]
         stats_message += f"Download: {self.down_rate_mb_s_overall():.2f} MB/s, "
         stats_message += f"File rate: {self.snapshot_rate_overall():.0f} files/24h, "
         stats_message += f"Conn eff: {connnection_efficiency:.2f}"
@@ -357,7 +357,10 @@ class DownloadStats:
         now = datetime.datetime.now()
         request_duration = response_start - request_start
         response_duration = now - response_start
-        request_size = len(request.data)
+        if request.data is None:
+            logger.info("Cannot determine the length of HTTP request. Ignoring this requests data in counts.")
+            return
+        request_size = len(request.data)  # type: ignore[arg-type]
 
         # Create a StatRecord for this report from a worker thread.
         current = StatRecord(

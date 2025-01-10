@@ -1,7 +1,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from .config_utils import ConfigManager
 
@@ -16,7 +16,7 @@ class Fibad:
 
     verbs = ["train", "infer", "download", "prepare", "rebuild_manifest"]
 
-    def __init__(self, *, config_file: Union[Path, str] = None, setup_logging: bool = True):
+    def __init__(self, *, config_file: Optional[Union[Path, str]] = None, setup_logging: bool = True):
         """Initialize fibad. Always applies the default config, and merges it with any provided config file.
 
         Parameters

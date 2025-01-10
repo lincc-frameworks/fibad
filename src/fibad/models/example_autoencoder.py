@@ -40,7 +40,7 @@ class ExampleAutoencoder(nn.Module):
         for _ in range(num_applications):
             input_size = self.conv2d_output_size(input_size, **kwargs)
 
-        return input_size
+        return int(input_size)
 
     def conv2d_output_size(self, input_size, kernel_size, padding=0, stride=1, dilation=1) -> int:
         # From https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html

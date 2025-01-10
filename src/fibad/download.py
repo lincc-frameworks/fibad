@@ -442,7 +442,7 @@ resuming the correct download? Deleting the manifest and cutout files will start
         locations: Table,
         path: Path,
         offset: int = 0,
-        default: dC.Rect = None,
+        default: Optional[dC.Rect] = None,
         fields: Optional[list[str]] = None,
     ) -> list[dC.Rect]:
         """Create the rects we will need to pass to the downloader.

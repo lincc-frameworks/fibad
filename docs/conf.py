@@ -6,7 +6,7 @@
 
 import os
 import sys
-from importlib.metadata import version
+from importlib.metadata import version as metadata_version
 
 # Define path to the code to be documented **relative to where conf.py (this file) is kept**
 sys.path.insert(0, os.path.abspath("../src/"))
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath("../src/"))
 project = "fibad"
 copyright = "2024, LINCC Frameworks"
 author = "LINCC Frameworks"
-release = version("fibad")
+release = metadata_version("fibad")
 # for example take major/minor
 version = ".".join(release.split(".")[:2])
 
@@ -39,7 +39,7 @@ copybutton_prompt_text = ">> "
 ## lets us suppress the copy button on select code blocks.
 copybutton_selector = "div:not(.no-copybutton) > div.highlight > pre"
 
-templates_path = []
+templates_path: list[str] = []
 exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
 # This assumes that sphinx-build is called from the root directory
