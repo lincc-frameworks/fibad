@@ -150,4 +150,6 @@ num_workers = 2
 
 [infer]
 model_weights_file = false
-split = "test"
+# Select a split ("train", "test", or "validate") to use for inference
+# default of false selects the entire dataset for inference.
+split = false
