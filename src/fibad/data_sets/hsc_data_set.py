@@ -7,7 +7,7 @@ import re
 import resource
 from copy import copy, deepcopy
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -90,9 +90,9 @@ class HSCDataSet(Dataset):
 
         # If splits cover more than the entire dataset, error out.
         if validate_size is None:
-            if np.round(train_size + test_size) > 1.0:
+            if np.round(train_size + test_size, decimals=5) > 1.0:
                 raise RuntimeError("Split fractions add up to more than 1.0")
-        elif np.round(train_size + test_size + validate_size) > 1.0:
+        elif np.round(train_size + test_size + validate_size, decimals=5) > 1.0:
             raise RuntimeError("Split fractions add up to more than 1.0")
 
         # Generate splits
@@ -204,23 +204,23 @@ class HSCDataSetSplit(Dataset):
             msg = f"Split provided for HSCDatSetSplit as a ratio is {ratio}, which is not between 0.0 and 1.0"
             raise RuntimeError(msg)
 
-        self.data = data.data if isinstance(data, HSCDataSetSplit) else data
+        self.data: HSCDataSetContainer = data.data if isinstance(data, HSCDataSetSplit) else data
 
         # The length of this split once constructed
         length = int(np.round(len(self.data) * ratio))
 
-        if isinstance(data, HSCDataSetSplit):
+        if not isinstance(data, HSCDataSetSplit):
+            # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
+            self.mask: np.ndarray[tuple[int], np.dtype[Any]] = np.zeros(len(data), dtype=bool)
+            self._flip_mask_values(length, "false_to_true")
+        else:
             # If we're splitting a split we need to modify the existing mask of the prior split
             # Namely we switch some true values to false to more of the underlying dataset
             split = data
             self.mask = copy(split.mask)
             remove_count = len(split) - length
-            self._flip_mask_values(remove_count, "true_to_false")
-
-        else:
-            # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
-            self.mask = np.zeros(len(data), dtype=bool)
-            self._flip_mask_values(length, "false_to_true")
+            if remove_count > 0:
+                self._flip_mask_values(remove_count, "true_to_false")
 
         self.indexes = np.nonzero(self.mask)[0]
 
@@ -288,7 +288,7 @@ class HSCDataSetSplit(Dataset):
             msg = "Tried to take logical and of two HSCDataSetSplits with different HSCDataSet objects"
             raise RuntimeError(msg)
 
-        self.mask = np.logical_and(self.mask, obj.mask)
+        np.logical_and(self.mask, obj.mask, out=self.mask)
         self.indexes = np.nonzero(self.mask)[0]
         return self
 
@@ -312,7 +312,7 @@ class HSCDataSetSplit(Dataset):
         return self.data[self.indexes[idx]]
 
 
-dim_dict = dict[str, tuple[int, int]]
+dim_dict = dict[str, list[tuple[int, int]]]
 files_dict = dict[str, dict[str, str]]
 
 
@@ -406,20 +406,17 @@ class HSCDataSetContainer(Dataset):
 
         self.num_filters = len(filters_ref)
 
-        self.cutout_shape = cutout_shape
+        self.pruned_objects: dict[str, str] = {}
+        self._prune_objects(filters_ref, cutout_shape)
 
-        self.pruned_objects = {}
-        self._prune_objects(filters_ref)
-
-        if self.cutout_shape is None:
-            self.cutout_shape = self._check_file_dimensions()
+        self.cutout_shape = self._check_file_dimensions() if cutout_shape is None else cutout_shape
 
         # Set up our default transform to center-crop the image to the common size before
         # Applying any transforms we were passed.
         crop = CenterCrop(size=self.cutout_shape)
         self.transform = Compose([crop, self.transform]) if self.transform is not None else crop
 
-        self.tensors = {}
+        self.tensors: dict[str, torch.Tensor] = {}
 
         logger.info(f"HSC Data set loader has {len(self)} objects")
 
@@ -445,7 +442,7 @@ class HSCDataSetContainer(Dataset):
         filter_regex = r"HSC-[GRIZY]" if filters is None else "|".join(filters)
         full_regex = f"({object_id_regex})_.*_({filter_regex}).fits"
 
-        files = {}
+        files: files_dict = {}
         # Go scan the path for object ID's so we have a list.
         for index, filepath in enumerate(Path(self.path).iterdir()):
             filename = filepath.name
@@ -510,9 +507,9 @@ class HSCDataSetContainer(Dataset):
             return list(set(table["object_id"]))
 
         # We have filter and filename defined so we can assemble the catalog at file level.
-        filter_catalog = {}
+        filter_catalog: files_dict = {}
         if "dim" in colnames:
-            dim_catalog = {}
+            dim_catalog: dim_dict = {}
 
         for row in table:
             object_id = row["object_id"]
@@ -568,7 +565,7 @@ class HSCDataSetContainer(Dataset):
         return numproc
 
     @staticmethod
-    def _fixup_limit(nproc, res, est_limit, est_procs) -> int:
+    def _fixup_limit(nproc: int, res, est_limit, est_procs) -> int:
         # If launching this many processes would trigger other resource limits, work around them
         limit_soft, limit_hard = resource.getrlimit(res)
 
@@ -603,19 +600,19 @@ class HSCDataSetContainer(Dataset):
         return retval
 
     @staticmethod
-    def _scan_file_dimension(processing_unit: tuple[str, list[str]]) -> list[tuple[int, int]]:
+    def _scan_file_dimension(processing_unit: tuple[str, list[str]]) -> tuple[str, list[tuple[int, int]]]:
         object_id, filenames = processing_unit
         return (object_id, [HSCDataSetContainer._fits_file_dims(filepath) for filepath in filenames])
 
     @staticmethod
-    def _fits_file_dims(filepath):
+    def _fits_file_dims(filepath) -> tuple[int, int]:
         try:
             with fits.open(filepath) as hdul:
-                return hdul[1].shape
+                return (hdul[1].shape[0], hdul[1].shape[1])
         except OSError:
             return (0, 0)
 
-    def _prune_objects(self, filters_ref: list[str]):
+    def _prune_objects(self, filters_ref: list[str], cutout_shape: Optional[tuple[int, int]]):
         """Class initialization helper. Prunes objects from the list of objects.
 
         1) Removes any objects which do not have all the filters specified in filters_ref
@@ -633,12 +630,14 @@ class HSCDataSetContainer(Dataset):
         filters_ref : list[str]
             List of the filter names
 
+        cutout_shape: : tuple[int, int]
+            Cutout shape tuple provided from constructor
         """
         filters_ref = sorted(filters_ref)
         self.prune_count = 0
-        for index, (object_id, filters) in enumerate(self.files.items()):
+        for index, (object_id, filters_unsorted) in enumerate(self.files.items()):
             # Drop objects with missing filters
-            filters = sorted(list(filters))
+            filters = sorted(list(filters_unsorted))
             if filters != filters_ref:
                 msg = f"HSCDataSet in {self.path} has the wrong group of filters for object {object_id}."
                 self._mark_for_prune(object_id, msg)
@@ -646,12 +645,12 @@ class HSCDataSetContainer(Dataset):
                 logger.debug(f"Reference filters were {filters_ref}")
 
             # Drop objects that can't meet the coutout size provided
-            elif self.cutout_shape is not None:
+            elif cutout_shape is not None:
                 for shape in self.dims[object_id]:
-                    if shape[0] < self.cutout_shape[0] or shape[1] < self.cutout_shape[1]:
+                    if shape[0] < cutout_shape[0] or shape[1] < cutout_shape[1]:
                         msg = f"A file for object {object_id} has shape ({shape[1]}px, {shape[1]}px)"
                         msg += " this is too small for the given cutout size of "
-                        msg += f"({self.cutout_shape[0]}px, {self.cutout_shape[1]}px)"
+                        msg += f"({cutout_shape[0]}px, {cutout_shape[1]}px)"
                         self._mark_for_prune(object_id, msg)
                         break
             if index != 0 and index % 1_000_000 == 0:
@@ -719,8 +718,8 @@ class HSCDataSetContainer(Dataset):
             msg = "Some images differ from the mean width or height of all images by more than 1px\n"
             msg += f"Images will be cropped to ({cutout_width}px, {cutout_height}px)\n"
             try:
-                min_width_file = self._get_file(np.argmin(all_widths))
-                min_height_file = self._get_file(np.argmin(all_heights))
+                min_width_file = self._get_file(int(np.argmin(all_widths)))
+                min_height_file = self._get_file(int(np.argmin(all_heights)))
                 msg += f"See {min_width_file} for an example image of width {cutout_width}px\n"
                 msg += f"See {min_height_file} for an example image of height {cutout_height}px"
             finally:

@@ -7,7 +7,7 @@ from fibad.plugin_utils import get_or_load_class, update_registry
 
 logger = logging.getLogger(__name__)
 
-MODEL_REGISTRY = {}
+MODEL_REGISTRY: dict[str, type[nn.Module]] = {}
 
 
 def _torch_save(self: nn.Module, save_path: Path):
@@ -70,7 +70,7 @@ def fibad_model(cls):
     return cls
 
 
-def fetch_model_class(runtime_config: dict) -> type:
+def fetch_model_class(runtime_config: dict) -> type[nn.Module]:
     """Fetch the model class from the model registry.
 
     Parameters

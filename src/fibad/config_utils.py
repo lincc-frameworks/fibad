@@ -2,7 +2,7 @@ import datetime
 import importlib
 import logging
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import toml
 
@@ -73,7 +73,7 @@ class ConfigManager:
 
     def __init__(
         self,
-        runtime_config_filepath: Union[Path, str] = None,
+        runtime_config_filepath: Optional[Union[Path, str]] = None,
         default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
     ):
         self.fibad_default_config = ConfigManager._read_runtime_config(default_config_filepath)
@@ -88,7 +88,7 @@ class ConfigManager:
             self.user_specific_config
         )
 
-        self.overall_default_config = {}
+        self.overall_default_config: dict = {}
         self._merge_defaults()
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
@@ -143,10 +143,12 @@ class ConfigManager:
                     if importlib.util.find_spec(external_library) is not None:
                         try:
                             lib = importlib.import_module(external_library)
+                            if lib.__file__ is None:
+                                raise RuntimeError()
                             lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
                             if lib_default_config_path.exists():
                                 default_configs.add(lib_default_config_path)
-                        except ModuleNotFoundError:
+                        except (ModuleNotFoundError, RuntimeError):
                             logger.error(
                                 f"External library {lib} not found. Please install it before running."
                             )
@@ -197,7 +199,7 @@ class ConfigManager:
         return final_config
 
     @staticmethod
-    def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
+    def _validate_runtime_config(runtime_config: dict, default_config: dict):
         """Recursive helper to check that all keys in runtime_config have a default
         in the merged default_config.
 

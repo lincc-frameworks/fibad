@@ -133,7 +133,7 @@ validate_size = 0.2
 # If `int`, represents the absolute number of test samples.
 # If `false`, the value is set to the complement of the train size.
 # If `train_size` is also `false`, it will be set to `0.25`.
-test_size = 0.6
+test_size = 0.2
 
 # Number to seed with for generating a random split. False means the data will be seeded from
 # a system source at runtime.
@@ -145,7 +145,7 @@ use_cache = true
 
 [data_loader]
 # Default PyTorch DataLoader parameters
-batch_size = 32
+batch_size =32
 
 # We could remove this potentially - pytorch-ignite will default to shuffle=True
 # If the user wanted to explicitly require no shuffling, they could set this to false.
