@@ -11,9 +11,13 @@ from fibad.models.model_registry import fibad_model
 
 
 @fibad_model
-class DCAE(nn.Module):
+class HSCDCAE(nn.Module):
     def __init__(self, config, shape):
         super().__init__()
+
+        # The current network works with images of size [3,150,150]
+        # You will need to updat padding, stride, etc. for imags
+        # of other sizes
 
         # Encoder
         self.encoder1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
@@ -24,13 +28,15 @@ class DCAE(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
 
         # Decoder
-        self.decoder4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.decoder3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.decoder4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=0, output_padding=0)
+        self.decoder3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=0, output_padding=0)
         self.decoder2 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1)
-        self.decoder1 = nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1)
+        self.decoder1 = nn.ConvTranspose2d(32, 3, kernel_size=3, stride=1, padding=1, output_padding=0)
 
         self.activation = nn.ReLU()
         self.final_activation = nn.Sigmoid()
+
+        self.config = config
 
     def forward(self, x):
         # Encoder with skip connections
