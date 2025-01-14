@@ -45,7 +45,9 @@ class HSCDataSet(Dataset):
 
     """
 
-    def __init__(self, config, split: Union[str, None]):
+    def __init__(self, config, split: Union[str, bool]):
+        split_parsed = split if isinstance(split, str) else None
+
         # initialize the filesystem references
         self.container = HSCDataSetContainer(config)
 
@@ -53,7 +55,7 @@ class HSCDataSet(Dataset):
         self._create_splits(config)
 
         # Set the split to what was requested.
-        self._set_split(split)
+        self._set_split(split_parsed)
 
     def _create_splits(self, config):
         seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
@@ -402,12 +404,12 @@ class HSCDataSetContainer(Dataset):
 
         # If no filters provided, we choose the first file in the dict as the prototypical set of filters
         # Any objects lacking this full set of filters will be pruned by _prune_objects
-        filters_ref = list(list(self.files.values())[0]) if filters is None else filters
+        self.filters_ref = list(list(self.files.values())[0]) if filters is None else filters
 
-        self.num_filters = len(filters_ref)
+        self.num_filters = len(self.filters_ref)
 
         self.pruned_objects: dict[str, str] = {}
-        self._prune_objects(filters_ref, cutout_shape)
+        self._prune_objects(self.filters_ref, cutout_shape)
 
         self.cutout_shape = self._check_file_dimensions() if cutout_shape is None else cutout_shape
 
@@ -637,11 +639,11 @@ class HSCDataSetContainer(Dataset):
         self.prune_count = 0
         for index, (object_id, filters_unsorted) in enumerate(self.files.items()):
             # Drop objects with missing filters
-            filters = sorted(list(filters_unsorted))
-            if filters != filters_ref:
+            filter_intersect = sorted([filter for filter in filters_unsorted if filter in filters_ref])
+            if filter_intersect != filters_ref:
                 msg = f"HSCDataSet in {self.path} has the wrong group of filters for object {object_id}."
                 self._mark_for_prune(object_id, msg)
-                logger.info(f"Filters for object {object_id} were {filters}")
+                logger.info(f"Filters for object {object_id} were {filters_unsorted}")
                 logger.debug(f"Reference filters were {filters_ref}")
 
             # Drop objects that can't meet the coutout size provided
@@ -976,6 +978,22 @@ class HSCDataSetContainer(Dataset):
         for _, filename in self._filter_filename(object_id):
             yield self._file_to_path(filename)
 
+    def _object_files_filters_ref(self, object_id):
+        """
+        Private read-only iterator over all files for a given object. This enforces a strict total order
+        across filters. Will not work prior to self.files, and self.path initialization in __init__
+
+        Guaranteed to only return files that have filters in self.filters_ref.
+
+        Yields
+        ------
+        Path
+            The path to the file.
+        """
+        for filter, filename in self._filter_filename(object_id):
+            if filter in self.filters_ref:
+                yield self._file_to_path(filename)
+
     def _file_to_path(self, filename: str) -> Path:
         """Turns a filename into a full path suitable for open. Equivalent to:
 
@@ -1026,7 +1044,7 @@ class HSCDataSetContainer(Dataset):
         # Read all the files corresponding to this object
         data = []
 
-        for filepath in self._object_files(object_id):
+        for filepath in self._object_files_filters_ref(object_id):
             raw_data = fits.getdata(filepath, memmap=False)
             data.append(raw_data)
 
