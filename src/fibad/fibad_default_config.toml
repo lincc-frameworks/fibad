@@ -88,6 +88,7 @@ base_channel_size = 32
 
 # The length of the latent space vector.
 latent_dim = 64
+HSCDCAE_final_layer = "tanh"
 
 
 [criterion]
@@ -106,6 +107,10 @@ lr = 0.01
 
 # momentum for torch.optim.SGD optimizer.
 momentum = 0.9
+
+["torch.optim.Adam"]
+# learning rate for torch.optim.SGD optimizer.
+lr = 0.01
 
 
 [train]
