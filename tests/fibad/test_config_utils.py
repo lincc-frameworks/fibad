@@ -50,16 +50,41 @@ def test_get_runtime_config():
     runtime_config = config_manager.config
 
     expected = {
-        "general": {"dev_mode": False},
+        "general": {"dev_mode": True},
         "train": {
             "model_name": "example_model",
             "model_class": "new_thing.cool_model.CoolModel",
             "model": {"model_weights_filepath": "final_best.pth", "layers": 3},
         },
         "infer": {"batch_size": 8},
+        "bespoke_table": {"key1": "value1", "key2": "value2"},
     }
 
+    string_representation = """# this is the default config file
+[general]
+# set dev_mode to true when developing
+# set to false for production use
+dev_mode = true
+
+[train]
+model_name = "example_model" # Use a built-in FIBAD model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
+
+[train.model]
+model_weights_filepath = "final_best.pth"
+layers = 3
+
+
+[infer]
+batch_size = 8 # change batch size
+
+[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
+"""
     assert runtime_config == expected
+    assert runtime_config.as_string() == string_representation
 
 
 def test_validate_runtime_config():

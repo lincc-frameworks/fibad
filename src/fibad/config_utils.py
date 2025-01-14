@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Union
 
 import tomlkit
+from tomlkit.toml_document import TOMLDocument
 
 DEFAULT_CONFIG_FILEPATH = Path(__file__).parent.resolve() / "fibad_default_config.toml"
 DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
@@ -20,8 +21,8 @@ class ConfigDict(dict):
     # TODO: Should there be some sort of "bake" method which occurs after config processing, and
     # percolates down to nested ConfigDicts and prevents __setitem__ and other mutations of dictionary
     # values? i.e. a method to make a config dictionary fully immutable (or very difficult/annoying to
-    # mutuate) before we pass control to possibly external module code that is relying on the dictionary
-    # to be static througout the run.
+    # mutate) before we pass control to possibly external module code that is relying on the dictionary
+    # to be static throughout the run.
 
     __slots__ = ()  # we don't need __dict__ on this object at all.
 
@@ -84,6 +85,14 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
+TOMLDocument.__missing__ = ConfigDict.__missing__
+TOMLDocument.get = ConfigDict.get
+TOMLDocument.__delitem__ = ConfigDict.__delitem__
+TOMLDocument.pop = ConfigDict.pop
+TOMLDocument.popitem = ConfigDict.popitem
+TOMLDocument.clear = ConfigDict.clear
+
+
 class ConfigManager:
     """A class to manage the runtime configuration for a Fibad object. This class
     will contain all the logic and methods for reading, merging, and validating
@@ -99,7 +108,7 @@ class ConfigManager:
 
         self.runtime_config_filepath = ConfigManager.resolve_runtime_config(runtime_config_filepath)
         if self.runtime_config_filepath is DEFAULT_CONFIG_FILEPATH:
-            self.user_specific_config = ConfigDict()
+            self.user_specific_config = TOMLDocument()
         else:
             self.user_specific_config = ConfigManager._read_runtime_config(self.runtime_config_filepath)
 
@@ -107,7 +116,7 @@ class ConfigManager:
             self.user_specific_config
         )
 
-        self.overall_default_config = ConfigDict()
+        self.overall_default_config = TOMLDocument()
         self._merge_defaults()
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
@@ -133,9 +142,8 @@ class ConfigManager:
         if config_filepath.exists():
             with open(config_filepath, "r") as f:
                 parsed_dict = tomlkit.load(f)
-                # parsed_dict = toml.load(f)
 
-        return ConfigDict(parsed_dict)
+        return parsed_dict
 
     @staticmethod
     def _find_external_library_default_config_paths(runtime_config: ConfigDict) -> set:
@@ -214,7 +222,7 @@ class ConfigManager:
             else:
                 final_config[k] = v
 
-        return ConfigDict(final_config)
+        return final_config
 
     @staticmethod
     def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
@@ -328,4 +336,3 @@ def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name:
     """
     with open(output_path / file_name, "w") as f:
         f.write(tomlkit.dumps(runtime_config))
-        # f.write(toml.dumps(runtime_config))
