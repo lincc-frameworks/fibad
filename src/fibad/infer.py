@@ -1,10 +1,17 @@
 import logging
 from pathlib import Path
+from typing import Optional, Union
 
+import chromadb
 import numpy as np
 from torch import Tensor
 
-from fibad.config_utils import ConfigDict, create_results_dir, log_runtime_config
+from fibad.config_utils import (
+    ConfigDict,
+    create_results_dir,
+    find_most_recent_results_dir,
+    log_runtime_config,
+)
 from fibad.pytorch_ignite import (
     create_evaluator,
     dist_data_loader,
@@ -34,6 +41,19 @@ def run(config: ConfigDict):
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
 
+    # Create a chromadb in results dir
+    # TODO: do we want to split this out and allow configuration of location?
+    chromadb_client = chromadb.PersistentClient(path=str(results_dir))
+    collection = chromadb_client.create_collection(
+        name="fibad",
+        metadata={
+            # These are all chromdb defaults. We may want to configure them
+            "hsnw:space": "l2",
+            "hsnw:construction_ef": 100,
+            "hsnw:search_ef": 100,
+        },
+    )
+
     write_index = 0
     object_ids = list(data_set.ids() if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
 
@@ -42,7 +62,14 @@ def run(config: ConfigDict):
         This function writes a single numpy binary file for each object.
         """
         nonlocal write_index
+        nonlocal collection
         batch_results = batch_results.detach().to("cpu")
+
+        # Save results to ChromaDB vector databse
+        embeddings = [t.flatten().numpy() for t in batch_results]
+        ids = [str(id) for id in range(write_index, write_index + len(batch_results))]
+        collection.add(embeddings=embeddings, ids=ids)
+
         for tensor in batch_results:
             object_id = object_ids[write_index]
             filename = f"{object_id}.npy"
@@ -54,6 +81,8 @@ def run(config: ConfigDict):
 
     evaluator = create_evaluator(model, _save_batch)
     evaluator.run(data_loader)
+
+    logger.info(f"Results saved in {results_dir}")
     logger.info("finished evaluating...")
 
 
@@ -69,22 +98,28 @@ def load_model_weights(config: ConfigDict, model):
         The model class to load weights into
 
     """
-    weights_file = config["infer"]["model_weights_file"]
+    weights_file: Optional[Union[str, Path]] = (
+        config["infer"]["model_weights_file"] if config["infer"]["model_weights_file"] else None
+    )
 
-    if not weights_file:
-        # TODO: Look at the last infer (or train) run from the rundir
-        # use config["model"]["weights_filename"] to find the weights
-        # Proceed with those weights
-        raise RuntimeError("Must define model_weights_file in the [infer] section of fibad config.")
+    if weights_file is None:
+        recent_results_path = find_most_recent_results_dir(config, "train")
+        if recent_results_path is None:
+            raise RuntimeError("Must define model_weights_file in the [infer] section of fibad config.")
 
-    weights_file = Path(weights_file)
+        weights_file = recent_results_path / config["train"]["weights_filepath"]
 
-    if not weights_file.exists():
-        raise RuntimeError(f"Model Weights file {weights_file} does not exist")
+    # Ensure weights file is a path object.
+    weights_file_path = Path(weights_file)
+
+    if not weights_file_path.exists():
+        raise RuntimeError(f"Model Weights file {weights_file_path} does not exist")
 
     try:
-        model.load(weights_file)
+        model.load(weights_file_path)
     except Exception as err:
-        msg = f"Model weights file {weights_file} did not load properly. Are you sure you are predicting "
+        msg = (
+            f"Model weights file {weights_file_path} did not load properly. Are you sure you are predicting "
+        )
         msg += "using the correct model"
         raise RuntimeError(msg) from err
