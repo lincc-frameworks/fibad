@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Union
 
-import toml
+import tomlkit
 
 DEFAULT_CONFIG_FILEPATH = Path(__file__).parent.resolve() / "fibad_default_config.toml"
 DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
@@ -28,10 +28,22 @@ class ConfigDict(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        current_comment = []
+        for t in self:
+            if isinstance(self[t], tomlkit.items.Table):
+                for k, v in self[t].value.body:
+                    if isinstance(v, tomlkit.items.Whitespace):
+                        current_comment.append(v.as_string())
+                    elif isinstance(v, tomlkit.items.Comment):
+                        current_comment.append(v.as_string())
+                    else:
+                        self[t][k] = (self[t][k], "".join(current_comment))
+                        current_comment = []
+
         # Replace all dictionary keys with values recursively.
-        for key, val in self.items():
-            if isinstance(val, dict) and not isinstance(val, ConfigDict):
-                self[key] = ConfigDict(val)
+        # for key, val in self.items():
+        #     if isinstance(val, dict) and not isinstance(val, ConfigDict):
+        #         self[key] = ConfigDict(val)
 
     def __missing__(self, key):
         msg = f"Accessed configuration key/section {key} which has not been defined. "
@@ -48,6 +60,13 @@ class ConfigDict(dict):
         msg += "Configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
         logger.fatal(msg)
         raise RuntimeError(msg)
+
+    def __getitem__(self, key):
+        tmp = super().__getitem__(key)
+        if isinstance(tmp, tuple):
+            return tmp[0]
+        else:
+            return tmp
 
     def __delitem__(self, key):
         raise RuntimeError("Removing keys or sections from a ConfigDict using del is not supported")
@@ -113,7 +132,8 @@ class ConfigManager:
         parsed_dict = {}
         if config_filepath.exists():
             with open(config_filepath, "r") as f:
-                parsed_dict = toml.load(f)
+                parsed_dict = tomlkit.load(f)
+                # parsed_dict = toml.load(f)
 
         return ConfigDict(parsed_dict)
 
@@ -307,4 +327,5 @@ def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name:
         Optional name for the config file, defaults to "runtime_config.toml"
     """
     with open(output_path / file_name, "w") as f:
-        f.write(toml.dumps(runtime_config))
+        f.write(tomlkit.dumps(runtime_config))
+        # f.write(toml.dumps(runtime_config))
