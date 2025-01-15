@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -50,16 +51,41 @@ def test_get_runtime_config():
     runtime_config = config_manager.config
 
     expected = {
-        "general": {"dev_mode": False},
+        "general": {"dev_mode": True},
         "train": {
             "model_name": "example_model",
             "model_class": "new_thing.cool_model.CoolModel",
             "model": {"model_weights_filepath": "final_best.pth", "layers": 3},
         },
         "infer": {"batch_size": 8},
+        "bespoke_table": {"key1": "value1", "key2": "value2"},
     }
 
+    string_representation = """# this is the default config file
+[general]
+# set dev_mode to true when developing
+# set to false for production use
+dev_mode = true
+
+[train]
+model_name = "example_model" # Use a built-in FIBAD model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
+
+[train.model]
+model_weights_filepath = "final_best.pth"
+layers = 3
+
+
+[infer]
+batch_size = 8 # change batch size
+
+[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
+"""
     assert runtime_config == expected
+    assert runtime_config.as_string() == string_representation
 
 
 def test_validate_runtime_config():
@@ -94,3 +120,29 @@ def test_validate_runtime_config_section():
         ConfigManager._validate_runtime_config(user_config, default_config)
 
     assert "Runtime config contains a section named dev_mode" in str(excinfo.value)
+
+
+def test_find_external_library_config_path_no_module():
+    """Test that a ModuleNotFound error is raised when trying to import a
+    non-existent module.
+    """
+
+    config = {"general": {"dev_mode": False}, "model": {"name": "foo.bar.model.Model"}}
+    default_config = ConfigDict(config)
+
+    with pytest.raises(ModuleNotFoundError) as excinfo:
+        ConfigManager._find_external_library_default_config_paths(default_config)
+
+    assert "Check installation" in str(excinfo.value)
+
+
+def test_find_external_library_config_path_no_default_config(caplog):
+    """Test that a warning is logged when a default configuration file is not found."""
+
+    config = {"general": {"dev_mode": False}, "model": {"name": "toml.bar.model.Model"}}
+    default_config = ConfigDict(config)
+
+    with caplog.at_level(logging.WARNING):
+        ConfigManager._find_external_library_default_config_paths(default_config)
+
+    assert "default_config.toml" in caplog.text
