@@ -119,6 +119,12 @@ filters = false
 # Implementation is dataset class dependent. Default is false meaning now filtering.
 filter_catalog = false
 
+
+# The transformation to be applied to images before being passed on to the model
+# This must be a valid Numpy function. Passing false will result in no transformations
+# (other than cropping) be applied to the images.  
+transform = "tanh"
+
 # How to split the data between training and eval sets.
 # The semantics are borrowed from scikit-learn's train-test-split, and HF Dataset's train-test-split function
 # It is an error for these values to add to more than 1.0 as ratios or the size of the dataset if expressed

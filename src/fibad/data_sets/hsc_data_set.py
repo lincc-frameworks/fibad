@@ -7,7 +7,7 @@ import re
 import resource
 from copy import copy, deepcopy
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -318,16 +318,16 @@ files_dict = dict[str, dict[str, str]]
 
 class HSCDataSetContainer(Dataset):
     def __init__(self, config):
-        # TODO: What will be a reasonable set of tranformations?
-        # For now tanh all the values so they end up in [-1,1]
-        # Another option might be sinh, but we'd need to mess with the example autoencoder module
-        # Because it goes from unbounded NN output space -> [-1,1] with tanh in its decode step.
-        transform = Lambda(lambd=np.tanh)
-
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
-
+        transform_str = config["data_set"]["transform"]
         self.use_cache = config["data_set"]["use_cache"]
+
+        if transform_str:
+            transform_func = self._get_np_function(transform_str)
+            transform = Lambda(lambd=transform_func)
+        else:
+            transform = None
 
         if config["data_set"]["filter_catalog"]:
             filter_catalog = Path(config["data_set"]["filter_catalog"])
@@ -347,6 +347,27 @@ class HSCDataSetContainer(Dataset):
             filters=filters if filters else None,
             filter_catalog=Path(filter_catalog) if filter_catalog else None,
         )
+
+    def _get_np_function(self, transform_str: str) -> Callable[..., Any]:
+        """
+        _get_np_function. Returns the numpy mathematical function that the
+        supplied string maps to; or raises an error if the supplied string
+        cannot be mapped to a function.
+
+        Parameters
+        ----------
+        transform_str: str
+            The string to me mapped to a numpy function
+        """
+
+        try:
+            func: Callable[..., Any] = getattr(np, transform_str)
+            if callable(func):
+                return func
+        except AttributeError as err:
+            msg = f"{transform_str} is not a valid numpy function.\n"
+            msg += "The string passed to the transform variable needs to be a numpy function"
+            raise RuntimeError(msg) from err
 
     def _init_from_path(
         self,
