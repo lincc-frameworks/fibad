@@ -2,7 +2,7 @@ import datetime
 import importlib
 import logging
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import tomlkit
 from tomlkit.toml_document import TOMLDocument
@@ -13,7 +13,7 @@ DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
 logger = logging.getLogger(__name__)
 
 
-class ConfigDict(dict):
+class ConfigDict(TOMLDocument):
     """The purpose of this class is to ensure key errors on config dictionaries return something helpful.
     and to discourage mutation actions on config dictionaries that should not happen at runtime.
     """
@@ -85,12 +85,12 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
-TOMLDocument.__missing__ = ConfigDict.__missing__
-TOMLDocument.get = ConfigDict.get
-TOMLDocument.__delitem__ = ConfigDict.__delitem__
-TOMLDocument.pop = ConfigDict.pop
-TOMLDocument.popitem = ConfigDict.popitem
-TOMLDocument.clear = ConfigDict.clear
+TOMLDocument.__missing__ = ConfigDict.__missing__  # type: ignore[attr-defined]
+TOMLDocument.get = ConfigDict.get  # type: ignore[assignment, method-assign]
+TOMLDocument.__delitem__ = ConfigDict.__delitem__  # type: ignore[assignment, method-assign]
+TOMLDocument.pop = ConfigDict.pop  # type: ignore[assignment, method-assign]
+TOMLDocument.popitem = ConfigDict.popitem  # type: ignore[assignment, method-assign]
+TOMLDocument.clear = ConfigDict.clear  # type: ignore[assignment, method-assign]
 
 
 class ConfigManager:
@@ -101,10 +101,10 @@ class ConfigManager:
 
     def __init__(
         self,
-        runtime_config_filepath: Union[Path, str] = None,
+        runtime_config_filepath: Optional[Union[Path, str]] = None,
         default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
     ):
-        self.fibad_default_config = ConfigManager._read_runtime_config(default_config_filepath)
+        self.fibad_default_config: TOMLDocument = ConfigManager._read_runtime_config(default_config_filepath)
 
         self.runtime_config_filepath = ConfigManager.resolve_runtime_config(runtime_config_filepath)
         if self.runtime_config_filepath is DEFAULT_CONFIG_FILEPATH:
@@ -119,12 +119,13 @@ class ConfigManager:
         self.overall_default_config = TOMLDocument()
         self._merge_defaults()
 
-        self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
-        if not self.config["general"]["dev_mode"]:
+        self.config: TOMLDocument = self.merge_configs(self.overall_default_config, self.user_specific_config)
+        dev_mode = self.config["general"]["dev_mode"]
+        if not dev_mode:
             ConfigManager._validate_runtime_config(self.config, self.overall_default_config)
 
     @staticmethod
-    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
+    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> TOMLDocument:
         """Read a single toml file and return a ConfigDict
 
         Parameters
@@ -134,11 +135,11 @@ class ConfigManager:
 
         Returns
         -------
-        ConfigDict
-            The contents of the toml file as a ConfigDict
+        TOMLDocument
+            The contents of the toml file as a tomlkit.TOMLDocument
         """
         config_filepath = Path(config_filepath)
-        parsed_dict = {}
+        parsed_dict: TOMLDocument = TOMLDocument()
         if config_filepath.exists():
             with open(config_filepath, "r") as f:
                 parsed_dict = tomlkit.load(f)
@@ -146,14 +147,14 @@ class ConfigManager:
         return parsed_dict
 
     @staticmethod
-    def _find_external_library_default_config_paths(runtime_config: ConfigDict) -> set:
+    def _find_external_library_default_config_paths(runtime_config: TOMLDocument) -> set:
         """Search for external libraries in the runtime configuration and gather the
         libpath specifications so that we can load the default configs for the libraries.
 
         Parameters
         ----------
-        runtime_config : ConfigDict
-            The runtime configuration.
+        runtime_config : TOMLDocument
+            The runtime configuration as a tomlkit.TOMLDocument.
         Returns
         -------
         set
@@ -171,6 +172,8 @@ class ConfigManager:
                     if importlib.util.find_spec(external_library) is not None:
                         try:
                             lib = importlib.import_module(external_library)
+                            if lib.__file__ is None:
+                                raise RuntimeError()
                             lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
                             if lib_default_config_path.exists():
                                 default_config_paths.add(lib_default_config_path)
@@ -198,20 +201,20 @@ class ConfigManager:
         )
 
     @staticmethod
-    def merge_configs(default_config: ConfigDict, overriding_config: ConfigDict) -> ConfigDict:
+    def merge_configs(default_config: TOMLDocument, overriding_config: TOMLDocument) -> TOMLDocument:
         """Merge two ConfigDicts with the overriding_config values overriding
         the default_config values.
 
         Parameters
         ----------
-        default_config : ConfigDict
+        default_config : TOMLDocument
             The default configuration.
-        overriding_config : ConfigDict
+        overriding_config : TOMLDocument
             The new configuration values to be merged into default_config.
 
         Returns
         -------
-        ConfigDict
+        TOMLDocument
             The merged configuration.
         """
 
@@ -225,7 +228,7 @@ class ConfigManager:
         return final_config
 
     @staticmethod
-    def _validate_runtime_config(runtime_config: ConfigDict, default_config: ConfigDict):
+    def _validate_runtime_config(runtime_config: dict, default_config: dict):
         """Recursive helper to check that all keys in runtime_config have a default
         in the merged default_config.
 

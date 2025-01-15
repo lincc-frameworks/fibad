@@ -28,7 +28,7 @@ class FakeFitsFS:
     """
 
     def __init__(self, test_files: dict):
-        self.patchers = []
+        self.patchers: list[mock._patch[mock.Mock]] = []
 
         self.test_files = test_files
 
@@ -63,6 +63,7 @@ def mkconfig(
     validate_size=0.1,
     seed=False,
     filter_catalog=False,
+    use_cache=False,
 ):
     """Makes a configuration that points at nonexistent path so HSCDataSet.__init__ will create an object,
     and our FakeFitsFS shim can be called.
@@ -77,6 +78,7 @@ def mkconfig(
             "train_size": train_size,
             "test_size": test_size,
             "validate_size": validate_size,
+            "use_cache": use_cache,
         },
     }
 

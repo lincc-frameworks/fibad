@@ -1,10 +1,12 @@
 import logging
 
+from torch.utils.data import Dataset
+
 from fibad.plugin_utils import get_or_load_class, update_registry
 
 logger = logging.getLogger(__name__)
 
-DATA_SET_REGISTRY = {}
+DATA_SET_REGISTRY: dict[str, type[Dataset]] = {}
 
 
 def fibad_data_set(cls):
@@ -24,7 +26,7 @@ def fibad_data_set(cls):
     return cls
 
 
-def fetch_data_set_class(runtime_config: dict) -> type:
+def fetch_data_set_class(runtime_config: dict) -> type[Dataset]:
     """Fetch the data loader class from the registry.
 
     Parameters

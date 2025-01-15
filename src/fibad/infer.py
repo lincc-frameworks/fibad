@@ -26,7 +26,7 @@ def run(config: ConfigDict):
 
     data_set = setup_dataset(config, split=config["infer"]["split"])
     model = setup_model(config, data_set)
-    logger.info(f"data set has length {len(data_set)}")
+    logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
     data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
     # Create a results directory and dump our config there
@@ -35,7 +35,7 @@ def run(config: ConfigDict):
     load_model_weights(config, model)
 
     write_index = 0
-    object_ids = list(data_set.ids() if hasattr(data_set, "ids") else range(len(data_set)))
+    object_ids = list(data_set.ids() if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately

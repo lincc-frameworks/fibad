@@ -28,8 +28,21 @@ sh = "22asec"
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
 type = "coadd"
 rerun = "pdr3_wide"
+
+# Credentials for the downloader. Either provide username/password in a fibad config file
+# or with a credentials.ini file. The format for credentials.ini is as follows:
+#
+# username = "<your username>"
+# password = "<your password>"
+#
+# It is preferred to use a credentials.ini file to avoid sensitive user credentials being
+# committed to source control systems like git.
 username = false
 password = false
+# Location of the credentials.ini file. Defaults to credentials.ini in the current directory
+# but can be configured to a common location for batch processing.
+credentials_file = "./credentials.ini"
+
 num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
 offset = 0
 concurrent_connections = 4
@@ -133,15 +146,19 @@ validate_size = 0.2
 # If `int`, represents the absolute number of test samples.
 # If `false`, the value is set to the complement of the train size.
 # If `train_size` is also `false`, it will be set to `0.25`.
-test_size = 0.6
+test_size = 0.2
 
 # Number to seed with for generating a random split. False means the data will be seeded from
 # a system source at runtime.
 seed = false
 
+#Controls whether images are cached during data loading. For training, this reduces runtimes
+#after the first epoch.
+use_cache = true
+
 [data_loader]
 # Default PyTorch DataLoader parameters
-batch_size = 32
+batch_size =32
 
 # We could remove this potentially - pytorch-ignite will default to shuffle=True
 # If the user wanted to explicitly require no shuffling, they could set this to false.
@@ -150,4 +167,6 @@ num_workers = 2
 
 [infer]
 model_weights_file = false
-split = "test"
+# Select a split ("train", "test", or "validate") to use for inference
+# default of false selects the entire dataset for inference.
+split = false
