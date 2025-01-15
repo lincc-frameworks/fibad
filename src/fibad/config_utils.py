@@ -66,6 +66,9 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
+# Here we patch the TOMLDocument functions to use the ConfigDict functions so that
+# we get the behavior that we desire - i.e. errors on missing default keys, no
+# use of config.get(..., <default>), etc.
 TOMLDocument.__missing__ = ConfigDict.__missing__  # type: ignore[attr-defined]
 TOMLDocument.get = ConfigDict.get  # type: ignore[assignment, method-assign]
 TOMLDocument.__delitem__ = ConfigDict.__delitem__  # type: ignore[assignment, method-assign]
