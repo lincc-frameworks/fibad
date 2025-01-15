@@ -13,7 +13,7 @@ DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
 logger = logging.getLogger(__name__)
 
 
-class ConfigDict(TOMLDocument):
+class ConfigDict(dict):
     """The purpose of this class is to ensure key errors on config dictionaries return something helpful.
     and to discourage mutation actions on config dictionaries that should not happen at runtime.
     """
@@ -29,22 +29,10 @@ class ConfigDict(TOMLDocument):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        current_comment = []
-        for t in self:
-            if isinstance(self[t], tomlkit.items.Table):
-                for k, v in self[t].value.body:
-                    if isinstance(v, tomlkit.items.Whitespace):
-                        current_comment.append(v.as_string())
-                    elif isinstance(v, tomlkit.items.Comment):
-                        current_comment.append(v.as_string())
-                    else:
-                        self[t][k] = (self[t][k], "".join(current_comment))
-                        current_comment = []
-
         # Replace all dictionary keys with values recursively.
-        # for key, val in self.items():
-        #     if isinstance(val, dict) and not isinstance(val, ConfigDict):
-        #         self[key] = ConfigDict(val)
+        for key, val in self.items():
+            if isinstance(val, dict) and not isinstance(val, ConfigDict):
+                self[key] = ConfigDict(val)
 
     def __missing__(self, key):
         msg = f"Accessed configuration key/section {key} which has not been defined. "
@@ -61,13 +49,6 @@ class ConfigDict(TOMLDocument):
         msg += "Configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
         logger.fatal(msg)
         raise RuntimeError(msg)
-
-    def __getitem__(self, key):
-        tmp = super().__getitem__(key)
-        if isinstance(tmp, tuple):
-            return tmp[0]
-        else:
-            return tmp
 
     def __delitem__(self, key):
         raise RuntimeError("Removing keys or sections from a ConfigDict using del is not supported")
@@ -119,9 +100,8 @@ class ConfigManager:
         self.overall_default_config = TOMLDocument()
         self._merge_defaults()
 
-        self.config: TOMLDocument = self.merge_configs(self.overall_default_config, self.user_specific_config)
-        dev_mode = self.config["general"]["dev_mode"]
-        if not dev_mode:
+        self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
+        if not self.config["general"]["dev_mode"]:
             ConfigManager._validate_runtime_config(self.config, self.overall_default_config)
 
     @staticmethod
@@ -147,13 +127,13 @@ class ConfigManager:
         return parsed_dict
 
     @staticmethod
-    def _find_external_library_default_config_paths(runtime_config: TOMLDocument) -> set:
+    def _find_external_library_default_config_paths(runtime_config: dict) -> set:
         """Search for external libraries in the runtime configuration and gather the
         libpath specifications so that we can load the default configs for the libraries.
 
         Parameters
         ----------
-        runtime_config : TOMLDocument
+        runtime_config : dict
             The runtime configuration as a tomlkit.TOMLDocument.
         Returns
         -------
@@ -177,11 +157,17 @@ class ConfigManager:
                             lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
                             if lib_default_config_path.exists():
                                 default_config_paths.add(lib_default_config_path)
+                            else:
+                                logger.warning(f"Cannot find default_config.toml for {external_library}.")
                         except ModuleNotFoundError:
                             logger.error(
                                 f"External library {lib} not found. Please install it before running."
                             )
                             raise
+                    else:
+                        raise ModuleNotFoundError(
+                            f"External library {external_library} not found. Check installation."
+                        )
 
         return default_config_paths
 
@@ -201,20 +187,20 @@ class ConfigManager:
         )
 
     @staticmethod
-    def merge_configs(default_config: TOMLDocument, overriding_config: TOMLDocument) -> TOMLDocument:
+    def merge_configs(default_config: dict, overriding_config: dict) -> dict:
         """Merge two ConfigDicts with the overriding_config values overriding
         the default_config values.
 
         Parameters
         ----------
-        default_config : TOMLDocument
+        default_config : dict
             The default configuration.
-        overriding_config : TOMLDocument
+        overriding_config : dict
             The new configuration values to be merged into default_config.
 
         Returns
         -------
-        TOMLDocument
+        dict
             The merged configuration.
         """
 

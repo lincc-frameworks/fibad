@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -119,3 +120,29 @@ def test_validate_runtime_config_section():
         ConfigManager._validate_runtime_config(user_config, default_config)
 
     assert "Runtime config contains a section named dev_mode" in str(excinfo.value)
+
+
+def test_find_external_library_config_path_no_module():
+    """Test that a ModuleNotFound error is raised when trying to import a
+    non-existent module.
+    """
+
+    config = {"general": {"dev_mode": False}, "model": {"name": "foo.bar.model.Model"}}
+    default_config = ConfigDict(config)
+
+    with pytest.raises(ModuleNotFoundError) as excinfo:
+        ConfigManager._find_external_library_default_config_paths(default_config)
+
+    assert "Check installation" in str(excinfo.value)
+
+
+def test_find_external_library_config_path_no_default_config(caplog):
+    """Test that a warning is logged when a default configuration file is not found."""
+
+    config = {"general": {"dev_mode": False}, "model": {"name": "toml.bar.model.Model"}}
+    default_config = ConfigDict(config)
+
+    with caplog.at_level(logging.WARNING):
+        ConfigManager._find_external_library_default_config_paths(default_config)
+
+    assert "default_config.toml" in caplog.text
