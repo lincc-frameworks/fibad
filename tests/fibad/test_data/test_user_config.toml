@@ -1,9 +1,14 @@
 [general]
-dev_mode = false
+dev_mode = true
 
 [train.model]
 model_weights_filepath = "final_best.pth"
 layers = 3
 
 [infer]
-batch_size = 8
+batch_size = 8 # change batch size
+
+[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
