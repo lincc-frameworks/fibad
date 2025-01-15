@@ -650,6 +650,14 @@ def test_valid_transform_string(caplog):
         lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
         assert lambda_transform.lambd == np.arcsinh
 
+    with FakeFitsFS(test_files):
+        a = HSCDataSet(mkconfig(transform="tanh"), split=None)
+
+        # transform always has CenterCrop in the beginning followed by the user
+        # defined transform
+        lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
+        assert lambda_transform.lambd == np.tanh
+
 
 def test_invalid_transform_string(caplog):
     """Test to ensure that an invalid string passed to transform will raise an error"""
