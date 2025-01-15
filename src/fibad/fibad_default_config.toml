@@ -97,14 +97,17 @@ latent_dim = 64
 # The name of the built-in criterion to use or the import path to an external criterion
 name = "torch.nn.CrossEntropyLoss"
 
+
 [optimizer]
 # The name of the built-in optimizer to use or the import path to an external optimizer
 name = "torch.optim.SGD"
 
-# learning rate parameter for default optimizer. The keys match the names of the parameters
+
+["torch.optim.SGD"]
+# learning rate for torch.optim.SGD optimizer.
 lr = 0.01
 
-# momentum parameter for default optimizer. The keys match the names of the parameters
+# momentum for torch.optim.SGD optimizer.
 momentum = 0.9
 
 

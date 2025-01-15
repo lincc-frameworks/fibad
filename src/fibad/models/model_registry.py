@@ -24,16 +24,42 @@ def _torch_load(self: nn.Module, load_path: Path):
 
 
 def _torch_criterion(self: nn.Module):
-    criterion_function_cls = get_or_load_class(self.config["criterion"])
-    arguments = dict(self.config["criterion"])
-    del arguments["name"]
-    return criterion_function_cls(**arguments)
+    """Load the criterion class using the name defined in the config and
+    instantiate it with the arguments defined in the config."""
+
+    # Load the class and get any parameters from the config dictionary
+    criterion_cls = get_or_load_class(self.config["criterion"])
+    criterion_name = self.config["criterion"]["name"]
+    arguments = self.config.get(criterion_name, {})
+
+    # Print some information about the criterion function and parameters used
+    log_string = f"Using criterion: {criterion_name} "
+    if arguments:
+        log_string += f"with arguments: {arguments}."
+    else:
+        log_string += "with default arguments."
+    logger.info(log_string)
+
+    return criterion_cls(**arguments)
 
 
 def _torch_optimizer(self: nn.Module):
+    """Load the optimizer class using the name defined in the config and
+    instantiate it with the arguments defined in the config."""
+
+    # Load the class and get any parameters from the config dictionary
     optimizer_cls = get_or_load_class(self.config["optimizer"])
-    arguments = {key: value for key, value in self.config["optimizer"].items() if value is not False}
-    del arguments["name"]
+    optimizer_name = self.config["optimizer"]["name"]
+    arguments = self.config.get(optimizer_name, {})
+
+    # Print some information about the optimizer function and parameters used
+    log_string = f"Using optimizer: {optimizer_name} "
+    if arguments:
+        log_string += f"with arguments: {arguments}."
+    else:
+        log_string += "with default arguments."
+    logger.info(log_string)
+
     return optimizer_cls(self.parameters(), **arguments)
 
 
