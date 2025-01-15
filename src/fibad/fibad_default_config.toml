@@ -1,78 +1,97 @@
 [general]
-# Whether to run in development mode. When `true`, this will slightly modify the
-# behavior of Fibad to make development faster and easier. For example, it will
-# not check for the existance of default config values in external libraries.
+# Set to `true` during development to skip checking for default config values
+# in external libraries. Use `false` otherwise.
 dev_mode = false
 
-# Destination of log messages
-# 'stderr' and 'stdout' specify the console.
+# Destination of log messages. Options: 'stderr', 'stdout' specify the console,
+# "path/to/fibad.log" specifies a file.
 log_destination = "stderr"
-# A path name specifies a file e.g.
-# log_destination = "fibad_log.txt"
 
-# Lowest log level to emit.
-# As you go down the list, fibad will become more verbose in the log.
-#
-# log_level = "critical" # Only emit the most severe of errors
-# log_level = "error"    # Emit all errors
-# log_level = "warning"  # Emit warnings and all errors
-log_level = "info"     # Emit informational messages, warnings and all errors
-# log_level = "debug"    # Very verbose, emit all log messages.
+# Lowest log level to emit. Options: "critical", "error", "warning", "info", "debug".
+log_level = "info"
 
+# Directory where data is stored.
 data_dir = "./data"
-results_dir = "./results" # Results get named <verb>-<timestamp> under this directory
+
+#Top level directory for writing results.
+results_dir = "./results"
+
 
 [download]
+# Cut out width in arcseconds.
 sw = "22asec"
+
+# Cut out height in arcseconds.
 sh = "22asec"
+
+# The filters to download.
 filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+
+# The type of data to download.
 type = "coadd"
+
+# The data release to download from.
 rerun = "pdr3_wide"
 
-# Credentials for the downloader. Either provide username/password in a fibad config file
-# or with a credentials.ini file. The format for credentials.ini is as follows:
-#
+# Path to credentials.ini file for the downloader. File contents should be:
 # username = "<your username>"
 # password = "<your password>"
-#
-# It is preferred to use a credentials.ini file to avoid sensitive user credentials being
-# committed to source control systems like git.
-username = false
-password = false
-# Location of the credentials.ini file. Defaults to credentials.ini in the current directory
-# but can be configured to a common location for batch processing.
 credentials_file = "./credentials.ini"
 
-num_sources = -1 # Values below 1 here indicate all sources in the catalog will be downloaded
+# Alternative method to pass credentials to the downloader. Prefer to use a
+#credentials.ini file to avoid exposing credentials with source control.
+username = false
+password = false
+
+# The number of sources to download from the catalog. Default is -1, which
+# downloads all sources in the catalog.
+num_sources = -1
+
+# The number of sources to skip in the catalog. Default is 0.
 offset = 0
+
+# The number of concurrent connections to use when downloading data.
 concurrent_connections = 4
+
+# The number of seconds between printing download statistics.
 stats_print_interval = 60
+
+# The path to the catalog file that defines which cutouts to download.
 fits_file = "./catalog.fits"
 
-# These control the downloader's HTTP requests and retries
-# `retry_wait` How long to wait before retrying a failed HTTP request in seconds. Default 30s
+# The number of seconds to wait before retrying a failed HTTP request in seconds.
 retry_wait = 30
-# `retries` How many times to retry a failed HTTP request before moving on to the next one. Default 3 times
+
+# How many times to retry a failed HTTP request before moving on to the next one.
 retries = 3
-# `timepout` How long should we wait to get a full HTTP response from the server. Default 3600s (1hr)
+
+# Number of seconds to wait for a full HTTP response from the server.
 timeout = 3600
-# `chunksize` How many sky location rectangles should we request in a single request. Default is 990
+
+# The number of sky location rectangles should we request in a single request.
 chunk_size = 990
 
-# Whether to retrieve the image layer
+# Request the image layer from the cutout service
 image = true
-# Whether to retrieve the variance layer
+
+# Request the variance layer from the cutout service
 variance = false
-# Whether to retrieve the mask layer
+
+# Request the mask layer from the cutout service
 mask = false
 
+
 [model]
-# The name of the built-in model to use or the libpath to an external model
-# e.g. "user_package.submodule.ExternalModel" or "ExampleAutoencoder"
+# The name of the model to use. Option are a builtin model class name or import path
+# to an external model. e.g. "ExampleAutoencoder", "user_pkg.model.ExternalModel"
 name = "ExampleAutoencoder"
 
+# The number of output channels from the first layer.
 base_channel_size = 32
+
+# The length of the latent space vector.
 latent_dim = 64
+
 
 [criterion]
 # The name of the built-in criterion to use or the libpath to an external criterion
