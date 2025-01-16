@@ -140,6 +140,11 @@ filters = false
 # [general].data_dir. Implementation is data_set class dependent. Use `false` for no filtering.
 filter_catalog = false
 
+# The transformation to be applied to images before being passed on to the model
+# This must be a valid Numpy function. Passing false will result in no transformations
+# (other than cropping) be applied to the images.  
+transform = "tanh"
+
 # train_size, validation_size, and test_size use these conventions:
 # * A `float` between `0.0` and `1.0` is the proportion of the dataset to include in the split.
 # * An `int`, represents the absolute number of samples in the particular split.
