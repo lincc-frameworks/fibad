@@ -36,7 +36,7 @@ class ConfigDict(dict):
 
     def __missing__(self, key):
         msg = f"Accessed configuration key/section {key} which has not been defined. "
-        msg += "All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
+        msg += f"All configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
         logger.fatal(msg)
         raise RuntimeError(msg)
 
@@ -46,7 +46,7 @@ class ConfigDict(dict):
         with default values defined in the config file."""
         msg = f"ConfigDict.get({key},{default}) called. "
         msg += "Please index config dictionaries with [] or __getitem__() only. "
-        msg += "Configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
+        msg += f"Configuration keys and sections must be defined in {DEFAULT_CONFIG_FILEPATH}"
         logger.fatal(msg)
         raise RuntimeError(msg)
 
