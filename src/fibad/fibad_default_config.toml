@@ -73,6 +73,7 @@ name = "ExampleAutoencoder"
 
 base_channel_size = 32
 latent_dim = 64
+HSCDCAE_final_layer = "linear"
 
 [criterion]
 # The name of the built-in criterion to use or the libpath to an external criterion

@@ -4,10 +4,16 @@
 # that are prepared with FiBAD's HSC Data Set class.
 
 
+import torch
 import torch.nn as nn
 
 # extra long import here to address a circular import issue
 from fibad.models.model_registry import fibad_model
+
+
+class ArcsinhActivation(nn.Module):
+    def forward(self, x):
+        return torch.arcsinh(x)
 
 
 @fibad_model
@@ -34,7 +40,18 @@ class HSCDCAE(nn.Module):
         self.decoder1 = nn.ConvTranspose2d(32, 3, kernel_size=3, stride=1, padding=1, output_padding=0)
 
         self.activation = nn.ReLU()
-        self.final_activation = nn.Sigmoid()
+
+        final_layer = config["model"]["HSCDCAE_final_layer"]
+        if final_layer == "sigmoid":
+            self.final_activation = nn.Sigmoid()
+        elif final_layer == "tanh":
+            self.final_activation = nn.Tanh()
+        elif final_layer == "arcsinh":
+            self.final_activation = ArcsinhActivation()
+        elif final_layer == "linear":
+            self.final_activation = nn.Linear()
+        else:
+            self.final_activation = nn.Identity()
 
         self.config = config
 
