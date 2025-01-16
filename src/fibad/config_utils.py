@@ -4,7 +4,8 @@ import logging
 from pathlib import Path
 from typing import Optional, Union
 
-import toml
+import tomlkit
+from tomlkit.toml_document import TOMLDocument
 
 DEFAULT_CONFIG_FILEPATH = Path(__file__).parent.resolve() / "fibad_default_config.toml"
 DEFAULT_USER_CONFIG_FILEPATH = Path.cwd() / "fibad_config.toml"
@@ -20,8 +21,8 @@ class ConfigDict(dict):
     # TODO: Should there be some sort of "bake" method which occurs after config processing, and
     # percolates down to nested ConfigDicts and prevents __setitem__ and other mutations of dictionary
     # values? i.e. a method to make a config dictionary fully immutable (or very difficult/annoying to
-    # mutuate) before we pass control to possibly external module code that is relying on the dictionary
-    # to be static througout the run.
+    # mutate) before we pass control to possibly external module code that is relying on the dictionary
+    # to be static throughout the run.
 
     __slots__ = ()  # we don't need __dict__ on this object at all.
 
@@ -65,6 +66,17 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
+# Here we patch the TOMLDocument functions to use the ConfigDict functions so that
+# we get the behavior that we desire - i.e. errors on missing default keys, no
+# use of config.get(..., <default>), etc.
+TOMLDocument.__missing__ = ConfigDict.__missing__  # type: ignore[attr-defined]
+TOMLDocument.get = ConfigDict.get  # type: ignore[assignment, method-assign]
+TOMLDocument.__delitem__ = ConfigDict.__delitem__  # type: ignore[assignment, method-assign]
+TOMLDocument.pop = ConfigDict.pop  # type: ignore[assignment, method-assign]
+TOMLDocument.popitem = ConfigDict.popitem  # type: ignore[assignment, method-assign]
+TOMLDocument.clear = ConfigDict.clear  # type: ignore[assignment, method-assign]
+
+
 class ConfigManager:
     """A class to manage the runtime configuration for a Fibad object. This class
     will contain all the logic and methods for reading, merging, and validating
@@ -76,11 +88,11 @@ class ConfigManager:
         runtime_config_filepath: Optional[Union[Path, str]] = None,
         default_config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH,
     ):
-        self.fibad_default_config = ConfigManager._read_runtime_config(default_config_filepath)
+        self.fibad_default_config: TOMLDocument = ConfigManager._read_runtime_config(default_config_filepath)
 
         self.runtime_config_filepath = ConfigManager.resolve_runtime_config(runtime_config_filepath)
         if self.runtime_config_filepath is DEFAULT_CONFIG_FILEPATH:
-            self.user_specific_config = ConfigDict()
+            self.user_specific_config = TOMLDocument()
         else:
             self.user_specific_config = ConfigManager._read_runtime_config(self.runtime_config_filepath)
 
@@ -88,7 +100,7 @@ class ConfigManager:
             self.user_specific_config
         )
 
-        self.overall_default_config: dict = {}
+        self.overall_default_config = TOMLDocument()
         self._merge_defaults()
 
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
@@ -96,7 +108,7 @@ class ConfigManager:
             ConfigManager._validate_runtime_config(self.config, self.overall_default_config)
 
     @staticmethod
-    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> ConfigDict:
+    def _read_runtime_config(config_filepath: Union[Path, str] = DEFAULT_CONFIG_FILEPATH) -> TOMLDocument:
         """Read a single toml file and return a ConfigDict
 
         Parameters
@@ -106,16 +118,16 @@ class ConfigManager:
 
         Returns
         -------
-        ConfigDict
-            The contents of the toml file as a ConfigDict
+        TOMLDocument
+            The contents of the toml file as a tomlkit.TOMLDocument
         """
         config_filepath = Path(config_filepath)
-        parsed_dict = {}
+        parsed_dict: TOMLDocument = TOMLDocument()
         if config_filepath.exists():
             with open(config_filepath, "r") as f:
-                parsed_dict = toml.load(f)
+                parsed_dict = tomlkit.load(f)
 
-        return ConfigDict(parsed_dict)
+        return parsed_dict
 
     @staticmethod
     def _find_external_library_default_config_paths(runtime_config: dict) -> set:
@@ -125,7 +137,7 @@ class ConfigManager:
         Parameters
         ----------
         runtime_config : dict
-            The runtime configuration.
+            The runtime configuration as a tomlkit.TOMLDocument.
         Returns
         -------
         set
@@ -133,10 +145,10 @@ class ConfigManager:
             libraries that are requested in the users configuration file.
         """
 
-        default_configs = set()
+        default_config_paths = set()
         for key, value in runtime_config.items():
             if isinstance(value, dict):
-                default_configs |= ConfigManager._find_external_library_default_config_paths(value)
+                default_config_paths |= ConfigManager._find_external_library_default_config_paths(value)
             else:
                 if key == "name" and "." in value:
                     external_library = value.split(".")[0]
@@ -147,14 +159,20 @@ class ConfigManager:
                                 raise RuntimeError()
                             lib_default_config_path = Path(lib.__file__).parent / "default_config.toml"
                             if lib_default_config_path.exists():
-                                default_configs.add(lib_default_config_path)
-                        except (ModuleNotFoundError, RuntimeError):
+                                default_config_paths.add(lib_default_config_path)
+                            else:
+                                logger.warning(f"Cannot find default_config.toml for {external_library}.")
+                        except ModuleNotFoundError:
                             logger.error(
                                 f"External library {lib} not found. Please install it before running."
                             )
                             raise
+                    else:
+                        raise ModuleNotFoundError(
+                            f"External library {external_library} not found. Check installation."
+                        )
 
-        return default_configs
+        return default_config_paths
 
     def _merge_defaults(self):
         """Merge the default configurations from the fibad and external libraries."""
@@ -173,15 +191,15 @@ class ConfigManager:
 
     @staticmethod
     def merge_configs(default_config: dict, overriding_config: dict) -> dict:
-        """Merge two configurations dictionaries with the overriding_config values
-        overriding the default_config values.
+        """Merge two ConfigDicts with the overriding_config values overriding
+        the default_config values.
 
         Parameters
         ----------
         default_config : dict
             The default configuration.
         overriding_config : dict
-            The user defined configuration.
+            The new configuration values to be merged into default_config.
 
         Returns
         -------
@@ -296,17 +314,17 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     return directory
 
 
-def log_runtime_config(runtime_config: dict, output_path: Path, file_name: str = "runtime_config.toml"):
+def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
     """Log a runtime configuration.
 
     Parameters
     ----------
-    runtime_config : dict
-        A dictionary containing runtime configuration values.
+    runtime_config : ConfigDict
+        A ConfigDict object containing runtime configuration values.
     output_path : str
         The path to put the config file
     file_name : str, Optional
         Optional name for the config file, defaults to "runtime_config.toml"
     """
     with open(output_path / file_name, "w") as f:
-        f.write(toml.dumps(runtime_config))
+        f.write(tomlkit.dumps(runtime_config))
