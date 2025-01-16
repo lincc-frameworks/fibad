@@ -41,15 +41,13 @@ class HSCDCAE(nn.Module):
 
         self.activation = nn.ReLU()
 
-        final_layer = config["model"]["HSCDCAE_final_layer"]
+        final_layer = config["model"]["HSCDCAE_final_layer "]
         if final_layer == "sigmoid":
             self.final_activation = nn.Sigmoid()
         elif final_layer == "tanh":
             self.final_activation = nn.Tanh()
         elif final_layer == "arcsinh":
             self.final_activation = ArcsinhActivation()
-        elif final_layer == "linear":
-            self.final_activation = nn.Linear()
         else:
             self.final_activation = nn.Identity()
 
