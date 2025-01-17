@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from fibad.data_sets.hsc_data_set import HSCDataSet, HSCDataSetSplit
+from torchvision.transforms.v2 import CenterCrop, Lambda
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
@@ -64,6 +65,7 @@ def mkconfig(
     seed=False,
     filter_catalog=False,
     use_cache=False,
+    transform="tanh",
 ):
     """Makes a configuration that points at nonexistent path so HSCDataSet.__init__ will create an object,
     and our FakeFitsFS shim can be called.
@@ -79,6 +81,7 @@ def mkconfig(
             "test_size": test_size,
             "validate_size": validate_size,
             "use_cache": use_cache,
+            "transform": transform,
         },
     }
 
@@ -630,3 +633,55 @@ def test_split_and_conflicting_datasets():
 
         with pytest.raises(RuntimeError):
             a.current_split.logical_and(b.current_split)
+
+
+def test_valid_transform_string(caplog):
+    """Test to ensure that a valid string passed to transform
+    will map to a numpy function"""
+
+    caplog.set_level(logging.ERROR)
+    test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet(mkconfig(transform="arcsinh"), split=None)
+
+        # transform always has CenterCrop in the beginning followed by the user
+        # defined transform
+        lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
+        assert lambda_transform.lambd == np.arcsinh
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet(mkconfig(transform="tanh"), split=None)
+
+        # transform always has CenterCrop in the beginning followed by the user
+        # defined transform
+        lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
+        assert lambda_transform.lambd == np.tanh
+
+
+def test_invalid_transform_string(caplog):
+    """Test to ensure that an invalid string passed to transform will raise an error"""
+
+    caplog.set_level(logging.ERROR)
+    test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
+
+    with FakeFitsFS(test_files):
+        with pytest.raises(RuntimeError):
+            HSCDataSet(mkconfig(transform="invalid_function"), split=None)
+
+
+def test_false_transform(caplog):
+    """Test to ensure that false passed to transform behaves as expected"""
+
+    caplog.set_level(logging.ERROR)
+    test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet(mkconfig(transform=False), split=None)
+
+        # When transform is False; only a CenterCrop should be applied
+        # automatically with a size conforming to test_files above
+        expected_transform = CenterCrop(size=(np.int64(262), np.int64(262)))
+        actual_transform = a.container.transform
+        assert isinstance(actual_transform, CenterCrop)
+        assert actual_transform.size == expected_transform.size

@@ -1,4 +1,7 @@
+# this is the default config file
 [general]
+# set dev_mode to true when developing
+# set to false for production use
 dev_mode = true
 
 [train]
