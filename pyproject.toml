@@ -19,12 +19,14 @@ dependencies = [
     "astropy", # Used to load fits files of sources to query HSC cutout server
     "pytorch-ignite", # Used for distributed training, logging, etc.
     "toml", # Used to load configuration files as dictionaries
+    "tomlkit", # Used to load configuration files as dictionaries and retain comments
     "torch", # Used for CNN model and in train.py
     "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
     "tensorboardX", # Used to log training metrics
     "tensorboard", # Used to log training metrics
     "GPUtil", # Used to gather GPU usage information
     "schwimmbad", # Used to speedup hsc data loader file scans
+    "chromadb", # Used for similarity search
     "holoviews", # Used in Holoviews visualization prototype
     "bokeh", # Used in Holoviews visualization prototype
     "jupyter_bokeh", # Used in Holoviews visualization prototype
