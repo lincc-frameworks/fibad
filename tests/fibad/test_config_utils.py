@@ -73,7 +73,7 @@ model_name = "example_model" # Use a built-in FIBAD model
 model_class = "new_thing.cool_model.CoolModel" # Use a custom model
 
 [train.model]
-model_weights_filepath = "final_best.pth"
+weights_filepath = "final_best.pth"
 layers = 3
 
 
