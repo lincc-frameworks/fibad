@@ -42,42 +42,59 @@ def run(config: ConfigDict):
     load_model_weights(config, model)
 
     # Create a chromadb in results dir
-    # TODO: do we want to split this out and allow configuration of location?
-    chromadb_client = chromadb.PersistentClient(path=str(results_dir))
-    collection = chromadb_client.create_collection(
-        name="fibad",
-        metadata={
-            # These are all chromdb defaults. We may want to configure them
-            "hsnw:space": "l2",
-            "hsnw:construction_ef": 100,
-            "hsnw:search_ef": 100,
-        },
-    )
+    if config["infer"]["chromadb"]:
+        chromadb_client = chromadb.PersistentClient(path=str(results_dir))
+        collection = chromadb_client.create_collection(
+            name="fibad",
+            metadata={
+                # These are all chromdb defaults. We may want to configure them
+                "hsnw:space": "l2",
+                "hsnw:construction_ef": 100,
+                "hsnw:search_ef": 100,
+            },
+        )
 
     write_index = 0
-    object_ids = list(data_set.ids() if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
+    batch_index = 0
+    object_ids: list[int] = list(int(data_set.ids()) if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately
         This function writes a single numpy binary file for each object.
         """
         nonlocal write_index
-        nonlocal collection
+        nonlocal batch_index
+        nonlocal object_ids
+
+        batch_len = len(batch_results)
         batch_results = batch_results.detach().to("cpu")
+        batch_object_ids = [object_ids[id] for id in range(write_index, write_index + len(batch_results))]
 
-        # Save results to ChromaDB vector databse
-        embeddings = [t.flatten().numpy() for t in batch_results]
-        ids = [str(id) for id in range(write_index, write_index + len(batch_results))]
-        collection.add(embeddings=embeddings, ids=ids)
+        # Save results to ChromaDB vector database
+        if config["infer"]["chromadb"]:
+            nonlocal collection
+            chroma_ids: list[str] = [str(id) for id in batch_object_ids]
+            embeddings: list[np.ndarray] = [t.flatten().numpy() for t in batch_results]
+            collection.add(embeddings=embeddings, ids=chroma_ids)
 
-        for tensor in batch_results:
-            object_id = object_ids[write_index]
-            filename = f"{object_id}.npy"
-            savepath = results_dir / filename
-            if savepath.exists():
-                RuntimeError("The path to save results for object {object_id} already exists.")
-            np.save(savepath, tensor.numpy(), allow_pickle=False)
-            write_index += 1
+        # Save results from this batch in a numpy file as a structured array
+        first_tensor = batch_results[0].numpy()
+        structured_batch_type = np.dtype(
+            [("id", np.int64), ("tensor", first_tensor.dtype, first_tensor.shape)]
+        )
+        structured_batch = np.zeros(batch_len, structured_batch_type)
+        structured_batch["id"] = batch_object_ids
+        structured_batch["tensor"] = [t.numpy() for t in batch_results]
+
+        filename = f"batch_{batch_index}.npy"
+        savepath = results_dir / filename
+        if savepath.exists():
+            RuntimeError("The path to save results for object {object_id} already exists.")
+
+        np.save(savepath, structured_batch, allow_pickle=False)
+
+        batch_index += 1
+        write_index += batch_len
 
     evaluator = create_evaluator(model, _save_batch)
     evaluator.run(data_loader)
