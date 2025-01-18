@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Union
 
 import ignite.distributed as idist
+import mlflow
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
@@ -253,6 +254,7 @@ def create_validator(
     def log_validation_loss(validator, trainer):
         step = trainer.state.get_event_attrib_value(Events.EPOCH_COMPLETED)
         tensorboardx_logger.add_scalar("training/validation/loss", validator.state.output["loss"], step)
+        mlflow.log_metrics({"validation/loss": validator.state.output["loss"]}, step=step)
 
     validator.add_event_handler(Events.EPOCH_COMPLETED, log_validation_loss, trainer)
 
@@ -340,6 +342,7 @@ def create_trainer(
     def log_training_loss_tensorboard(trainer):
         step = trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED)
         tensorboardx_logger.add_scalar("training/training/loss", trainer.state.output["loss"], step)
+        mlflow.log_metrics({"training/loss": trainer.state.output["loss"]}, step=step)
 
     # mlflow_logger.attach_output_handler(
     #     trainer,

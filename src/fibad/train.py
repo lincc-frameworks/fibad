@@ -56,7 +56,7 @@ def run(config):
     mlflow.set_tracking_uri("file://" + str(results_root_dir / "mlflow"))
     mlflow.set_experiment("notebook")
 
-    with mlflow.start_run():
+    with mlflow.start_run(log_system_metrics=True):
         mlflow.log_params(config["model"])
         mlflow.log_param("epochs", config["train"]["epochs"])
         mlflow.log_param("batch_size", config["data_loader"]["batch_size"])
