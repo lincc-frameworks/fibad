@@ -22,9 +22,13 @@ def main():
     subparser_usage_prefix = parser.format_usage()[7:-1]
     subparsers = parser.add_subparsers(title="Verbs:", required=False)
 
+    # cut off "usage: " from beginning and "\n" from end so we get an invocation
+    # which subcommand parsers can add to appropriately.
+    subparser_usage_prefix = parser.format_usage()[7:-1]
+    subparsers = parser.add_subparsers(title="Verbs:", required=False)
+
     # Add a subparser for every verb, (whether defined by function or class)
     for cli_name in all_verbs():
-        # print(cli_name)
         subparser_kwargs = {}
 
         if is_verb_class(cli_name):
