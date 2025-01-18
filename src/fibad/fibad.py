@@ -4,17 +4,16 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .config_utils import ConfigManager
+from .verbs.verb_registry import all_class_verbs, fetch_verb_class, is_verb_class
 
 
 class Fibad:
     """
     Overall class that represents an interface into fibad. Currently this encapsulates a configuration and is
-    the external interface to all verbs in a programmatic context.
+    the external interface to all verbs in a programmatic or notebook context.
 
     CLI functions in fibad_cli are implemented by calling this class
     """
-
-    verbs = ["train", "infer", "download", "prepare", "rebuild_manifest"]
 
     def __init__(self, *, config_file: Optional[Union[Path, str]] = None, setup_logging: bool = True):
         """Initialize fibad. Always applies the default config, and merges it with any provided config file.
@@ -193,3 +192,23 @@ class Fibad:
         from .rebuild_manifest import run
 
         return run(config=self.config, **kwargs)
+
+    # Python notebook interface to class verbs
+    # we need both __dir__ and __getattr__ so that the
+    # functions from the various verb classes appear to be
+    # methods on the fibad object
+    def __dir__(self):
+        return all_class_verbs()
+
+    def __getattr__(self, name):
+        if not is_verb_class(name):
+            return None
+
+        # We return the run function on the verb class after
+        # just-in-time creating the verb so that a notebook user
+        # sees the function signature and help.
+        #
+        # It may be possible to do this with functools.partial techniques
+        # but should be tested.
+        verb_inst = fetch_verb_class(name)(config=self.config)
+        return verb_inst.run
