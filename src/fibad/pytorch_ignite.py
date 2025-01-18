@@ -324,6 +324,9 @@ def create_trainer(
         prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
 
+    # results_root_dir = Path(config["general"]["results_dir"]).resolve()
+    # mlflow_logger = MLflowLogger("file://" + str(results_root_dir / "mlflow"))
+
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
         logger.info(f"Training model on device: {device}")
@@ -337,6 +340,13 @@ def create_trainer(
     def log_training_loss_tensorboard(trainer):
         step = trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED)
         tensorboardx_logger.add_scalar("training/training/loss", trainer.state.output["loss"], step)
+
+    # mlflow_logger.attach_output_handler(
+    #     trainer,
+    #     event_name=Events.ITERATION_COMPLETED,
+    #     tag="training",
+    #     output_transform=lambda loss: {"loss": loss},
+    # )
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_loss(trainer):

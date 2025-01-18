@@ -1,5 +1,7 @@
 import logging
+from pathlib import Path
 
+import mlflow
 from tensorboardX import SummaryWriter
 
 from fibad.config_utils import create_results_dir, log_runtime_config
@@ -49,8 +51,20 @@ def run(config):
         create_validator(model, config, results_dir, tensorboardx_logger, validation_data_loader, trainer)
 
     monitor = GpuMonitor(tensorboard_logger=tensorboardx_logger)
-    # Run the training process
-    trainer.run(train_data_loader, max_epochs=config["train"]["epochs"])
+
+    results_root_dir = Path(config["general"]["results_dir"]).resolve()
+    mlflow.set_tracking_uri("file://" + str(results_root_dir / "mlflow"))
+    mlflow.set_experiment("notebook")
+
+    with mlflow.start_run():
+        mlflow.log_params(config["model"])
+        mlflow.log_param("epochs", config["train"]["epochs"])
+        mlflow.log_param("batch_size", config["data_loader"]["batch_size"])
+
+        # Run the training process
+        trainer.run(train_data_loader, max_epochs=config["train"]["epochs"])
+
+        mlflow.pytorch.log_model(model, "models")
 
     # Save the trained model
     model.save(results_dir / config["train"]["weights_filepath"])
