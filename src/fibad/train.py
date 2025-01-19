@@ -57,9 +57,7 @@ def run(config):
     mlflow.set_experiment("notebook")
 
     with mlflow.start_run(log_system_metrics=True):
-        mlflow.log_params(config["model"])
-        mlflow.log_param("epochs", config["train"]["epochs"])
-        mlflow.log_param("batch_size", config["data_loader"]["batch_size"])
+        _log_params(config)
 
         # Run the training process
         trainer.run(train_data_loader, max_epochs=config["train"]["epochs"])
@@ -72,3 +70,31 @@ def run(config):
 
     logger.info("Finished Training")
     tensorboardx_logger.close()
+
+
+def _log_params(config):
+    """Log the various parameters to mlflow from the config file.
+
+    Parameters
+    ----------
+    config : dict
+        The main configuration dictionary
+    """
+
+    # Log all model params
+    mlflow.log_params(config["model"])
+
+    # Log some training and data loader params
+    mlflow.log_param("epochs", config["train"]["epochs"])
+    mlflow.log_param("batch_size", config["data_loader"]["batch_size"])
+
+    # Log the criterion and optimizer params
+    criterion_name = config["criterion"]["name"]
+    mlflow.log_param("criterion", criterion_name)
+    if criterion_name in config:
+        mlflow.log_params(config[criterion_name])
+
+    optimizer_name = config["optimizer"]["name"]
+    mlflow.log_param("optimizer", optimizer_name)
+    if optimizer_name in config:
+        mlflow.log_params(config[optimizer_name])

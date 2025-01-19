@@ -344,13 +344,6 @@ def create_trainer(
         tensorboardx_logger.add_scalar("training/training/loss", trainer.state.output["loss"], step)
         mlflow.log_metrics({"training/loss": trainer.state.output["loss"]}, step=step)
 
-    # mlflow_logger.attach_output_handler(
-    #     trainer,
-    #     event_name=Events.ITERATION_COMPLETED,
-    #     tag="training",
-    #     output_transform=lambda loss: {"loss": loss},
-    # )
-
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_loss(trainer):
         logger.info(f"Epoch {trainer.state.epoch} run time: {trainer.state.times['EPOCH_COMPLETED']:.2f}[s]")
