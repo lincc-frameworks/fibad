@@ -321,6 +321,7 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     directory.mkdir(parents=True, exist_ok=False)
     return directory
 
+
 def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path]:
     """Find the most recent results directory corresponding to a particular verb
     This is a best effort search in the currently configured results root.
@@ -351,8 +352,8 @@ def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path
 
     return best_path
 
-def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
 
+def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
     """Log a runtime configuration.
 
     Parameters
