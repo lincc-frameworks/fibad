@@ -54,7 +54,12 @@ def run(config):
 
     results_root_dir = Path(config["general"]["results_dir"]).resolve()
     mlflow.set_tracking_uri("file://" + str(results_root_dir / "mlflow"))
-    mlflow.set_experiment("notebook")
+
+    # Get experiment_name and cast to string (it's a tomlkit.string by default)
+    experiment_name = str(config["train"]["experiment_name"])
+
+    # This will create the experiment if it doesn't exist
+    mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(log_system_metrics=True):
         _log_params(config)
