@@ -2,6 +2,7 @@ import logging
 import os
 
 import pytest
+
 from fibad.config_utils import ConfigDict, ConfigManager
 
 
@@ -55,7 +56,7 @@ def test_get_runtime_config():
         "train": {
             "model_name": "example_model",
             "model_class": "new_thing.cool_model.CoolModel",
-            "model": {"model_weights_filepath": "final_best.pth", "layers": 3},
+            "model": {"weights_filepath": "final_best.pth", "layers": 3},
         },
         "infer": {"batch_size": 8},
         "bespoke_table": {"key1": "value1", "key2": "value2"},
@@ -72,7 +73,7 @@ model_name = "example_model" # Use a built-in FIBAD model
 model_class = "new_thing.cool_model.CoolModel" # Use a custom model
 
 [train.model]
-model_weights_filepath = "final_best.pth"
+weights_filepath = "final_best.pth"
 layers = 3
 
 

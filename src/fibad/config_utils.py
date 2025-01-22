@@ -1,6 +1,9 @@
+import base64
 import datetime
 import importlib
 import logging
+import random
+import re
 from pathlib import Path
 from typing import Optional, Union
 
@@ -308,13 +311,48 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
         The path created by this function
     """
     results_root = Path(config["general"]["results_dir"]).resolve()
+    # This date format is chosen specifically to create a lexical search order
+    # which matches the date order.
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    directory = results_root / f"{timestamp}-{postfix}"
+    # Generate 4 random ascii characters to avoid collisions from multiple fibad processes
+    # started in a shared filesystem environment.
+    random_str = base64.urlsafe_b64encode(random.randbytes(3)).decode("ascii")
+    directory = results_root / f"{timestamp}-{postfix}-{random_str}"
     directory.mkdir(parents=True, exist_ok=False)
     return directory
 
+def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path]:
+    """Find the most recent results directory corresponding to a particular verb
+    This is a best effort search in the currently configured results root.
+
+    If result directories are created within 1 second of one another this function
+    will return one of the directories but it is undefined which one it will return.
+
+    This function may return None indicating it could not find a directory matching
+    the query verb
+    """
+    results_root = Path(config["general"]["results_dir"]).resolve()
+
+    max_timestamp = 0
+    best_path = None
+
+    for path in results_root.glob(f"*-{verb}-*"):
+        if path.is_dir():
+            regex = r"([0-9]{8})-([0-9]{6})-.*"
+            m = re.match(regex, path.name)
+
+            if m is None:
+                continue
+
+            timestamp = int(m[1] + m[2])
+            if timestamp > max_timestamp:
+                max_timestamp = timestamp
+                best_path = path
+
+    return best_path
 
 def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
+
     """Log a runtime configuration.
 
     Parameters
