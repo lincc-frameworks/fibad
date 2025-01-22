@@ -122,6 +122,8 @@ resume = false
 # The data_set split to use when training a model.
 split = "train"
 
+# The name of the experiment when logging training results to mlflow
+experiment_name = "notebook"
 
 [data_set]
 # Name of the built-in data loader to use or the import path to an external data

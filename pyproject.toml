@@ -34,6 +34,8 @@ dependencies = [
     "numpy", # Used in Holoviews visualization prototype
     "scipy", # Used in Holoviews visualization prototype
     "cython", # Used in Holoviews visualization prototype
+    "mlflow", # Used to log training metrics and compare models
+    "pynvml", # Used to gather GPU usage information
 ]
 
 [project.scripts]
