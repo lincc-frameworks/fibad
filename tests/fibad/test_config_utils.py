@@ -2,7 +2,6 @@ import logging
 import os
 
 import pytest
-
 from fibad.config_utils import ConfigDict, ConfigManager
 
 

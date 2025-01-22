@@ -331,11 +331,13 @@ class HSCDataSetContainer(Dataset):
         else:
             transform = None
 
+        # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
+        # to ensure we don't use the manifest we believe is corrupt.
+        rebuild_manifest = config["rebuild_manifest"] if "rebuild_manifest" in config else False  # noqa: SIM401
+
         if config["data_set"]["filter_catalog"]:
             filter_catalog = Path(config["data_set"]["filter_catalog"])
-        elif not config.get("rebuild_manifest", False):
-            # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
-            # to ensure we don't use the manifest we believe is corrupt.
+        elif not rebuild_manifest:
             filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
             if not filter_catalog.exists():
                 filter_catalog = False
