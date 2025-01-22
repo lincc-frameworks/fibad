@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Union
 
 import ignite.distributed as idist
+import mlflow
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
@@ -253,6 +254,7 @@ def create_validator(
     def log_validation_loss(validator, trainer):
         step = trainer.state.get_event_attrib_value(Events.EPOCH_COMPLETED)
         tensorboardx_logger.add_scalar("training/validation/loss", validator.state.output["loss"], step)
+        mlflow.log_metrics({"validation/loss": validator.state.output["loss"]}, step=step)
 
     validator.add_event_handler(Events.EPOCH_COMPLETED, log_validation_loss, trainer)
 
@@ -324,6 +326,9 @@ def create_trainer(
         prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
 
+    # results_root_dir = Path(config["general"]["results_dir"]).resolve()
+    # mlflow_logger = MLflowLogger("file://" + str(results_root_dir / "mlflow"))
+
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
         logger.info(f"Training model on device: {device}")
@@ -337,6 +342,7 @@ def create_trainer(
     def log_training_loss_tensorboard(trainer):
         step = trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED)
         tensorboardx_logger.add_scalar("training/training/loss", trainer.state.output["loss"], step)
+        mlflow.log_metrics({"training/loss": trainer.state.output["loss"]}, step=step)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_loss(trainer):
