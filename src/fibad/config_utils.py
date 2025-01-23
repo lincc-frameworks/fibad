@@ -4,6 +4,7 @@ import importlib
 import logging
 import random
 import re
+from importlib import util as importlib_util
 from pathlib import Path
 from typing import Optional, Union
 
@@ -155,7 +156,7 @@ class ConfigManager:
             else:
                 if key == "name" and "." in value:
                     external_library = value.split(".")[0]
-                    if importlib.util.find_spec(external_library) is not None:
+                    if importlib_util.find_spec(external_library) is not None:
                         try:
                             lib = importlib.import_module(external_library)
                             if lib.__file__ is None:
