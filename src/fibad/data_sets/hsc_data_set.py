@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import re
 import resource
+from collections.abc import Generator
 from copy import copy, deepcopy
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Union
@@ -156,6 +157,9 @@ class HSCDataSet(Dataset):
 
     def shape(self) -> tuple[int, int, int]:
         return self.container.shape()
+
+    def ids(self) -> Generator[str, None, None]:
+        return self.container.ids()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         # return self.current_split[idx]
@@ -921,7 +925,7 @@ class HSCDataSetContainer(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def ids(self, log_every=None):
+    def ids(self, log_every=None) -> Generator[str, None, None]:
         """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 

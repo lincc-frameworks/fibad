@@ -56,7 +56,7 @@ def run(config: ConfigDict):
 
     write_index = 0
     batch_index = 0
-    object_ids: list[int] = list(int(data_set.ids()) if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
+    object_ids = list(data_set.ids() if hasattr(data_set, "ids") else range(len(data_set)))  # type: ignore[arg-type]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately
