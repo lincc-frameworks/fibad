@@ -198,7 +198,7 @@ class Fibad:
     # functions from the various verb classes appear to be
     # methods on the fibad object
     def __dir__(self):
-        return all_class_verbs()
+        return sorted(dir(Fibad) + list(self.__dict__.keys()) + all_class_verbs())
 
     def __getattr__(self, name):
         if not is_verb_class(name):

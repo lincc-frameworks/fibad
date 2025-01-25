@@ -8,7 +8,7 @@ from fibad.verbs import all_verbs, fetch_verb_class, is_verb_class
 
 def main():
     """Primary entry point for the Fibad CLI. This handles dispatching to the various
-    Fibad actions.
+    Fibad actions and returning a result.
     """
 
     description = "Fibad CLI"
@@ -52,11 +52,14 @@ def main():
         sys.exit(1)
 
     fibad_instance = Fibad(config_file=args.runtime_config)
+    retval = 0
     if is_verb_class(args.verb):
         verb = fetch_verb_class(cli_name)(fibad_instance.config)
-        verb.run_cli(args)
+        retval = verb.run_cli(args)
     else:
         getattr(fibad_instance, args.verb)()
+
+    exit(retval)
 
 
 if __name__ == "__main__":
