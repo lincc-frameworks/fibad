@@ -4,6 +4,7 @@ import importlib
 import logging
 import random
 import re
+from importlib import util as importlib_util
 from pathlib import Path
 from typing import Optional, Union
 
@@ -155,7 +156,7 @@ class ConfigManager:
             else:
                 if key == "name" and "." in value:
                     external_library = value.split(".")[0]
-                    if importlib.util.find_spec(external_library) is not None:
+                    if importlib_util.find_spec(external_library) is not None:
                         try:
                             lib = importlib.import_module(external_library)
                             if lib.__file__ is None:
@@ -321,6 +322,7 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     directory.mkdir(parents=True, exist_ok=False)
     return directory
 
+
 def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path]:
     """Find the most recent results directory corresponding to a particular verb
     This is a best effort search in the currently configured results root.
@@ -351,8 +353,8 @@ def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path
 
     return best_path
 
-def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
 
+def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name: str = "runtime_config.toml"):
     """Log a runtime configuration.
 
     Parameters

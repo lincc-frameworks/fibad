@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import re
 import resource
+from collections.abc import Generator
 from copy import copy, deepcopy
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Union
@@ -156,6 +157,9 @@ class HSCDataSet(Dataset):
 
     def shape(self) -> tuple[int, int, int]:
         return self.container.shape()
+
+    def ids(self) -> Generator[str, None, None]:
+        return self.container.ids()
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         # return self.current_split[idx]
@@ -331,11 +335,13 @@ class HSCDataSetContainer(Dataset):
         else:
             transform = None
 
+        # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
+        # to ensure we don't use the manifest we believe is corrupt.
+        rebuild_manifest = config["rebuild_manifest"] if "rebuild_manifest" in config else False  # noqa: SIM401
+
         if config["data_set"]["filter_catalog"]:
             filter_catalog = Path(config["data_set"]["filter_catalog"])
-        elif not config.get("rebuild_manifest", False):
-            # Note "rebuild_manifest" is not a config, its a hack for rebuild_manifest mode
-            # to ensure we don't use the manifest we believe is corrupt.
+        elif not rebuild_manifest:
             filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
             if not filter_catalog.exists():
                 filter_catalog = False
@@ -919,7 +925,7 @@ class HSCDataSetContainer(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def ids(self, log_every=None):
+    def ids(self, log_every=None) -> Generator[str, None, None]:
         """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 

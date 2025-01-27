@@ -1,52 +1,39 @@
-
-.. fibad documentation main file.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Welcome to fibad's documentation!
-========================================================================================
+=================================
 
-Dev Guide - Getting Started
----------------------------
+What is fibad?
+--------------
+Fibad is the Framework for Image-Base Anomaly Detection.
 
-Before installing any dependencies or writing code, it's a great idea to create a
-virtual environment. LINCC-Frameworks engineers primarily use `conda` to manage virtual
-environments. If you have conda installed locally, you can run the following to
-create and activate a new environment.
+Why did we build fibad?
+-----------------------
+Image-based ML in astronomy is challenging work.
+We've found many bottlenecks in the process that require signifincant effort to overcome.
+Most of the time that effort doesn't accrue to science, it's just a means to an end.
+But it's repeated over and over again by many different people.
+Fibad is our effort to make the process easier and more efficient taking care of
+the common tasks so that scientists can focus on the science.
 
-.. code-block:: console
-
-   >> conda create env -n <env_name> python=3.10
-   >> conda activate <env_name>
-
-
-Once you have created a new environment, you can install this project for local
-development using the following commands:
-
-.. code-block:: console
-
-   >> pip install -e .'[dev]'
-   >> pre-commit install
-   >> conda install pandoc
-
-
-Notes:
-
-1) The single quotes around ``'[dev]'`` may not be required for your operating system.
-2) ``pre-commit install`` will initialize pre-commit for this local repository, so
-   that a set of tests will be run prior to completing a local commit. For more
-   information, see the Python Project Template documentation on
-   `pre-commit <https://lincc-ppt.readthedocs.io/en/latest/practices/precommit.html>`_.
-3) Installing ``pandoc`` allows you to verify that automatic rendering of Jupyter notebooks
-   into documentation for ReadTheDocs works as expected. For more information, see
-   the Python Project Template documentation on
-   `Sphinx and Python Notebooks <https://lincc-ppt.readthedocs.io/en/latest/practices/sphinx.html#python-notebooks>`_.
-
+Fibad's guiding principles
+--------------------------
+* **Principle 1** Empower the scientists to do science - not software engineering.
+Fibad automatically discovers and uses the most performant hardware available
+for training without any changes to the users code.
+* **Principle 2** Make the software easy to use.
+Fibad is designed to be used in a Jupyter notebook for exploration or from the
+command line within HPC or Slurm environments without modification.
+* **Principle 3** Make the software extensible to support many different use cases.
+Fibad is designed to be easily extended to support new models and data sources.
 
 .. toctree::
    :hidden:
 
    Home page <self>
+   Architecture overview <architecture_overview>
    Configuration <configuration>
+   External libraries <external_libraries>
+   Data set splits <data_set_splits>
+   Model evaluation <model_evaluation>
+   Developer guide <dev_guide>
    API Reference <autoapi/index>
    Notebooks <notebooks>

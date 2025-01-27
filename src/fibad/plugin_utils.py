@@ -1,4 +1,5 @@
 import importlib
+from importlib import util as importlib_util
 from typing import Any, Optional, TypeVar, Union
 
 T = TypeVar("T")
@@ -71,10 +72,10 @@ def import_module_from_string(module_path: str) -> Any:
     try:
         # Attempt to find the module spec, i.e. `module.submodule.`.
         # Will raise exception if `submodule`, 'subsubmodule', etc. is not found.
-        importlib.util.find_spec(module_name)
+        importlib_util.find_spec(module_name)
 
-        # `importlib.util.find_spec()` will return None if `module` is not found.
-        if (importlib.util.find_spec(module_name)) is not None:
+        # `importlib_util.find_spec()` will return None if `module` is not found.
+        if (importlib_util.find_spec(module_name)) is not None:
             # Load the requested module
             module = importlib.import_module(module_name)
 
