@@ -15,9 +15,7 @@ def main():
     epilog = "FIBAD is the Framework for Image-Based Anomaly Detection"
 
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
-
-    parser.add_argument("--version", dest="version", action="store_true", help="Show version")
-    parser.add_argument("-c", "--runtime-config", type=str, help="Full path to runtime config file")
+    _add_major_arguments(parser)
 
     # cut off "usage: " from beginning and "\n" from end so we get an invocation
     # which subcommand parsers can add to appropriately.
@@ -26,7 +24,7 @@ def main():
 
     # Add a subparser for every verb, (whether defined by function or class)
     for cli_name in all_verbs():
-        print(cli_name)
+        # print(cli_name)
         subparser_kwargs = {}
 
         if is_verb_class(cli_name):
@@ -41,6 +39,7 @@ def main():
             verb_class.setup_parser(verb_parser)
 
         verb_parser.set_defaults(verb=cli_name)
+        _add_major_arguments(verb_parser)
 
     args = parser.parse_args()
 
@@ -61,6 +60,11 @@ def main():
         getattr(fibad_instance, args.verb)()
 
     exit(retval)
+
+
+def _add_major_arguments(parser):
+    parser.add_argument("--version", dest="version", action="store_true", help="Show version")
+    parser.add_argument("-c", "--runtime-config", type=str, help="Full path to runtime config file")
 
 
 if __name__ == "__main__":
