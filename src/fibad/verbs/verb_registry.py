@@ -40,7 +40,7 @@ def fibad_verb(cls: type[Verb]) -> type[Verb]:
 
 
 def all_verbs() -> list[str]:
-    """Returns All verbs that are currently registered"""
+    """Returns all verbs that are currently registered"""
     return [verb for verb in VERB_REGISTRY]
 
 
