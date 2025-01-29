@@ -34,7 +34,7 @@ VERB_REGISTRY: dict[str, Optional[type[Verb]]] = {
 
 
 def fibad_verb(cls: type[Verb]) -> type[Verb]:
-    """Decorator to Register a fibad verb"""
+    """Decorator to register a fibad verb"""
     update_registry(VERB_REGISTRY, cls.cli_name, cls)  # type: ignore[attr-defined]
     return cls
 
