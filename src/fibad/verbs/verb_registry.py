@@ -45,7 +45,7 @@ def all_verbs() -> list[str]:
 
 
 def all_class_verbs() -> list[str]:
-    """Returns All verbs that are currently registered with a class-based implementation"""
+    """Returns all verbs that are currently registered with a class-based implementation"""
     return [verb for verb in VERB_REGISTRY if VERB_REGISTRY.get(verb) is not None]
 
 
