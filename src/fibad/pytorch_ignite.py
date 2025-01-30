@@ -244,8 +244,8 @@ def create_validator(
 
     @validator.on(Events.EPOCH_COMPLETED)
     def log_training_loss():
-        logger.info(f"Validation run time: {validator.state.times['EPOCH_COMPLETED']:.2f}[s]")
-        logger.info(f"Validation metrics: {validator.state.output}")
+        logger.debug(f"Validation run time: {validator.state.times['EPOCH_COMPLETED']:.2f}[s]")
+        logger.debug(f"Validation metrics: {validator.state.output}")
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def run_validation():
@@ -346,8 +346,8 @@ def create_trainer(
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_loss(trainer):
-        logger.info(f"Epoch {trainer.state.epoch} run time: {trainer.state.times['EPOCH_COMPLETED']:.2f}[s]")
-        logger.info(f"Epoch {trainer.state.epoch} metrics: {trainer.state.output}")
+        logger.debug(f"Epoch {trainer.state.epoch} run time: {trainer.state.times['EPOCH_COMPLETED']:.2f}[s]")
+        logger.debug(f"Epoch {trainer.state.epoch} metrics: {trainer.state.output}")
 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, latest_checkpoint)
     trainer.add_event_handler(Events.EPOCH_COMPLETED, best_checkpoint)
