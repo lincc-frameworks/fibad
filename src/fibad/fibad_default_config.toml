@@ -198,4 +198,5 @@ chromadb = true
 inference_dir = false
 
 [umap]
+umap_options = false
 # In general any config defined here will be passed 

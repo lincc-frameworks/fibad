@@ -1,13 +1,19 @@
 import logging
+import pickle
 from argparse import ArgumentParser, Namespace
-from typing import Optional, Union
 from pathlib import Path
+from typing import Optional, Union
+
+import numpy as np
 import umap
 
+from fibad.config_utils import create_results_dir
+from fibad.data_sets.inference_dataset import InferenceDataSet, InferenceDataSetWriter
+
 from .verb_registry import Verb, fibad_verb
-from fibad.config_utils import find_most_recent_results_dir
 
 logger = logging.getLogger(__name__)
+
 
 @fibad_verb
 class Umap(Verb):
@@ -20,7 +26,11 @@ class Umap(Verb):
     def setup_parser(parser: ArgumentParser):
         """Stub of parser setup"""
         parser.add_argument(
-            "-r", "--results-dir", type=str, required=False, help="Directory containing inference results."
+            "-i",
+            "--input-dir",
+            type=str,
+            required=False,
+            help="Directory containing inference results to umap.",
         )
 
     # Should there be a version of this on the base class which uses a dict on the Verb
@@ -32,43 +42,46 @@ class Umap(Verb):
             raise RuntimeError("Run CLI called with no arguments.")
         # This is where we map from CLI parsed args to a
         # self.run (args) call.
-        return self.run(results_dir=args.results_dir)
+        return self.run(input_dir=args.input_dir)
 
-    def run(self, results_dir: Optional[Union[Path, str]], **kwargs):
-        """Create visualization"""
-        # Lookup latest infer directory, or use the provided one.
-        # TODO: duplicated from lookup
-        if results_dir is None:
-            if self.config["results"]["inference_dir"]:
-                results_dir = self.config["results"]["inference_dir"]
-            else:
-                results_dir = find_most_recent_results_dir(self.config, verb="infer")
-                msg = f"Using most recent results dir {results_dir} for lookup."
-                msg += "Use the [results] inference_dir config to set a directory or pass it to this verb."
-                logger.info(msg)
-
-        if results_dir is None:
-            msg = "Could not find a results directory. Run infer or use "
-            msg += "[results] inference_dir config to specify a directory"
-            logger.error(msg)
-            return None
-
-        if isinstance(results_dir, str):
-            results_dir = Path(results_dir)
+    def run(self, input_dir: Optional[Union[Path, str]], **kwargs):
+        """Create a umap of a particular inference run"""
 
         # TODO pass in kwargs so people can control umap?
         #      Should this be config or args?
-        reducer = umap.UMAP()
+        reducer = umap.UMAP(**kwargs)
+
+        # Set up the results directory where we will store our umapped output
+        results_dir = create_results_dir(self.config, "umap")
+        umap_results = InferenceDataSetWriter(results_dir)
 
         # Load all the latent space data.
-        # TODO sample this based on a config
+        inference_results = InferenceDataSet(self.config, split=False, results_dir=input_dir)
+
+        # TODO Sample size should be a config
+        sample_size = 100
+        rng = np.random.default_rng()
+        index_choices = rng.choice(np.arange(len(inference_results)), size=sample_size, replace=False)
+        data_sample = inference_results[index_choices].numpy()
 
         # Fit a single reducer on the sampled data
-        reducer.fit()
+        reducer.fit(data_sample)
 
-        # Save the reducer to our results dir
+        # Save the reducer to our results directory
+        with open(results_dir / "umap.pickle", "wb") as f:
+            pickle.dump(reducer, f)
 
-        # Run all data through the reducer in batches
-        # writing out as we go
+        # Run all data through the reducer in batches, writing it out as we go.
+        batch_size = self.config["data_loader"]["batch_size"]
+        total_length = len(inference_results)
+        num_batches = int(np.ceil(total_length / batch_size))
 
+        all_indexes = np.arange(0, total_length)
+        all_ids = np.array([int(i) for i in inference_results.ids()])
+        for batch_indexes in np.array_split(all_indexes, num_batches):
+            batch = inference_results[batch_indexes]
+            batch_ids = all_ids[batch_indexes]
+            transformed_batch = reducer.transform(batch)
+            umap_results.write_batch(batch_ids, transformed_batch)
 
+        umap_results.write_index()
