@@ -57,11 +57,13 @@ class Umap(Verb):
 
         # Load all the latent space data.
         inference_results = InferenceDataSet(self.config, split=False, results_dir=input_dir)
+        total_length = len(inference_results)
 
-        # TODO Sample size should be a config
-        sample_size = 100
+        # Sample the data to fit
+        config_sample_size = self.config["umap"]["fit_sample_size"]
+        sample_size = np.min(config_sample_size if config_sample_size else np.inf, total_length)
         rng = np.random.default_rng()
-        index_choices = rng.choice(np.arange(len(inference_results)), size=sample_size, replace=False)
+        index_choices = rng.choice(np.arange(total_length), size=sample_size, replace=False)
         data_sample = inference_results[index_choices].numpy()
 
         # Fit a single reducer on the sampled data
@@ -73,7 +75,6 @@ class Umap(Verb):
 
         # Run all data through the reducer in batches, writing it out as we go.
         batch_size = self.config["data_loader"]["batch_size"]
-        total_length = len(inference_results)
         num_batches = int(np.ceil(total_length / batch_size))
 
         all_indexes = np.arange(0, total_length)
