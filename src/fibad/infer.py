@@ -111,7 +111,7 @@ def run(config: ConfigDict):
     save_batch_index(results_dir, np.array(object_ids), batch_nums[: len(object_ids)])
 
     # Log completion
-    logger.info(f"Inference Results saved in {results_dir}")
+    logger.info(f"Inference results saved in: {results_dir}")
 
 
 def save_batch_index(results_dir: Path, ids: np.ndarray, batch_nums: np.ndarray):
