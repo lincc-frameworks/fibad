@@ -192,3 +192,7 @@ split = false
 
 # Whether to generate a chromadb vector database of inference results
 chromadb = true
+
+[results]
+# Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
+inference_dir = false
