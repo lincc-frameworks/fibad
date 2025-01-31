@@ -196,7 +196,3 @@ chromadb = true
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
 inference_dir = false
-
-[umap]
-umap_options = false
-# In general any config defined here will be passed 
