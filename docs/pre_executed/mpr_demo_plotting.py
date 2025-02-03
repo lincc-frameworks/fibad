@@ -66,24 +66,19 @@ def plotter(ax, data_tuple):
     ax.axis("off")  # Hide the axis
 
 
-def objects_in_range(all_embeddings, median_dist_all_nn, data_directory, min_thresh=0, max_thresh=100_000):
-    """Find the objects that are within a certain threshold range."""
-
-    # Find the indexes of the objects that are well separated from their nearest neighbors
-    indexes = [(i, x) for i, x in enumerate(median_dist_all_nn) if min_thresh < x and x < max_thresh]
-
-    print(f"Number of objects in threshold range: {len(indexes)}")
+def sort_objects_by_median_distance(all_embeddings, median_dist_all_nn, data_directory):
+    """Order all the objects according to median distance to nearest neighbor.
+    Return a tuple for easy plotting: (object id, rounded median distance, file name)."""
 
     # Use the indexes to gather metadata: object ID, rounded median distance, and file name
     data_directory = Path(data_directory).resolve()
     objects = []
-    for indx in sorted(indexes, key=lambda x: x[1]):
-        object_id = all_embeddings["ids"][indx[0]]
+    for indx in np.argsort(median_dist_all_nn):
+        object_id = all_embeddings["ids"][indx]
 
         found_files = glob.glob(f"{data_directory / object_id}*.fits")
         file_name = found_files[0][:-11]
 
-        # print(f"{object_id} : {np.round(indx[1])} : {file_name}")
-        objects.append((object_id, np.round(indx[1]), file_name))
+        objects.append((object_id, np.round(median_dist_all_nn[indx]), file_name))
 
     return objects
