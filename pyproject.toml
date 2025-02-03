@@ -37,6 +37,7 @@ dependencies = [
     "cython", # Used in Holoviews visualization prototype
     "mlflow", # Used to log training metrics and compare models
     "pynvml", # Used to gather GPU usage information
+    "pooch", # Used to download data files
 ]
 
 [project.scripts]
