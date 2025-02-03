@@ -7586,6 +7586,7 @@ Each cutout includes i, r and g bands and is 8 arcseconds on a side.</p>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">fibad</span>
+
 <span class="n">f</span> <span class="o">=</span> <span class="n">fibad</span><span class="o">.</span><span class="n">Fibad</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -7838,8 +7839,6 @@ We've updated the location of our sample data, and specified which model we want
 <pre>[2025-02-02 15:33:25,347 fibad.pytorch_ignite:INFO] Total training time: 40.96[s]
 [2025-02-02 15:33:25,348 fibad.pytorch_ignite:INFO] Latest checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153243-train-cmH6/checkpoint_epoch_20.pt
 [2025-02-02 15:33:25,350 fibad.pytorch_ignite:INFO] Best metric checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153243-train-cmH6/checkpoint_19_loss=-173.9774.pt
-[2025-02-02 15:33:25,348 fibad.pytorch_ignite:INFO] Latest checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153243-train-cmH6/checkpoint_epoch_20.pt
-[2025-02-02 15:33:25,350 fibad.pytorch_ignite:INFO] Best metric checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153243-train-cmH6/checkpoint_19_loss=-173.9774.pt
 2025/02/02 15:33:25 INFO mlflow.system_metrics.system_metrics_monitor: Stopping system metrics monitoring...
 2025/02/02 15:33:25 INFO mlflow.system_metrics.system_metrics_monitor: Successfully terminated system metrics monitoring!
 [2025-02-02 15:33:25,395 fibad.train:INFO] Finished Training
@@ -7897,7 +7896,7 @@ To do so, the command line interface of Fibad was used to work within a Slurm en
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="o">%</span><span class="k">reload_ext</span> tensorboard
@@ -7913,13 +7912,19 @@ To do so, the command line interface of Fibad was used to work within a Slurm en
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Reusing TensorBoard on port 6006 (pid 29208), started 3:30:41 ago. (Use '!kill 29208' to kill it.)</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<iframe frameborder="0" height="800" id="tensorboard-frame-5e2a68d9acaf5a3c" width="100%">
+<iframe frameborder="0" height="800" id="tensorboard-frame-320acb0811df1a40" width="100%">
 </iframe>
 <script>
         (function() {
-          const frame = document.getElementById("tensorboard-frame-5e2a68d9acaf5a3c");
-          const url = new URL("/", window.location);
+          const frame = document.getElementById("tensorboard-frame-320acb0811df1a40");
+          const url = new URL("http://localhost");
           const port = 6006;
           if (port) {
             url.port = port;
@@ -7951,7 +7956,6 @@ To do so, the command line interface of Fibad was used to work within a Slurm en
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
-<span class="kn">import</span> <span class="nn">torch.optim</span> <span class="k">as</span> <span class="nn">optim</span>
 <span class="kn">from</span> <span class="nn">fibad.models.model_registry</span> <span class="kn">import</span> <span class="n">fibad_model</span>
 
 
@@ -7998,17 +8002,12 @@ To do so, the command line interface of Fibad was used to work within a Slurm en
         <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eval_encoder</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="n">x_hat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eval_decoder</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
 
-        <span class="c1"># Here, the loss function is defined in the config</span>
         <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">criterion</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_hat</span><span class="p">)</span>
         <span class="n">loss</span> <span class="o">=</span> <span class="n">loss</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
         <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
         <span class="k">return</span> <span class="p">{</span><span class="s2">"loss"</span><span class="p">:</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()}</span>
-
-    <span class="c1"># # The optimizer can be coded directly, or defined in the configuration file</span>
-    <span class="c1"># def _optimizer(self):</span>
-    <span class="c1">#     return optim.Adam(self.parameters(), lr=1e-3)</span>
 </pre></div>
 </div>
 </div>
@@ -8063,14 +8062,10 @@ Above, an autoencoder is written for comparison against the builtin <code>Exampl
 
 <span class="c1"># Define loss and optimizer functions for easy experimentation</span>
 <span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"criterion"</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"torch.nn.MSELoss"</span>
-<span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"torch.nn.MSELoss"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"reduction"</span><span class="p">:</span> <span class="s2">"none"</span>
-<span class="p">}</span>
+<span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"torch.nn.MSELoss"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"reduction"</span><span class="p">:</span> <span class="s2">"none"</span><span class="p">}</span>
 
 <span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"optimizer"</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"torch.optim.Adam"</span>
-<span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"torch.optim.Adam"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"lr"</span><span class="p">:</span> <span class="mf">1e-3</span>
-<span class="p">}</span>
+<span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"torch.optim.Adam"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"lr"</span><span class="p">:</span> <span class="mf">1e-3</span><span class="p">}</span>
 
 <span class="c1"># train the new model</span>
 <span class="n">f</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
@@ -8229,8 +8224,6 @@ Above, an autoencoder is written for comparison against the builtin <code>Exampl
 <pre>[2025-02-02 15:34:06,556 fibad.pytorch_ignite:INFO] Total training time: 39.48[s]
 [2025-02-02 15:34:06,558 fibad.pytorch_ignite:INFO] Latest checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153327-train-ckbC/checkpoint_epoch_20.pt
 [2025-02-02 15:34:06,558 fibad.pytorch_ignite:INFO] Best metric checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153327-train-ckbC/checkpoint_19_loss=-137.0688.pt
-[2025-02-02 15:34:06,558 fibad.pytorch_ignite:INFO] Latest checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153327-train-ckbC/checkpoint_epoch_20.pt
-[2025-02-02 15:34:06,558 fibad.pytorch_ignite:INFO] Best metric checkpoint saved as: /home/drew/code/fibad/docs/pre_executed/results/20250202-153327-train-ckbC/checkpoint_19_loss=-137.0688.pt
 2025/02/02 15:34:06 INFO mlflow.system_metrics.system_metrics_monitor: Stopping system metrics monitoring...
 2025/02/02 15:34:06 INFO mlflow.system_metrics.system_metrics_monitor: Successfully terminated system metrics monitoring!
 [2025-02-02 15:34:06,600 fibad.train:INFO] Finished Training
@@ -8285,8 +8278,13 @@ Recall that under the hood Fibad is:</p>
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">subprocess</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
 <span class="n">backend_store_uri</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"file://</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">'general'</span><span class="p">][</span><span class="s1">'results_dir'</span><span class="p">])</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s1">'mlflow'</span><span class="si">}</span><span class="s2">"</span>
-<span class="n">mlflow_ui_process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s2">"mlflow"</span><span class="p">,</span> <span class="s2">"ui"</span><span class="p">,</span> <span class="s2">"--backend-store-uri"</span><span class="p">,</span> <span class="n">backend_store_uri</span><span class="p">,</span> <span class="s2">"--port"</span><span class="p">,</span> <span class="s2">"8080"</span><span class="p">],</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+<span class="n">mlflow_ui_process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">"mlflow"</span><span class="p">,</span> <span class="s2">"ui"</span><span class="p">,</span> <span class="s2">"--backend-store-uri"</span><span class="p">,</span> <span class="n">backend_store_uri</span><span class="p">,</span> <span class="s2">"--port"</span><span class="p">,</span> <span class="s2">"8080"</span><span class="p">],</span>
+    <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+    <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8301,7 +8299,8 @@ Recall that under the hood Fibad is:</p>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">IFrame</span>
-<span class="n">IFrame</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s1">'http://localhost:8080'</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="s1">'100%'</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+
+<span class="n">IFrame</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s2">"http://localhost:8080"</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="s2">"100%"</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8374,12 +8373,6 @@ Typically, the UI would be started from the command line and viewed in a browser
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>[2025-02-02 15:34:07,044 fibad.data_sets.hsc_data_set:INFO] Processed 993 objects for pruning
-[2025-02-02 15:34:07,045 fibad.data_sets.hsc_data_set:INFO] Checking file dimensions to determine standard cutout size...
-[2025-02-02 15:34:07,047 fibad.data_sets.hsc_data_set:INFO] HSC Data set loader has 993 objects
-[2025-02-02 15:34:07,050 fibad.data_sets.hsc_data_set:INFO] test split contains 993 items
-[2025-02-02 15:34:07,051 fibad.data_sets.hsc_data_set:INFO] train split contains 0 items
-[2025-02-02 15:34:07,055 fibad.models.model_registry:INFO] Using criterion: torch.nn.MSELoss with arguments: {'reduction': 'none'}.
-[2025-02-02 15:34:07,055 fibad.models.model_registry:INFO] Using optimizer: torch.optim.Adam with arguments: {'lr': 0.001}.
 [2025-02-02 15:34:07,045 fibad.data_sets.hsc_data_set:INFO] Checking file dimensions to determine standard cutout size...
 [2025-02-02 15:34:07,047 fibad.data_sets.hsc_data_set:INFO] HSC Data set loader has 993 objects
 [2025-02-02 15:34:07,050 fibad.data_sets.hsc_data_set:INFO] test split contains 993 items
@@ -8533,7 +8526,14 @@ The lists will be sorted by increasing median distance to nearest neighbors.</p>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">mpr_demo_plotting</span> <span class="kn">import</span> <span class="n">objects_in_range</span>
-<span class="n">anom_objects</span> <span class="o">=</span> <span class="n">objects_in_range</span><span class="p">(</span><span class="n">all_embeddings</span><span class="p">,</span> <span class="n">median_dist_all_nn</span><span class="p">,</span> <span class="n">data_directory</span><span class="o">=</span><span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">'general'</span><span class="p">][</span><span class="s1">'data_dir'</span><span class="p">],</span> <span class="n">min_thresh</span><span class="o">=</span><span class="mi">18_000</span><span class="p">,</span> <span class="n">max_thresh</span><span class="o">=</span><span class="mi">30_000</span><span class="p">)</span>
+
+<span class="n">anom_objects</span> <span class="o">=</span> <span class="n">objects_in_range</span><span class="p">(</span>
+    <span class="n">all_embeddings</span><span class="p">,</span>
+    <span class="n">median_dist_all_nn</span><span class="p">,</span>
+    <span class="n">data_directory</span><span class="o">=</span><span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"general"</span><span class="p">][</span><span class="s2">"data_dir"</span><span class="p">],</span>
+    <span class="n">min_thresh</span><span class="o">=</span><span class="mi">18_000</span><span class="p">,</span>
+    <span class="n">max_thresh</span><span class="o">=</span><span class="mi">30_000</span><span class="p">,</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8560,7 +8560,9 @@ The lists will be sorted by increasing median distance to nearest neighbors.</p>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">common_objects</span> <span class="o">=</span> <span class="n">objects_in_range</span><span class="p">(</span><span class="n">all_embeddings</span><span class="p">,</span> <span class="n">median_dist_all_nn</span><span class="p">,</span> <span class="n">data_directory</span><span class="o">=</span><span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">'general'</span><span class="p">][</span><span class="s1">'data_dir'</span><span class="p">],</span> <span class="n">max_thresh</span><span class="o">=</span><span class="mi">900</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">common_objects</span> <span class="o">=</span> <span class="n">objects_in_range</span><span class="p">(</span>
+    <span class="n">all_embeddings</span><span class="p">,</span> <span class="n">median_dist_all_nn</span><span class="p">,</span> <span class="n">data_directory</span><span class="o">=</span><span class="n">f</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">"general"</span><span class="p">][</span><span class="s2">"data_dir"</span><span class="p">],</span> <span class="n">max_thresh</span><span class="o">=</span><span class="mi">900</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8599,6 +8601,7 @@ The lists will be sorted by increasing median distance to nearest neighbors.</p>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">mpr_demo_plotting</span> <span class="kn">import</span> <span class="n">plot_grid</span>
+
 <span class="n">plot_grid</span><span class="p">(</span><span class="n">common_objects</span><span class="p">)</span>
 </pre></div>
 </div>
