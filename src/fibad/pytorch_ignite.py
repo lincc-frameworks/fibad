@@ -8,6 +8,7 @@ import mlflow
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
+from ignite.handlers.tqdm_logger import ProgressBar
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import DataLoader, Dataset
@@ -332,7 +333,6 @@ def create_trainer(
     @trainer.on(Events.STARTED)
     def log_training_start(trainer):
         logger.info(f"Training model on device: {device}")
-        logger.info(f"Total epochs: {trainer.state.max_epochs}")
 
     @trainer.on(Events.EPOCH_STARTED)
     def log_epoch_start(trainer):
@@ -364,5 +364,8 @@ def create_trainer(
 
     trainer.add_event_handler(Events.COMPLETED, log_last_checkpoint_location, latest_checkpoint)
     trainer.add_event_handler(Events.COMPLETED, log_best_checkpoint_location, best_checkpoint)
+
+    pbar = ProgressBar(persist=False, bar_format="")
+    pbar.attach(trainer)
 
     return trainer
