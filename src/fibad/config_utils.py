@@ -368,3 +368,93 @@ def log_runtime_config(runtime_config: ConfigDict, output_path: Path, file_name:
     """
     with open(output_path / file_name, "w") as f:
         f.write(tomlkit.dumps(runtime_config))
+
+
+def config_help(config: TOMLDocument, *args):
+    """
+    Early version of a config help function. It's a bit difficult to parse through
+    the Tomlkit Table to print just one item such that it would include the comments
+    preceding it.
+
+    For now, we support the following cases, and generally print out the entire
+    table for the given key.
+
+    Cases:
+    - if no args, prints the whole config.
+    - if args[0] is a table name, print the whole table
+    - if args[0] is not a table, assume it's a key and search
+    -- print each one of the tables that it is found in.
+
+    Parameters
+    ----------
+    config : TOMLDocument
+        A configuration dictionary that will be used to search for specified tables
+        and keys.
+
+    args : str
+        A variable number of string arguments that specify the table name or key
+        to search for in the configuration dictionary.
+    """
+
+    config_dict = config.value
+
+    # No tables provided, print the whole config
+    if not args:
+        print(config.as_string())
+
+    # Table name provided as args[0], print that config table
+    if len(args) == 1 and args[0] in config_dict:
+        print(f"[{args[0]}]")
+        print(config[args[0]].as_string())
+
+    # One arg provided, but it's not a table name.
+    # Assume it's a config key and search the config for it.
+    # Print each table that it is found in.
+    if len(args) == 1 and args[0] not in config_dict:
+        matching = find_keys(config, args[0])
+        if len(matching):
+            tables = [m.split(".")[0] for m in matching]
+            print(f"Found '{args[0]}' in the following config sections: [{'], ['.join(tables)}]")
+            for t in tables:
+                config_help(config, t)
+        else:
+            print(f"Could not find '{args[0]}' in the config")
+
+    if len(args) == 2:
+        if args[0] in config_dict and args[1] in config_dict[args[0]]:
+            print(f"[{args[0]}]")
+            print(config[args[0]].as_string())
+        else:
+            print(f"Cannot find ['{args[0]}']['{args[1]}'] in the current configuration.")
+
+
+def find_keys(config, key_name):
+    """
+    Recursively find all keys in a nested dictionary that match the given key name.
+
+    Parameters
+    ----------
+    config : dict
+        The nested dictionary to search.
+    key_name : str
+        The name of the key to find.
+
+    Returns
+    -------
+    list
+        A list of matching keys.
+    """
+    matching_keys = []
+
+    def _find_keys(d, parent_key=""):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k == key_name:
+                    matching_keys.append((parent_key + "." + k).strip("."))
+                _find_keys(v, parent_key + "." + k)
+        # elif isinstance(d, list):
+        #     for i, item in enumerate(d):
+        #         _find_keys(item, parent_key + f'[{i}]')
+
+    _find_keys(config)
+    return matching_keys

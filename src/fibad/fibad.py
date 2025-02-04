@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Union
 
-from .config_utils import ConfigManager
+from .config_utils import ConfigManager, config_help
 from .verbs.verb_registry import all_class_verbs, fetch_verb_class, is_verb_class
 
 
@@ -134,6 +134,22 @@ class Fibad:
         # Format our log messages
         formatter = logging.Formatter("[%(asctime)s %(name)s:%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
+
+    def config_help(self, *args):
+        """
+        Small function to pass self.config to Fibad.config_utils.config_help().
+
+        We expect users to call this from within a notebook. The typical syntax
+        would be:
+        ```
+        f = Fibad()
+        f.config_help()  # To print the whole configuration
+        f.config_help("<section>")  # To print a particular section of the config.
+        f.config_help("<section>", "<key>")  # To print a section containing a key.
+        f.config_help("<key>")  # Print all sections that contain the given key.
+        """
+
+        config_help(self.config, *args)
 
     def raw_data_dimensions(self) -> tuple[list[int], list[int]]:
         """Gives the dimensions of underlying data that forms input to the training, and inference
