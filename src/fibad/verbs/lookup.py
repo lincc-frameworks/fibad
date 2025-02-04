@@ -1,5 +1,4 @@
 import logging
-import re
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Optional, Union
@@ -7,7 +6,7 @@ from typing import Optional, Union
 import numpy as np
 
 from fibad.config_utils import find_most_recent_results_dir
-from fibad.infer import save_batch_index
+from fibad.data_sets.inference_dataset import InferenceDataSet
 
 from .verb_registry import Verb, fibad_verb
 
@@ -92,46 +91,14 @@ class Lookup(Verb):
         if isinstance(results_dir, str):
             results_dir = Path(results_dir)
 
-        # Open the batch index numpy file.
-        # Loop over files and create if it does not exist
-        batch_index_path = results_dir / "batch_index.npy"
-        if not batch_index_path.exists():
-            self.create_index(results_dir)
+        inference_dataset = InferenceDataSet(self.config, split=False, results_dir=results_dir)
 
-        batch_index = np.load(results_dir / "batch_index.npy")
-        batch_num = batch_index[batch_index["id"] == int(id)]["batch_num"]
-        if len(batch_num) == 0:
-            return None
-        batch_num = batch_num[0]
+        all_ids = np.array([i for i in inference_dataset.ids()])
+        lookup_index = np.argwhere(all_ids == id)
 
-        recarray = np.load(results_dir / f"batch_{batch_num}.npy")
-        tensor = recarray[recarray["id"] == int(id)]["tensor"]
-        if len(tensor) == 0:
-            return None
+        if len(lookup_index) == 1:
+            return np.array(inference_dataset[lookup_index[0]].numpy())
+        elif len(lookup_index) > 1:
+            raise RuntimeError(f"Inference result directory {results_dir} has duplicate ID numbers")
 
-        return np.array(tensor[0])
-
-    def create_index(self, results_dir: Path):
-        """Recreate the index into the batch numpy files
-
-        Parameters
-        ----------
-        results_dir : Path
-            Path to the batch numpy files
-        """
-        ids = []
-        batch_nums = []
-        # Use the batched numpy files to assemble an index.
-        logger.info("Recreating index...")
-        for file in results_dir.glob("batch_*.npy"):
-            print(".", end="", flush=True)
-            m = re.match(r"batch_([0-9]+).npy", file.name)
-            if m is None:
-                logger.warn(f"Could not find batch number for {file}")
-                continue
-            batch_num = int(m[1])
-            recarray = np.load(file)
-            ids += list(recarray["id"])
-            batch_nums += [batch_num] * len(recarray["id"])
-
-        save_batch_index(results_dir, np.array(ids), np.array(batch_nums))
+        return None
