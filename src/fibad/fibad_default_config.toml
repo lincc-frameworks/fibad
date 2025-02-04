@@ -198,4 +198,8 @@ chromadb = true
 inference_dir = false
 
 [umap]
-fit_sample_size = 100
+# Number of data points used to fit the umap transform.
+fit_sample_size = 1024
+
+# Number of threads to use when transforming latent space to 
+num_threads = false

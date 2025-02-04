@@ -77,7 +77,7 @@ class InferenceDataSet(Dataset):
         # We need to look up all the batches for the ids we get
         lookup_batch = self.batch_index[idx]
 
-        # We then need to sort the reultant id->batch catalog by batch
+        # We then need to sort the resultant id->batch catalog by batch
         original_indexes = np.argsort(lookup_batch, order="batch_num")
         sorted_lookup_batches = np.take_along_axis(lookup_batch, original_indexes, axis=-1)
 
@@ -120,18 +120,26 @@ class InferenceDataSet(Dataset):
         if results_dir is None:
             if self.config["results"]["inference_dir"]:
                 results_dir = self.config["results"]["inference_dir"]
+                if not isinstance(results_dir, str):
+                    msg = "Configured [results_dir] is not a string"
+                    raise RuntimeError(msg)
             else:
                 results_dir = find_most_recent_results_dir(self.config, verb="infer")
+                if results_dir is None:
+                    msg = "Could not find a results directory. Run infer or use "
+                    msg += "[results] inference_dir config to specify a directory."
+                    raise RuntimeError(msg)
                 msg = f"Using most recent results dir {results_dir} for lookup."
                 msg += "Use the [results] inference_dir config to set a directory or pass it to this verb."
                 logger.info(msg)
 
-        if results_dir is None:
-            msg = "Could not find a results directory. Run infer or use "
-            msg += "[results] inference_dir config to specify a directory."
+        retval = Path(results_dir) if isinstance(results_dir, str) else results_dir
+
+        if not retval.exists():
+            msg = f"Inference directory {results_dir} does not exist"
             raise RuntimeError(msg)
 
-        return Path(results_dir) if isinstance(results_dir, str) else results_dir
+        return retval
 
     # This functionality (and its linkage to InferenceDataSetWriter) can be considered deprecated
     # as of Feb 2025 and ought be removed shortly thereafter. Including this code was a way to
@@ -203,7 +211,7 @@ class InferenceDataSetWriter:
         filename = f"batch_{self.batch_index}.npy"
         savepath = self.result_dir / filename
         if savepath.exists():
-            RuntimeError(f"The path to save results for objects in batch {self.batch_index} already exists.")
+            RuntimeError(f"Writing objects in batch {self.batch_index} but {filename} already exists.")
 
         np.save(savepath, structured_batch, allow_pickle=False)
         self.all_ids = np.append(self.all_ids, ids)

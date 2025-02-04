@@ -61,7 +61,7 @@ class Umap(Verb):
 
         # Sample the data to fit
         config_sample_size = self.config["umap"]["fit_sample_size"]
-        sample_size = np.min(config_sample_size if config_sample_size else np.inf, total_length)
+        sample_size = np.min([config_sample_size if config_sample_size else np.inf, total_length])
         rng = np.random.default_rng()
         index_choices = rng.choice(np.arange(total_length), size=sample_size, replace=False)
         data_sample = inference_results[index_choices].numpy()
