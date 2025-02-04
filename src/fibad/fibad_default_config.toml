@@ -196,3 +196,7 @@ chromadb = true
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
 inference_dir = false
+
+[umap]
+# Number of data points used to fit the umap transform.
+fit_sample_size = 1024

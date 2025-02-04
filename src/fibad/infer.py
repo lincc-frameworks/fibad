@@ -12,6 +12,7 @@ from fibad.config_utils import (
     find_most_recent_results_dir,
     log_runtime_config,
 )
+from fibad.data_sets.inference_dataset import InferenceDataSetWriter
 from fibad.pytorch_ignite import (
     create_evaluator,
     dist_data_loader,
@@ -54,6 +55,8 @@ def run(config: ConfigDict):
             },
         )
 
+    data_writer = InferenceDataSetWriter(results_dir)
+
     # These are values the _save_batch callback needs to run
     write_index = 0
     batch_index = 0
@@ -70,6 +73,7 @@ def run(config: ConfigDict):
         nonlocal write_index
         nonlocal batch_index
         nonlocal object_ids
+        nonlocal data_writer
 
         batch_len = len(batch_results)
         batch_results = batch_results.detach().to("cpu")
@@ -83,22 +87,7 @@ def run(config: ConfigDict):
             collection.add(embeddings=embeddings, ids=chroma_ids)
 
         # Save results from this batch in a numpy file as a structured array
-        first_tensor = batch_results[0].numpy()
-        structured_batch_type = np.dtype(
-            [("id", np.int64), ("tensor", first_tensor.dtype, first_tensor.shape)]
-        )
-        structured_batch = np.zeros(batch_len, structured_batch_type)
-        structured_batch["id"] = batch_object_ids
-        structured_batch["tensor"] = [t.numpy() for t in batch_results]
-
-        filename = f"batch_{batch_index}.npy"
-        savepath = results_dir / filename
-        if savepath.exists():
-            RuntimeError(f"The path to save results for objects in batch {batch_index} already exists.")
-
-        np.save(savepath, structured_batch, allow_pickle=False)
-
-        batch_index += 1
+        data_writer.write_batch(np.array(batch_object_ids), [t.numpy() for t in batch_results])
         write_index += batch_len
 
     # Run inference
@@ -106,37 +95,10 @@ def run(config: ConfigDict):
     evaluator.run(data_loader)
 
     # Write out a dictionary to map IDs->Batch
-    batch_size = config["data_loader"]["batch_size"]
-    batch_nums = np.array([np.full(batch_size, i) for i in range(0, batch_index)]).ravel()
-    save_batch_index(results_dir, np.array(object_ids), batch_nums[: len(object_ids)])
+    data_writer.write_index()
 
     # Log completion
     logger.info(f"Inference results saved in: {results_dir}")
-
-
-def save_batch_index(results_dir: Path, ids: np.ndarray, batch_nums: np.ndarray):
-    """Save a batch index in the result directory provided
-
-    Parameters
-    ----------
-    results_dir : Path
-        The results directory
-    ids : np.ndarray
-        All IDs to write out.
-    batch_nums : np.ndarray
-        The corresponding batch numbers for the IDs provided.
-    """
-    batch_index_dtype = np.dtype([("id", np.int64), ("batch_num", np.int64)])
-    batch_index = np.zeros(len(ids), batch_index_dtype)
-    batch_index["id"] = np.array(ids)
-    batch_index["batch_num"] = np.array(batch_nums)
-    batch_index.sort(order="id")
-
-    filename = "batch_index.npy"
-    savepath = results_dir / filename
-    if savepath.exists():
-        RuntimeError("The path to save batch index already exists.")
-    np.save(savepath, batch_index, allow_pickle=False)
 
 
 def load_model_weights(config: ConfigDict, model):
