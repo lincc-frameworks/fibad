@@ -38,6 +38,7 @@ dependencies = [
     "mlflow", # Used to log training metrics and compare models
     "pynvml", # Used to gather GPU usage information
     "umap-learn", # Used to map latent spaces down to 2d
+    "pooch", # Used to download data files
 ]
 
 [project.scripts]
