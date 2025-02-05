@@ -1,3 +1,4 @@
+import inspect
 import logging
 import pickle
 from argparse import ArgumentParser, Namespace
@@ -33,6 +34,19 @@ class Umap(Verb):
             help="Directory containing inference results to umap.",
         )
 
+        # Get all parameters from UMAP's constructor dynamically
+        # and allow users to pass values for these.
+        umap_params = inspect.signature(umap.UMAP).parameters
+
+        for param, details in umap_params.items():
+            if details.default is not inspect.Parameter.empty:  # Add only those with defaults
+                parser.add_argument(
+                    f"--{param}",
+                    type=type(details.default),
+                    default=details.default,
+                    help=f"UMAP parameter: {param}",
+                )
+
     # Should there be a version of this on the base class which uses a dict on the Verb
     # superclass to build the call to run based on what the subclass verb defined in setup_parser
     def run_cli(self, args: Optional[Namespace] = None):
@@ -40,15 +54,18 @@ class Umap(Verb):
         logger.info("Search run from cli")
         if args is None:
             raise RuntimeError("Run CLI called with no arguments.")
+
+        # Get valid UMAP parameters and extract those args to pass to umap
+        valid_umap_params = set(inspect.signature(umap.UMAP).parameters.keys())
+        umap_params = {k: v for k, v in vars(args).items() if k in valid_umap_params and v is not None}
+
         # This is where we map from CLI parsed args to a
         # self.run (args) call.
-        return self.run(input_dir=args.input_dir)
+        return self.run(input_dir=args.input_dir, **umap_params)
 
     def run(self, input_dir: Optional[Union[Path, str]], **kwargs):
         """Create a umap of a particular inference run"""
 
-        # TODO pass in kwargs so people can control umap?
-        #      Should this be config or args?
         reducer = umap.UMAP(**kwargs)
 
         # Set up the results directory where we will store our umapped output
