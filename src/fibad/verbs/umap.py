@@ -53,6 +53,7 @@ class Umap(Verb):
 
         # Set up the results directory where we will store our umapped output
         results_dir = create_results_dir(self.config, "umap")
+        logger.info(f"Saving UMAP results to {results_dir}")
         umap_results = InferenceDataSetWriter(results_dir)
 
         # Load all the latent space data.
@@ -65,6 +66,14 @@ class Umap(Verb):
         rng = np.random.default_rng()
         index_choices = rng.choice(np.arange(total_length), size=sample_size, replace=False)
         data_sample = inference_results[index_choices].numpy()
+
+        reshape = False
+        if data_sample.ndim != 2:
+            msg = f"The arrays passed to umap have dimensions {data_sample.shape[1:]}."
+            msg += "These will be flattened before being passed to umap"
+            logger.info(msg)
+            data_sample = data_sample.reshape(data_sample.shape[0], -1)
+            reshape = True
 
         # Fit a single reducer on the sampled data
         reducer.fit(data_sample)
@@ -81,6 +90,8 @@ class Umap(Verb):
         all_ids = np.array([int(i) for i in inference_results.ids()])
         for batch_indexes in np.array_split(all_indexes, num_batches):
             batch = inference_results[batch_indexes]
+            if reshape:
+                batch = batch.reshape(batch.shape[0], -1)
             batch_ids = all_ids[batch_indexes]
             transformed_batch = reducer.transform(batch)
             umap_results.write_batch(batch_ids, transformed_batch)
