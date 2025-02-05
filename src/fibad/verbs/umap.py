@@ -44,7 +44,7 @@ class Umap(Verb):
         # self.run (args) call.
         return self.run(input_dir=args.input_dir)
 
-    def run(self, input_dir: Optional[Union[Path, str]], **kwargs):
+    def run(self, input_dir: Optional[Union[Path, str]] = None, **kwargs):
         """Create a umap of a particular inference run"""
 
         # TODO pass in kwargs so people can control umap?
