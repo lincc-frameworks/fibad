@@ -1,0 +1,20 @@
+[general]
+dev_mode = true
+
+[model]
+name = "resnet"
+layers = 3
+
+[loss]
+name = "cross_entropy"
+
+[optimizer]
+name = "adam"
+
+[infer]
+batch_size = 8 # change batch size
+
+[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
