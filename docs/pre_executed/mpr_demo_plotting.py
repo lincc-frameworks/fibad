@@ -82,3 +82,15 @@ def sort_objects_by_median_distance(all_embeddings, median_dist_all_nn, data_dir
         objects.append((object_id, np.round(median_dist_all_nn[indx]), file_name))
 
     return objects
+
+
+def plot_umap(results_dir):
+    """Reads in the UMAP results and plots them as a scatter plot"""
+    a = np.load(results_dir / "batch_0.npy")
+    b = np.load(results_dir / "batch_1.npy")
+    out = np.concatenate((a["tensor"], b["tensor"]), axis=0)
+    fig, ax = plt.subplots(figsize=(12, 12))
+    fig.patch.set_facecolor("darkslategrey")
+    ax.set_facecolor("darkslategrey")
+    ax.scatter(out[:, 0], out[:, 1], s=3, c="yellow")
+    plt.show()
