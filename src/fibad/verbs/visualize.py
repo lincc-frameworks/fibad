@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 import holoviews as hv
 import numpy as np
-from holoviews.operation.datashader import rasterize, shade
+from holoviews.operation.datashader import dynspread, rasterize
 from holoviews.streams import RangeXY
 from scipy.spatial import Delaunay, KDTree
 
@@ -69,9 +69,12 @@ class Visualize(Verb):
             "height": 500,
             "xlim": (xmin, xmax),
             "ylim": (ymin, ymax),
+            "cnorm": "eq_hist",
         }
         plot_options.update(kwargs)
-        plot_pane = hv.DynamicMap(self.visible_points, streams=[RangeXY()])
+
+        plot_dm = hv.DynamicMap(self.visible_points, streams=[RangeXY()])
+        plot_pane = dynspread(rasterize(plot_dm).opts(**plot_options))
 
         # Setup the table pane event handler
         self.prev_kwargs = {
@@ -93,12 +96,11 @@ class Visualize(Verb):
 
         # Setup the table pane
         self.table = hv.Table(([0], [0], [0]), ["object_id"], ["x", "y"])
-        table_options = {"width": 600, "height": 500}
-        table_pane = hv.DynamicMap(self.selected_objects, streams=table_streams)
+        table_options = {"width": plot_options["width"]}
+        table_pane = hv.DynamicMap(self.selected_objects, streams=table_streams).opts(**table_options)
 
         # Return the plot pane and table pane as a combined object
-
-        return shade(rasterize(plot_pane)).opts(**plot_options) + table_pane.opts(**table_options)
+        return plot_pane + table_pane
 
     def visible_points(self, x_range: Union[tuple, list], y_range: Union[tuple, list]) -> hv.Points:
         """Generate a hv.Points object with the points inside the bounding box passed.
