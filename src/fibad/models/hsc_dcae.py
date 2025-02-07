@@ -54,19 +54,16 @@ class HSCDCAE(nn.Module):
         self.config = config
 
     def forward(self, x):
+        # Dropping labels if present
+        x = x[0] if isinstance(x, tuple) else x
+
         # Encoder with skip connections
         x1 = self.activation(self.encoder1(x))
         x2 = self.activation(self.encoder2(self.pool(x1)))
         x3 = self.activation(self.encoder3(self.pool(x2)))
         x4 = self.activation(self.encoder4(self.pool(x3)))
 
-        # Decoder with skip connections
-        x = self.activation(self.decoder4(x4) + x3)
-        x = self.activation(self.decoder3(x) + x2)
-        x = self.activation(self.decoder2(x) + x1)
-        x = self.final_activation(self.decoder1(x))
-
-        return x
+        return x4
 
     def train_step(self, batch):
         """This function contains the logic for a single training step. i.e. the
@@ -83,10 +80,22 @@ class HSCDCAE(nn.Module):
             The loss value for the current batch.
         """
 
-        data = batch[0]
+        # Dropping labels if present
+        data = batch[0] if isinstance(batch, tuple) else batch
         self.optimizer.zero_grad()
 
-        decoded = self.forward(data)
+        # Encoder with skip connections
+        x1 = self.activation(self.encoder1(data))
+        x2 = self.activation(self.encoder2(self.pool(x1)))
+        x3 = self.activation(self.encoder3(self.pool(x2)))
+        x4 = self.activation(self.encoder4(self.pool(x3)))
+
+        # Decoder with skip connections
+        x = self.activation(self.decoder4(x4) + x3)
+        x = self.activation(self.decoder3(x) + x2)
+        x = self.activation(self.decoder2(x) + x1)
+        decoded = self.final_activation(self.decoder1(x))
+
         loss = self.criterion(decoded, data)
         loss.backward()
         self.optimizer.step()
