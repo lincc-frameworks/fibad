@@ -6,7 +6,7 @@ import random
 import re
 from importlib import util as importlib_util
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import tomlkit
 from tomlkit.toml_document import TOMLDocument
@@ -70,6 +70,98 @@ class ConfigDict(dict):
         raise RuntimeError("Removing keys or sections from a ConfigDict using clear() is not supported")
 
 
+def config_help(config: TOMLDocument, *args):
+    """
+    A simple config help function. It's a bit difficult to parse through
+    the Tomlkit Table to print just one item such that it would include the comments
+    preceding it.
+
+    For now, we support the following cases, and generally print out the entire
+    table for the given key.
+
+    Cases:
+    - if no args, prints the whole config.
+    - if args[0] is a table name, print the whole table
+    - if args[0] is not a table, assume it's a key and search
+    -- print each one of the tables that it is found in.
+
+    Parameters
+    ----------
+    config : TOMLDocument
+        A configuration dictionary that will be used to search for specified tables
+        and keys.
+
+    args : str
+        A variable number of string arguments that specify the table name or key
+        to search for in the configuration dictionary.
+    """
+
+    # Get the config as a dictionary
+    config_dict = config.value
+
+    # No tables provided, print the whole config
+    if not args:
+        print(config.as_string())
+
+    # Table name provided as args[0], print that config table
+    if len(args) == 1 and args[0] in config_dict:
+        print(f"[{args[0]}]")
+        print(config[args[0]].as_string())
+
+    # One arg provided, but it's not a table name.
+    # Assume it's a config key and search the config for it.
+    # Print each table that it is found in.
+    if len(args) == 1 and args[0] not in config_dict:
+        matching = find_keys(config_dict, args[0])
+        if len(matching):
+            tables = [m.split(".")[0] for m in matching]
+            print(f"Found '{args[0]}' in the following config sections: [{'], ['.join(tables)}]")
+            for t in tables:
+                config_help(config, t)
+        else:
+            print(f"Could not find '{args[0]}' in the config")
+
+    if len(args) == 2:
+        if args[0] in config_dict and args[1] in config_dict[args[0]]:
+            print(f"[{args[0]}]")
+            print(config[args[0]].as_string())
+        else:
+            print(f"Cannot find ['{args[0]}']['{args[1]}'] in the current configuration.")
+
+    if len(args) > 2:
+        print("Too many arguments provided. Expecting 0, 1, or 2 arguments.")
+        print("Usage: config.help(['table_name'|'key_name']), config.help('table_name', 'key_name')")
+
+
+def find_keys(config: dict[str, Any], key_name: str):
+    """
+    Recursively find all keys in a nested dictionary that match the given key name.
+
+    Parameters
+    ----------
+    config : dict
+        The nested dictionary to search.
+    key_name : str
+        The name of the key to find.
+
+    Returns
+    -------
+    list
+        A list of matching keys.
+    """
+    matching_keys = []
+
+    def _find_keys(d, parent_key=""):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k == key_name:
+                    matching_keys.append((parent_key + "." + k).strip("."))
+                _find_keys(v, parent_key + "." + k)
+
+    _find_keys(config)
+    return matching_keys
+
+
 # Here we patch the TOMLDocument functions to use the ConfigDict functions so that
 # we get the behavior that we desire - i.e. errors on missing default keys, no
 # use of config.get(..., <default>), etc.
@@ -79,6 +171,7 @@ TOMLDocument.__delitem__ = ConfigDict.__delitem__  # type: ignore[assignment, me
 TOMLDocument.pop = ConfigDict.pop  # type: ignore[assignment, method-assign]
 TOMLDocument.popitem = ConfigDict.popitem  # type: ignore[assignment, method-assign]
 TOMLDocument.clear = ConfigDict.clear  # type: ignore[assignment, method-assign]
+TOMLDocument.help = config_help  # type: ignore
 
 
 class ConfigManager:
