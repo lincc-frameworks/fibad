@@ -103,6 +103,7 @@ section to learn how to configure FIBAD for your specific use case.
 
    Getting started <self>
    Configuration <configuration>
+   Verbs <verbs>
    External libraries <external_libraries>
    Data set splits <data_set_splits>
    Model evaluation <model_evaluation>
