@@ -154,5 +154,6 @@ module = [
     'astropy.table',
     'GPUtil',
     'toml',
+    'umap',
     ]
 ignore_missing_imports = true

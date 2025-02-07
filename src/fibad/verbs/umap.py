@@ -46,7 +46,8 @@ class Umap(Verb):
         # self.run (args) call.
         return self.run(input_dir=args.input_dir)
 
-    def run(self, input_dir: Optional[Union[Path, str]]):
+
+    def run(self, input_dir: Optional[Union[Path, str]] = None):
         """
         Create a umap of a particular inference run
 
@@ -59,7 +60,6 @@ class Umap(Verb):
         ----------
         input_dir : str or Path, Optional
             The directory containing the inference results.
-
 
         Returns
         -------

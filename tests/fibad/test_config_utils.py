@@ -146,3 +146,216 @@ def test_find_external_library_config_path_no_default_config(caplog):
         ConfigManager._find_external_library_default_config_paths(default_config)
 
     assert "default_config.toml" in caplog.text
+
+
+def test_config_help(capsys):
+    """Basic use case where config help function prints entire config"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help()
+
+    captured = capsys.readouterr()
+
+    expected_output = """# this is the default config file
+[general]
+# set dev_mode to true when developing
+# set to false for production use
+dev_mode = true
+
+[train]
+model_name = "example_model" # Use a built-in FIBAD model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
+
+[train.model]
+weights_filepath = "final_best.pth"
+layers = 3
+
+
+[infer]
+batch_size = 8 # change batch size
+
+[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
+"""
+
+    assert expected_output in captured.out
+
+
+def test_config_help_specific_table(capsys):
+    """Basic use case where config help function prints one table"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help("bespoke_table")
+
+    captured = capsys.readouterr()
+
+    expected_output = """[bespoke_table]
+# this is a bespoke table
+key1 = "value1"
+key2 = "value2" # unlikely to modify
+"""
+
+    assert expected_output in captured.out
+
+
+def test_config_help_table_and_key(capsys):
+    """Basic use case where config help function prints table when provided with
+    a table and key."""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help("train", "model_name")
+
+    captured = capsys.readouterr()
+
+    expected_output = """[train]
+model_name = "example_model" # Use a built-in FIBAD model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
+"""
+
+    assert expected_output in captured.out
+
+
+def test_config_help_non_existant_table_or_key(capsys):
+    """Basic use case where config help function prints error message when table
+    or key isn't present"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    non_table_name = "non_existant_table"
+    runtime_config.help(non_table_name)
+
+    captured = capsys.readouterr()
+
+    expected_output = f"Could not find '{non_table_name}' in the config"
+
+    assert expected_output in captured.out
+
+
+def test_config_help_real_table_non_existant_key(capsys):
+    """User requests help for real table, but non-existant key"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help("general", "non_existant_key")
+
+    captured = capsys.readouterr()
+
+    expected_output = "Cannot find ['general']['non_existant_key'] in the current configuration."
+
+    assert expected_output in captured.out
+
+
+def test_config_help_key_in_multiple_tables(capsys):
+    """User requests help for a key that is present in more than one table"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config_repeated_keys.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help("name")
+
+    captured = capsys.readouterr()
+
+    expected_output = """Found 'name' in the following config sections: [model], [loss], [optimizer]
+[model]
+name = "resnet"
+layers = 3
+
+
+[loss]
+name = "cross_entropy"
+
+
+[optimizer]
+name = "adam"
+"""
+
+    assert expected_output in captured.out
+
+
+def test_config_help_too_many_args(capsys):
+    """User requests help for with >2 input args"""
+
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    config_manager = ConfigManager(
+        runtime_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_user_config.toml")
+        ),
+        default_config_filepath=os.path.abspath(
+            os.path.join(this_file_dir, "./test_data/test_default_config.toml")
+        ),
+    )
+
+    runtime_config = config_manager.config
+
+    runtime_config.help("general", "dev_mode", "extra_arg")
+
+    captured = capsys.readouterr()
+
+    expected_output = """Too many arguments provided. Expecting 0, 1, or 2 arguments.
+Usage: config.help(['table_name'|'key_name']), config.help('table_name', 'key_name')"""
+
+    assert expected_output in captured.out
