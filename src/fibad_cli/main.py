@@ -24,7 +24,6 @@ def main():
 
     # Add a subparser for every verb, (whether defined by function or class)
     for cli_name in all_verbs():
-        # print(cli_name)
         subparser_kwargs = {}
 
         if is_verb_class(cli_name):
@@ -54,7 +53,7 @@ def main():
     fibad_instance = Fibad(config_file=args.runtime_config)
     retval = 0
     if is_verb_class(args.verb):
-        verb = fetch_verb_class(cli_name)(fibad_instance.config)
+        verb = fetch_verb_class(args.verb)(fibad_instance.config)
         retval = verb.run_cli(args)
     else:
         getattr(fibad_instance, args.verb)()

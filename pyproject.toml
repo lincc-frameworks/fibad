@@ -37,6 +37,8 @@ dependencies = [
     "cython", # Used in Holoviews visualization prototype
     "mlflow", # Used to log training metrics and compare models
     "pynvml", # Used to gather GPU usage information
+    "umap-learn", # Used to map latent spaces down to 2d
+    "pooch", # Used to download data files
 ]
 
 [project.scripts]
@@ -152,5 +154,6 @@ module = [
     'astropy.table',
     'GPUtil',
     'toml',
+    'umap',
     ]
 ignore_missing_imports = true

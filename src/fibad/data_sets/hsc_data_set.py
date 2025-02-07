@@ -109,7 +109,6 @@ class HSCDataSet(Dataset):
             rest = rest.logical_and(copy(self.splits["train"]).complement())
             self.splits["validate"] = HSCDataSetSplit(rest, validate_size, seed=seed)
 
-        logger.info("HSC Data Set Splits loaded are:")
         for key, value in self.splits.items():
             logger.info(f"{key} split contains {len(value)} items")
 
@@ -132,11 +131,6 @@ class HSCDataSet(Dataset):
         # assume that validate gets all the remaining indices
         if validate_size:
             valid_idx = indices[num_test + num_train :]
-
-        logger.info(f"Test split contains {len(test_idx)} items")
-        logger.info(f"Train split contains {len(train_idx)} items")
-        if validate_size:
-            logger.info(f"Validation split contains {len(valid_idx)} items")
 
         # create the samplers
         self.train_sampler = SubsetRandomSampler(train_idx)
@@ -698,7 +692,9 @@ class HSCDataSetContainer(Dataset):
             logger.error("Greater than 5% of objects in the data directory were pruned.")
         elif prune_fraction > 0.01:
             logger.warning("Greater than 1% of objects in the data directory were pruned.")
-        logger.info(f"Pruned {self.prune_count} out of {pre_prune_object_count} objects")
+
+        if self.prune_count > 0:
+            logger.info(f"Pruned {self.prune_count} out of {pre_prune_object_count} objects")
 
     def _mark_for_prune(self, object_id, reason):
         self.pruned_objects[object_id] = reason

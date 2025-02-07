@@ -197,3 +197,13 @@ chromadb = true
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
 inference_dir = false
+
+[umap]
+# Number of data points used to fit the umap transform.
+fit_sample_size = 1024
+name = "umap.UMAP"
+
+["umap.UMAP"]
+# Specify any parameter accepted by https://umap-learn.readthedocs.io/en/latest/api.html#umap
+n_components = 2
+n_neighbors = 15

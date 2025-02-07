@@ -34,18 +34,18 @@ VERB_REGISTRY: dict[str, Optional[type[Verb]]] = {
 
 
 def fibad_verb(cls: type[Verb]) -> type[Verb]:
-    """Decorator to Register a fibad verb"""
+    """Decorator to register a fibad verb"""
     update_registry(VERB_REGISTRY, cls.cli_name, cls)  # type: ignore[attr-defined]
     return cls
 
 
 def all_verbs() -> list[str]:
-    """Returns All verbs that are currently registered"""
+    """Returns all verbs that are currently registered"""
     return [verb for verb in VERB_REGISTRY]
 
 
 def all_class_verbs() -> list[str]:
-    """Returns All verbs that are currently registered with a class-based implementation"""
+    """Returns all verbs that are currently registered with a class-based implementation"""
     return [verb for verb in VERB_REGISTRY if VERB_REGISTRY.get(verb) is not None]
 
 

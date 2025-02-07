@@ -34,7 +34,7 @@ class Fibad:
               setup_logging=True will control where the log is emitted to and what the threshold level is.
             - You have another library which needs overall control over python logging's config, and you
               do not want fibad to alter any global logging config. In this case you should always pass
-              setup_logging=False. Fibad will stil send logs into python logging; however, the other
+              setup_logging=False. Fibad will still send logs into python logging; however, the other
               system will be responsible for where those logs are emitted, and what the threshold level
               is.
 

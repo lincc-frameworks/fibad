@@ -67,8 +67,6 @@ def run(config):
         # Run the training process
         trainer.run(train_data_loader, max_epochs=config["train"]["epochs"])
 
-        mlflow.pytorch.log_model(model, "models")
-
     # Save the trained model
     model.save(results_dir / config["train"]["weights_filepath"])
     monitor.stop()
