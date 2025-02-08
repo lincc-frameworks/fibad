@@ -1,6 +1,7 @@
 from .lookup import Lookup
 from .umap import Umap
 from .verb_registry import all_class_verbs, all_verbs, fetch_verb_class, is_verb_class
+from .visualize import Visualize
 
 __all__ = [
     "VERB_REGISTRY",
@@ -10,4 +11,5 @@ __all__ = [
     "all_verbs",
     "Lookup",
     "Umap",
+    "Visualize",
 ]
