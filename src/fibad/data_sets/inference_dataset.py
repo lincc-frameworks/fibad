@@ -73,7 +73,7 @@ class InferenceDataSet(Dataset):
 
     def __getitem__(self, idx: Union[int, np.ndarray]) -> Tensor:
         try:
-            _ = (e for e in idx)
+            _ = (e for e in idx)  # type: ignore[union-attr]
         except TypeError:
             idx = np.array([idx])
 
