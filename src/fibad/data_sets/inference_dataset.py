@@ -20,9 +20,15 @@ class InferenceDataSet(Dataset):
     """This is a dataset class to represent the situations where we wish to treat the output of inference
     as a dataset. e.g. when performing umap/visualization operations"""
 
-    def __init__(self, config, split: Union[str, bool], results_dir: Optional[Union[Path, str]] = None):
+    def __init__(
+        self,
+        config,
+        split: Union[str, bool],
+        results_dir: Optional[Union[Path, str]] = None,
+        verb: Optional[str] = None,
+    ):
         self.config = config
-        self.results_dir = self._resolve_results_dir(config, results_dir)
+        self.results_dir = self._resolve_results_dir(config, results_dir, verb)
 
         # Open the batch index numpy file.
         # Loop over files and create if it does not exist
@@ -66,7 +72,9 @@ class InferenceDataSet(Dataset):
         return (str(id) for id in self.batch_index["id"])
 
     def __getitem__(self, idx: Union[int, np.ndarray]) -> Tensor:
-        if isinstance(idx, int):
+        try:
+            _ = (e for e in idx)  # type: ignore[union-attr]
+        except TypeError:
             idx = np.array([idx])
 
         # Allocate a numpy array to hold all the tensors we will get in order
@@ -114,9 +122,14 @@ class InferenceDataSet(Dataset):
 
         return self.cached_batch[np.isin(self.cached_batch["id"], ids)]
 
-    def _resolve_results_dir(self, config, results_dir=Optional[Union[Path, str]]) -> Path:
+    def _resolve_results_dir(
+        self, config, results_dir: Optional[Union[Path, str]], verb: Optional[str]
+    ) -> Path:
         """Initialize an inference results directory as a data source. Accepts an override of what
         directory to use"""
+
+        verb = "infer" if verb is None else verb
+
         if results_dir is None:
             if self.config["results"]["inference_dir"]:
                 results_dir = self.config["results"]["inference_dir"]
@@ -124,7 +137,7 @@ class InferenceDataSet(Dataset):
                     msg = "Configured [results_dir] is not a string"
                     raise RuntimeError(msg)
             else:
-                results_dir = find_most_recent_results_dir(self.config, verb="infer")
+                results_dir = find_most_recent_results_dir(self.config, verb=verb)
                 if results_dir is None:
                     msg = "Could not find a results directory. Run infer or use "
                     msg += "[results] inference_dir config to specify a directory."
