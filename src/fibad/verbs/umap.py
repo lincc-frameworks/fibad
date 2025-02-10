@@ -84,7 +84,7 @@ class Umap(Verb):
         index_choices = rng.choice(np.arange(total_length), size=sample_size, replace=False)
 
         # If the input to umap is not of the shape [samples,input_dims] we reshape the input accordingly
-        data_sample = inference_results[index_choices].numpy().reshape(sample_size, -1)
+        data_sample = inference_results[index_choices].numpy().reshape((sample_size, -1))
 
         # Fit a single reducer on the sampled data
         reducer.fit(data_sample)
