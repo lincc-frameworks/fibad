@@ -105,6 +105,9 @@ class Umap(Verb):
             desc="Creating Lower Dimensional Representation using UMAP",
             total=num_batches,
         ):
+            # We flatten all dimensions of the input array except the dimension
+            # corresponding to batch elements. This ensures that all inputs to
+            # the UMAP algorithm are flattend per input item in the batch
             batch = inference_results[batch_indexes].reshape(len(batch_indexes), -1)
             batch_ids = all_ids[batch_indexes]
             transformed_batch = reducer.transform(batch)
