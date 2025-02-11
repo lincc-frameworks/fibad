@@ -61,7 +61,11 @@ def run(config):
     # This will create the experiment if it doesn't exist
     mlflow.set_experiment(experiment_name)
 
-    with mlflow.start_run(log_system_metrics=True):
+    # If run_name is not `false` in the config, use it as the MLFlow run name in
+    # this experiment. Otherwise use the name of the results directory
+    run_name = str(config["train"]["run_name"]) if config["train"]["run_name"] else results_dir.name
+
+    with mlflow.start_run(log_system_metrics=True, run_name=run_name):
         _log_params(config)
 
         # Run the training process

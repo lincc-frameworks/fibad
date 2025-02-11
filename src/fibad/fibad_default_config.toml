@@ -125,6 +125,10 @@ split = "train"
 # The name of the experiment when logging training results to mlflow
 experiment_name = "notebook"
 
+# The name of the run when logging training results to mlflow.
+# If false, uses result directory string, <timestamp>-train-<uid>, as run name.
+run_name = false
+
 [data_set]
 # Name of the built-in data loader to use or the import path to an external data
 # loader. e.g. "HSCDataSet", "user_pkg.data_set.ExternalDataSet"
