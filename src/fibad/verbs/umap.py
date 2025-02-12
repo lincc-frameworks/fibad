@@ -59,8 +59,7 @@ class Umap(Verb):
         ----------
         input_dir : str or Path, Optional
             The directory containing the inference results.
-
-
+        
         Returns
         -------
         None
