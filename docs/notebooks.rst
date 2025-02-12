@@ -1,6 +1,7 @@
-Notebooks
-========================================================================================
+Example notebooks
+=================
 
 .. toctree::
+    :maxdepth: 1
 
-    Training a simple model <pre_executed/train_model>
+    Getting started with FIBAD <pre_executed/train_model>

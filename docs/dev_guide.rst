@@ -15,11 +15,15 @@ create and activate a new environment.
    >> conda activate <env_name>
 
 
+Build from Source
+-----------------
+
 Once you have created a new environment, you can install this project for local
 development using the following commands:
 
 .. code-block:: console
 
+   >> git clone https://github.com/lincc-frameworks/fibad.git
    >> pip install -e .'[dev]'
    >> pre-commit install
    >> conda install pandoc

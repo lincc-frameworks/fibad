@@ -93,7 +93,7 @@ Your dataset class is (for now) in charge of implementing the split and randomne
 ...............
 Return a shape tuple corresponding to the standard size of tensors in your data set. An image dataset 
 consisting of 250x250 px images with 3 color channels each might have a shape of (3, 250, 250) indicating that
- the color channels are the first iterable axis of each image tensor.
+the color channels are the first iterable axis of each image tensor.
 
 ``ids(self)``
 .............
