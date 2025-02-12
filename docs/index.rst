@@ -84,13 +84,19 @@ To visualize the results, we should created an embedded lower dimensional space.
 
 The `UMAP <https://umap-learn.readthedocs.io/en/latest/>`_ algorithm is used to
 create a 2D representation of the 64 element vectors.
+The results of using UMAP can then be examined with an interactive visualization
+withing a Jupyter notebook.
 
 .. code-block:: python
 
    # Visualize the UMAP results
    f.visualize()
 
-**placeholder for image**
+.. figure:: _static/umap_visualization.JPG
+   :align: center
+   :alt: An example UMAP visualization of the CiFAR dataset.
+
+   An example UMAP visualization of the CiFAR dataset.
 
 This example shows how FIBAD can be used to quickly train, infer, and visualize
 data.
@@ -110,5 +116,5 @@ section to learn how to configure FIBAD for your specific use case.
    Architecture overview <architecture_overview>
    Developer guide <dev_guide>
    API Reference <autoapi/index>
-   Notebooks <notebooks>
+   Example notebooks <notebooks>
    About <about>
