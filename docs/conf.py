@@ -40,6 +40,8 @@ copybutton_prompt_text = ">> "
 ## lets us suppress the copy button on select code blocks.
 copybutton_selector = "div:not(.no-copybutton) > div.highlight > pre"
 
+extensions.append("sphinx_togglebutton")
+
 templates_path: list[str] = []
 exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 

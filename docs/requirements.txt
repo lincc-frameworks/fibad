@@ -9,3 +9,4 @@ sphinx-autoapi
 sphinx-copybutton
 sphinx-rtd-theme
 sphinx-tabs
+sphinx-togglebutton
