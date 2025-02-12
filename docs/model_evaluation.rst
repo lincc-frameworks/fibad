@@ -2,27 +2,52 @@ Model evaluation
 ================
 
 One goal of fibad is to make model evaluation easier. Many tools exist for visualization
-and evaluation of models. Fibad integrates with tensorboard and MLFlow to provide
+and evaluation of models. Fibad integrates with TensorBoard and MLFlow to provide
 easy access to these tools.
 
-Tensorboard
+TensorBoard
 -----------
 
-Fibad automatically logs training, validation and gpu metrics to tensorboard while
-training a model. This allows for easy visualization of the training process.
+Fibad automatically logs training, validation and gpu metrics (when available) to
+TensorBoard while training a model.
+This allows for easy visualization of the training process.
 
-For more info about tensorboard see <tensorboard link>
-
+For more information about TensorBoard see the
+`documentation <https://www.tensorflow.org/tensorboard/get_started>`_.
 
 MLFlow
 ------
 
 Fibad supports MLFlow for model tracking and experiment management.
-Talk about the defaults that were selected (experiment_name = notebook) and how
-to get MLFlow started at the command line. 
-``mlflow ui --port 5000 --backend-store-uri <path>``
+By default the data collected for each run will be nested under the experiment
+"notebook" using a run name that is the same as the results directory,
+i.e. <timestampe>-train-<uid>.
 
-For more info about MLFlow see <mlflow link>
+The MLFlow server can be run from within a notebook or from the command line.
+
+.. tabs::
+
+    .. group-tab:: Notebook
+
+        .. code-block:: python
+
+           # Start the MLFlow UI server
+           backend_store_uri = f"file://{Path(f.config['general']['results_dir']).resolve() / 'mlflow'}"
+           mlflow_ui_process = subprocess.Popen(
+               ["mlflow", "ui", "--backend-store-uri", backend_store_uri, "--port", "8080"],
+               stdout=subprocess.PIPE,
+               stderr=subprocess.PIPE,
+           )
+
+           # Display the MLFlow UI in an IFrame in the notebook
+           IFrame(src="http://localhost:8080", width="100%", height=1000)
+
+    .. group-tab:: CLI
+
+        .. code-block:: bash
+
+           >> mlflow ui --port 8080 --backend-store-uri <results_dir>/mlruns
 
 
-
+For more information about MLFlow see the
+`documentation <https://mlflow.org/docs/latest/index.html>`_.
