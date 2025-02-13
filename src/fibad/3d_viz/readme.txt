@@ -13,4 +13,4 @@ To save a UMAP to the JSON format, use save_umap_to_json.py
 
 
 ###########
-For a simpler plotly 3d plot, use save_umap_to_json.py
+For a simpler plotly 3d plot, use plotly_3d.py
