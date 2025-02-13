@@ -15,8 +15,23 @@
             canvas { display: block; }
     
 			/* Stying of Box Containing Object IDs*/
-			#info { position: absolute; top: 10px; left: 10px; color: yellow; font-size: 14px; font-family: Arial, sans-serif; }
-            
+            #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: yellow;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            max-width: 75vw;  /* 75% of viewport width */
+            max-height: 200px; /* Limits height */
+            overflow-y: auto;  /* Enables scrolling */
+            border-radius: 5px;
+            word-wrap: break-word; /* Ensures long words wrap */
+            white-space: normal; /* Allows text to break into new lines */
+            }
+
 			#selectionBox {
             position: absolute;
             border: 2px dashed yellow;
