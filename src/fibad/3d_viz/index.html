@@ -15,23 +15,23 @@
             canvas { display: block; }
     
 			/* Stying of Box Containing Object IDs*/
-            #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: yellow;
-            font-size: 14px;
-            font-family: Arial, sans-serif;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 5px;
-            max-width: 75vw;  /* 75% of viewport width */
-            max-height: 200px; /* Limits height */
-            overflow-y: auto;  /* Enables scrolling */
-            border-radius: 5px;
-            word-wrap: break-word; /* Ensures long words wrap */
-            white-space: normal; /* Allows text to break into new lines */
-            }
-
+			#info { 
+			position: absolute; 
+			top: 10px; 
+			left: 10px; 
+			color: yellow; 
+			font-size: 14px; 
+			font-family: Arial, sans-serif;
+			background: rgba(0, 0, 0, 0.7);
+    		padding: 5px;
+    		max-width: 75vw;  /* 75% of viewport width */
+    		max-height: 200px; /* Limits height */
+    		overflow-y: auto;  /* Enables scrolling */
+    		border-radius: 5px;
+    		word-wrap: break-word; /* Ensures long words wrap */
+    		white-space: normal; /* Allows text to break into new lines */
+			}
+            
 			#selectionBox {
             position: absolute;
             border: 2px dashed yellow;
@@ -82,7 +82,7 @@
                 <li><b>Move Camera:</b> Left-click + drag</li>
                 <li><b>Zoom:</b> Scroll</li>
                 <li><b>Select Points:</b> Hold <b>S</b> + Left-click + Drag</li>
-                <li><b>Selection Behavior:</b> Selected points turn <span style="color: red;">red</span>, previous selections is cleared
+                <li><b>Selection Behavior:</b> Selected points turn <span style="color: white;">white</span>, previous selections is cleared
                     </span>
                 </li>
             </ul>
@@ -104,7 +104,8 @@
             let selectedPoints = [];
             const selectionBox = document.getElementById("selectionBox");
             let isSKeyPressed = false;
-            
+            let originalColors = []; // Variable to store virdis colors	   
+		
             function init() {
 
 				// Set up new 3js Scene
@@ -138,6 +139,15 @@
 				// Start rendering loop
                 animate();
             }
+
+			function viridisColormap(value, min, max) {
+    			// Normalize the value between 0 and 1
+    			const t = (value - min) / (max - min);
+    			const r = Math.min(Math.max(68 + 182 * t, 0), 255) / 255;
+    			const g = Math.min(Math.max(1 + 130 * t, 0), 255) / 255;
+    			const b = Math.min(Math.max(84 - 60 * t, 0), 255) / 255;
+    			return [r, g, b];
+			}
             
             function createPointCloud() {
                 const geometry = new THREE.BufferGeometry();
@@ -166,7 +176,13 @@
                     let z = (point.z - (minZ + maxZ) / 2) * scaleFactor;
             
                     positions.push(x, y, z);
-                    colors.push(1, 1, 0); // Yellow color
+                    // colors.push(1, 1, 0); // Yellow color
+
+					const [r, g, b] = viridisColormap(point.x, minX, maxX);
+        			colors.push(r, g, b);
+
+					originalColors.push([r, g, b]); // Store original colors
+
                 });
             
                 geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -241,12 +257,12 @@
             const positions = geometry.attributes.position.array;
             const colors = geometry.attributes.color.array;
             
-            // Reset all points to yellow before selecting new ones
+            // Reset all points to orginal colors before selecting new ones
             for (let i = 0; i < colors.length / 3; i++) {
-                colors[i * 3] = 1; // Red channel
-                colors[i * 3 + 1] = 1; // Green channel
-                colors[i * 3 + 2] = 0; // Blue channel (Yellow color)
-            }
+            	colors[i * 3] = originalColors[i][0]; // Red channel
+        		colors[i * 3 + 1] = originalColors[i][1]; // Green channel
+        		colors[i * 3 + 2] = originalColors[i][2]; // Blue channel
+			}
             
             // Now apply selection (turn selected points red)
             for (let i = 0; i < positions.length / 3; i++) {
@@ -259,8 +275,8 @@
                 if (vector.x >= minX && vector.x <= maxX && vector.y >= minY && vector.y <= maxY) {
                     selectedPoints.push(points[i].id);
                     colors[i * 3] = 1; // Red channel
-                    colors[i * 3 + 1] = 0; // Green channel
-                    colors[i * 3 + 2] = 0; // Blue channel (Red color)
+                    colors[i * 3 + 1] = 1; // Green channel
+                    colors[i * 3 + 2] = 1; // Blue channel (Red color)
                 }
             }
             
