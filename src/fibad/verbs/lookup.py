@@ -5,9 +5,6 @@ from typing import Optional, Union
 
 import numpy as np
 
-from fibad.config_utils import find_most_recent_results_dir
-from fibad.data_sets.inference_dataset import InferenceDataSet
-
 from .verb_registry import Verb, fibad_verb
 
 logger = logging.getLogger(__name__)
@@ -73,6 +70,9 @@ class Lookup(Verb):
         Optional[np.ndarray]
             The output tensor of the model for the given input.
         """
+        from fibad.config_utils import find_most_recent_results_dir
+        from fibad.data_sets.inference_dataset import InferenceDataSet
+
         if results_dir is None:
             if self.config["results"]["inference_dir"]:
                 results_dir = self.config["results"]["inference_dir"]
