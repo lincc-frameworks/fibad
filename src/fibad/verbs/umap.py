@@ -5,11 +5,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-import umap
-from tqdm.auto import tqdm
-
-from fibad.config_utils import create_results_dir
-from fibad.data_sets.inference_dataset import InferenceDataSet, InferenceDataSetWriter
 
 from .verb_registry import Verb, fibad_verb
 
@@ -65,6 +60,11 @@ class Umap(Verb):
         None
             The method does not return anything but saves the UMAP representations to disk.
         """
+        import umap
+        from tqdm.auto import tqdm
+
+        from fibad.config_utils import create_results_dir
+        from fibad.data_sets.inference_dataset import InferenceDataSet, InferenceDataSetWriter
 
         reducer = umap.UMAP(**self.config["umap.UMAP"])
 

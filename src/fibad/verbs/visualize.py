@@ -3,13 +3,9 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Optional, Union
 
-import holoviews as hv
 import numpy as np
-from holoviews.operation.datashader import dynspread, rasterize
-from holoviews.streams import RangeXY
-from scipy.spatial import Delaunay, KDTree
 
-from fibad.data_sets.inference_dataset import InferenceDataSet
+from holoviews import Points, Table
 
 from .verb_registry import Verb, fibad_verb
 
@@ -54,12 +50,19 @@ class Visualize(Verb):
         Holoview
             Combined holoview object
         """
+        from holoviews import DynamicMap, Table, extension
+        from holoviews.operation.datashader import dynspread, rasterize
+        from holoviews.streams import Lasso, RangeXY, SelectionXY, Tap
+        from scipy.spatial import KDTree
+
+        from fibad.data_sets.inference_dataset import InferenceDataSet
+
         # Get the umap data and put it in a kdtree for indexing.
         self.umap_results = InferenceDataSet(self.config, split=False, results_dir=input_dir, verb="umap")
         self.tree = KDTree(self.umap_results)
 
         # Initialize holoviews with bokeh.
-        hv.extension("bokeh")
+        extension("bokeh")
 
         # Set up the plot pane
         xmin, xmax, ymin, ymax = self._even_aspect_bounding_box()
@@ -73,7 +76,7 @@ class Visualize(Verb):
         }
         plot_options.update(kwargs)
 
-        plot_dm = hv.DynamicMap(self.visible_points, streams=[RangeXY()])
+        plot_dm = DynamicMap(self.visible_points, streams=[RangeXY()])
         plot_pane = dynspread(rasterize(plot_dm).opts(**plot_options))
 
         # Setup the table pane event handler
@@ -89,20 +92,20 @@ class Visualize(Verb):
             "y_selection": None,
         }
         table_streams = [
-            hv.streams.Lasso(source=plot_pane),
-            hv.streams.Tap(source=plot_pane),
-            hv.streams.SelectionXY(source=plot_pane),
+            Lasso(source=plot_pane),
+            Tap(source=plot_pane),
+            SelectionXY(source=plot_pane),
         ]
 
         # Setup the table pane
-        self.table = hv.Table(([0], [0], [0]), ["object_id"], ["x", "y"])
+        self.table = Table(([0], [0], [0]), ["object_id"], ["x", "y"])
         table_options = {"width": plot_options["width"]}
-        table_pane = hv.DynamicMap(self.selected_objects, streams=table_streams).opts(**table_options)
+        table_pane = DynamicMap(self.selected_objects, streams=table_streams).opts(**table_options)
 
         # Return the plot pane and table pane as a combined object
         return plot_pane + table_pane
 
-    def visible_points(self, x_range: Union[tuple, list], y_range: Union[tuple, list]) -> hv.Points:
+    def visible_points(self, x_range: Union[tuple, list], y_range: Union[tuple, list]) -> Points:
         """Generate a hv.Points object with the points inside the bounding box passed.
 
         This is the event handler for moving or scaling the latent space plot, and is called by Holoviews.
@@ -119,12 +122,14 @@ class Visualize(Verb):
         hv.Points
             Points lying inside the bounding box passed
         """
+        from holoviews import Points
+
         if x_range is None or y_range is None:
-            return hv.Points([])
+            return Points([])
 
-        return hv.Points(self.box_select_points(x_range, y_range)[0])
+        return Points(self.box_select_points(x_range, y_range)[0])
 
-    def selected_objects(self, **kwargs) -> hv.Table:
+    def selected_objects(self, **kwargs) -> Table:
         """Generate the holoview table for a selected set of objects based on input from the
         Lasso, Tap, and SelectionXY streams.
 
@@ -141,6 +146,8 @@ class Visualize(Verb):
         hv.Table
             Table with Object ID, x, y locations of the selected objects
         """
+        from holoviews import Table
+
         if self._called_lasso(kwargs):
             points, points_id = self.poly_select_points(kwargs["geometry"])
         elif self._called_tap(kwargs):
@@ -156,7 +163,7 @@ class Visualize(Verb):
             return self.table
 
         # Basic table with x/y pairs
-        self.table = hv.Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
+        self.table = Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
 
         self.prev_kwargs = kwargs
         return self.table
@@ -202,6 +209,8 @@ class Visualize(Verb):
             First element is an ndarray of x/y points in latent space inside the polygon
             Second element is an ndarray of corresponding object ids
         """
+        from scipy.spatial import Delaunay
+
         # Coarse grain the points within the axis-aligned bounding box of the geometry
         (xmin, xmax, ymin, ymax) = Visualize._bounding_box(geometry)
         point_indexes_coarse = self.box_select_indexes([xmin, xmax], [ymin, ymax])
