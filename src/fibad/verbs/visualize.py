@@ -5,7 +5,6 @@ from typing import Optional, Union
 
 import numpy as np
 
-# import holoviews as hv
 from holoviews import Points, Table
 
 from .verb_registry import Verb, fibad_verb
