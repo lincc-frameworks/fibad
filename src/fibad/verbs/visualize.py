@@ -156,7 +156,10 @@ class Visualize(Verb):
             return self.table
 
         # Basic table with x/y pairs
-        self.table = hv.Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
+        if len(points_id):
+            self.table = hv.Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
+        else:
+            self.table = hv.Table(([0], [0], [0]), ["id"], ["x", "y"])
 
         self.prev_kwargs = kwargs
         return self.table
@@ -209,6 +212,8 @@ class Visualize(Verb):
 
         tri = Delaunay(geometry)
         mask = tri.find_simplex(points_coarse) != -1
+
+        mask = np.asarray(mask)
 
         if any(mask):
             points = points_coarse[mask]
