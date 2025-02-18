@@ -1,6 +1,7 @@
 import logging
 import re
 from collections.abc import Generator
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional, Union
 
@@ -197,6 +198,7 @@ class InferenceDataSetWriter:
 
         self.all_ids = np.array([], dtype=np.int64)
         self.all_batch_nums = np.array([], dtype=np.int64)
+        self.writer_pool = Pool()
 
     def write_batch(self, ids: np.ndarray, tensors: list[np.ndarray]):
         """Write a batch of tensors into the dataset. This writes the whole batch immediately.
@@ -226,7 +228,10 @@ class InferenceDataSetWriter:
         if savepath.exists():
             RuntimeError(f"Writing objects in batch {self.batch_index} but {filename} already exists.")
 
-        np.save(savepath, structured_batch, allow_pickle=False)
+        self.writer_pool.apply_async(
+            func=np.save, args=(savepath, structured_batch), kwds={"allow_pickle": False}
+        )
+
         self.all_ids = np.append(self.all_ids, ids)
         self.all_batch_nums = np.append(self.all_batch_nums, np.full(batch_len, self.batch_index))
 
@@ -236,6 +241,11 @@ class InferenceDataSetWriter:
         """Writes out the batch index built up by this object over multiple write_batch calls.
         See save_batch_index for details.
         """
+        # First ensure we are done writing out all batches
+        self.writer_pool.close()
+        self.writer_pool.join()
+
+        # Then write out the batch index.
         InferenceDataSetWriter.save_batch_index(self.result_dir, self.all_ids, self.all_batch_nums)
 
     @staticmethod

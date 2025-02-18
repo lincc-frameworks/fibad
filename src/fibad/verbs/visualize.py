@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-
 from holoviews import Points, Table
 
 from .verb_registry import Verb, fibad_verb
