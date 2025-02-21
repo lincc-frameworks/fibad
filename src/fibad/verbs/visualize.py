@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-
 from holoviews import Points, Table
 
 from .verb_registry import Verb, fibad_verb
@@ -163,7 +162,10 @@ class Visualize(Verb):
             return self.table
 
         # Basic table with x/y pairs
-        self.table = Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
+        if len(points_id):
+            self.table = Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
+        else:
+            self.table = Table(([0], [0], [0]), ["id"], ["x", "y"])
 
         self.prev_kwargs = kwargs
         return self.table
@@ -218,6 +220,8 @@ class Visualize(Verb):
 
         tri = Delaunay(geometry)
         mask = tri.find_simplex(points_coarse) != -1
+
+        mask = np.asarray(mask)
 
         if any(mask):
             points = points_coarse[mask]
