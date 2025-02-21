@@ -34,6 +34,9 @@ def export_to_onnx(model, sample, config, ctx):
     sample_out = None
     if ctx["ml_framework"] == "pytorch":
         sample_out = _export_pytorch_to_onnx(model, sample, onnx_output_filepath, onnx_opset_version)
+    else:
+        logger.warning("No ONNX export implementation for the given ML framework.")
+        return
 
     # check the ONNX model for correctness
     try:
