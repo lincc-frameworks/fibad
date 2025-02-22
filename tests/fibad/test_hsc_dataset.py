@@ -1,12 +1,12 @@
 import logging
 import unittest.mock as mock
-from copy import copy
 from pathlib import Path
 
 import numpy as np
 import pytest
-from fibad.data_sets.hsc_data_set import HSCDataSet, HSCDataSetSplit
 from torchvision.transforms.v2 import CenterCrop, Lambda
+
+from fibad.data_sets.hsc_data_set import HSCDataSet
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
@@ -59,10 +59,6 @@ class FakeFitsFS:
 def mkconfig(
     crop_to=False,
     filters=False,
-    train_size=0.2,
-    test_size=0.6,
-    validate_size=0.1,
-    seed=False,
     filter_catalog=False,
     use_cache=False,
     transform="tanh",
@@ -76,10 +72,6 @@ def mkconfig(
             "crop_to": crop_to,
             "filters": filters,
             "filter_catalog": filter_catalog,
-            "seed": seed,
-            "train_size": train_size,
-            "test_size": test_size,
-            "validate_size": validate_size,
             "use_cache": use_cache,
             "transform": transform,
         },
@@ -131,7 +123,7 @@ def test_load(caplog):
     caplog.set_level(logging.WARNING)
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         # 10 objects should load
         assert len(a) == 10
@@ -152,7 +144,7 @@ def test_load_duplicate(caplog):
     duplicate_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263), infill_str="duplicate")
     test_files.update(duplicate_files)
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         # Only 10 objects should load
         assert len(a) == 10
@@ -167,7 +159,7 @@ def test_load_duplicate(caplog):
         assert "_duplicate_" in caplog.text
 
         # The duplicate files should not be in the data set
-        for filepath in a.container._all_files():
+        for filepath in a._all_files():
             assert "_duplicate_" not in str(filepath)
 
 
@@ -183,13 +175,13 @@ def test_prune_warn_1_percent(caplog):
     test_files["00000000000000101_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         # We should have the correct number of objects
         assert len(a) == 98
 
         # Object 2 should not be loaded
-        assert "00000000000000101" not in a.container
+        assert "00000000000000101" not in a
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
@@ -210,13 +202,13 @@ def test_prune_error_5_percent(caplog):
     test_files["00000000000000020_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         # We should have two objects, having dropped one.
         assert len(a) == 18
 
         # Object 20 should not be loaded
-        assert "00000000000000020" not in a.container
+        assert "00000000000000020" not in a
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 5% of objects in the data directory were pruned." in caplog.text
@@ -239,7 +231,7 @@ def test_crop(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(99, 99), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
@@ -265,7 +257,7 @@ def test_crop_warn_2px_larger(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(99, 99), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 99, 99)
@@ -291,7 +283,7 @@ def test_crop_warn_2px_smaller(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(98, 98), offset=60))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(), split=None)
+        a = HSCDataSet(mkconfig())
 
         assert len(a) == 70
         assert a.shape() == (5, 98, 98)
@@ -312,7 +304,7 @@ def test_prune_size(caplog):
     test_files.update(generate_files(num_objects=10, num_filters=5, shape=(98, 98), offset=30))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(crop_to=(99, 99)), split=None)
+        a = HSCDataSet(mkconfig(crop_to=(99, 99)))
 
         assert len(a) == 20
         assert a.shape() == (5, 99, 99)
@@ -327,7 +319,7 @@ def test_partial_filter(caplog):
     caplog.set_level(logging.WARNING)
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R"]), split=None)
+        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R"]))
 
         # 10 objects should load
         assert len(a) == 10
@@ -352,287 +344,19 @@ def test_partial_filter_prune_warn_1_percent(caplog):
     test_files["00000000000000101_missing_g_HSC-R.fits"] = (100, 100)
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(filters=["HSC-R", "HSC-I"]), split=None)
+        a = HSCDataSet(mkconfig(filters=["HSC-R", "HSC-I"]))
 
         # We should have the correct number of objects
         assert len(a) == 98
 
         # Object 101 should not be loaded
-        assert "00000000000000101" not in a.container
+        assert "00000000000000101" not in a
 
         # We should Error log because greater than 5% of the objects were pruned
         assert "Greater than 1% of objects in the data directory were pruned." in caplog.text
 
         # We should warn that we dropped an object explicitly
         assert "Dropping object" in caplog.text
-
-
-def test_split():
-    """Test splitting in the default config where train, test, and validate are all specified"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="validate")
-        assert len(a) == 10
-
-        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="test")
-        assert len(a) == 60
-
-        a = HSCDataSet(mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"]), split="train")
-        assert len(a) == 20
-
-
-def test_split_no_validate():
-    """Test splitting when validate is overridden"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 60
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 20
-
-        with pytest.raises(RuntimeError):
-            a = HSCDataSet(config, split="validate")
-
-
-def test_split_with_validate_no_test():
-    """Test splitting when validate is provided by test size is not"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], test_size=False, validate_size=0.2)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 60
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 20
-
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 20
-
-
-def test_split_with_validate_no_test_no_train():
-    """Test splitting when validate is provided by test size is not"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(
-            filters=["HSC-G", "HSC-R", "HSC-I"], test_size=False, train_size=False, validate_size=0.2
-        )
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 55
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 25
-
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 20
-
-
-def test_split_with_validate_with_test_no_train():
-    """Test splitting when validate is provided by test size is not"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(
-            filters=["HSC-G", "HSC-R", "HSC-I"], test_size=0.6, train_size=False, validate_size=0.2
-        )
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 60
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 20
-
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 20
-
-
-def test_split_no_validate_no_test():
-    """Test splitting when validate and test are overridden"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, test_size=False)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 80
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 20
-
-        with pytest.raises(RuntimeError):
-            a = HSCDataSet(config, split="validate")
-
-
-def test_split_no_validate_no_train():
-    """Test splitting when validate and train are overridden"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=False)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 60
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 40
-
-        with pytest.raises(RuntimeError):
-            a = HSCDataSet(config, split="validate")
-
-
-def test_split_invalid_ratio():
-    """Test that split RuntimeErrors when provided with an invalid ratio"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=1.1)
-        with pytest.raises(RuntimeError):
-            HSCDataSet(config, split=None)
-
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=-0.1)
-        with pytest.raises(RuntimeError):
-            HSCDataSet(config, split=None)
-
-
-def test_split_no_splits_configured():
-    """Test splitting when all splits are overriden, and nothing is specified."""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(
-            filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, test_size=False, train_size=False
-        )
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 75
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 25
-
-        with pytest.raises(RuntimeError):
-            a = HSCDataSet(config, split="validate")
-
-
-def test_split_values_configured():
-    """Test splitting when all splits are integer data counts"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=22, test_size=56, train_size=22)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 56
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 22
-
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 22
-
-
-def test_split_values_configured_no_validate():
-    """Test splitting when all splits are integer data counts and validate is not configured
-    so the total selected data doesn't cover the dataset.
-    """
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], test_size=56, train_size=22)
-
-        a = HSCDataSet(config, split="test")
-        assert len(a) == 56
-
-        a = HSCDataSet(config, split="train")
-        assert len(a) == 22
-
-        a = HSCDataSet(config, split="validate")
-        assert len(a) == 10
-
-
-def test_split_invalid_configured():
-    """Test that split RuntimeErrors when provided with an invalid datapoint count"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=120)
-        with pytest.raises(RuntimeError):
-            HSCDataSet(config, split=None)
-
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, train_size=-10)
-        with pytest.raises(RuntimeError):
-            HSCDataSet(config, split=None)
-
-
-def test_split_values_rng():
-    """Generate twice with the same RNG seed, verify same values are selected."""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], test_size=56, train_size=22, seed=5)
-
-        a = HSCDataSet(config, split="test")
-        b = HSCDataSet(config, split="test")
-
-        assert all([a == b for a, b in zip(a.current_split.indexes, b.current_split.indexes)])
-        assert a.current_split.rng.random() == b.current_split.rng.random()
-
-
-def test_split_copy():
-    """Generate a split, copy it, then verify they:
-    - Both have the same underlying container object
-    - That the rng for both returns the same next number
-    - Both mask the same underlying data while having separate arrays.
-    """
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=22, test_size=56, train_size=22)
-
-        testsplit = HSCDataSet(config, split="test").current_split
-        copysplit = copy(testsplit)
-
-        assert testsplit.data is copysplit.data
-        assert testsplit.mask is not copysplit.mask
-        assert all([a == b for a, b in zip(testsplit.mask, copysplit.mask)])
-        assert testsplit.indexes is not copysplit.indexes
-        assert all([a == b for a, b in zip(testsplit.indexes, copysplit.indexes)])
-        assert testsplit.rng is not copysplit.rng
-        assert testsplit.rng.random() == copysplit.rng.random()
-
-
-def test_split_compliment():
-    """Generate a split and its complement. Verify they are compliments"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=22, test_size=56, train_size=22)
-
-        testsplit = HSCDataSet(config, split="test").current_split
-        complement = copy(testsplit).complement()
-
-        assert all([a != b for a, b in zip(testsplit.mask, complement.mask)])
-
-
-def test_split_and():
-    """Generate two splits, and them together. Verify they are actually a conjunction"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, test_size=False)
-
-        dataset = HSCDataSet(config, split="test")
-        test_split = dataset.current_split
-        train_split = HSCDataSetSplit(dataset.container, ratio=0.5)
-
-        and_split = train_split.logical_and(test_split)
-        and_mask = np.logical_and(test_split.mask, train_split.mask)
-
-        assert all([a == b for a, b in zip(and_split.mask, and_mask)])
-
-
-def test_split_and_conflicting_datasets():
-    """Generate two splits from different data sets, and them together. Verify this RuntimeErrors"""
-    test_files = generate_files(num_objects=100, num_filters=3, shape=(100, 100))
-    with FakeFitsFS(test_files):
-        config = mkconfig(filters=["HSC-G", "HSC-R", "HSC-I"], validate_size=False, test_size=False)
-
-        a = HSCDataSet(config, split="test")
-        b = HSCDataSet(config, split="test")
-
-        with pytest.raises(RuntimeError):
-            a.current_split.logical_and(b.current_split)
 
 
 def test_valid_transform_string(caplog):
@@ -643,19 +367,19 @@ def test_valid_transform_string(caplog):
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(transform="arcsinh"), split=None)
+        a = HSCDataSet(mkconfig(transform="arcsinh"))
 
         # transform always has CenterCrop in the beginning followed by the user
         # defined transform
-        lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
+        lambda_transform = [t for t in a.transform.transforms if isinstance(t, Lambda)][0]
         assert lambda_transform.lambd == np.arcsinh
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(transform="tanh"), split=None)
+        a = HSCDataSet(mkconfig(transform="tanh"))
 
         # transform always has CenterCrop in the beginning followed by the user
         # defined transform
-        lambda_transform = [t for t in a.container.transform.transforms if isinstance(t, Lambda)][0]
+        lambda_transform = [t for t in a.transform.transforms if isinstance(t, Lambda)][0]
         assert lambda_transform.lambd == np.tanh
 
 
@@ -667,7 +391,7 @@ def test_invalid_transform_string(caplog):
 
     with FakeFitsFS(test_files):
         with pytest.raises(RuntimeError):
-            HSCDataSet(mkconfig(transform="invalid_function"), split=None)
+            HSCDataSet(mkconfig(transform="invalid_function"))
 
 
 def test_false_transform(caplog):
@@ -677,11 +401,11 @@ def test_false_transform(caplog):
     test_files = generate_files(num_objects=10, num_filters=5, shape=(262, 263))
 
     with FakeFitsFS(test_files):
-        a = HSCDataSet(mkconfig(transform=False), split=None)
+        a = HSCDataSet(mkconfig(transform=False))
 
         # When transform is False; only a CenterCrop should be applied
         # automatically with a size conforming to test_files above
         expected_transform = CenterCrop(size=(np.int64(262), np.int64(262)))
-        actual_transform = a.container.transform
+        actual_transform = a.transform
         assert isinstance(actual_transform, CenterCrop)
         assert actual_transform.size == expected_transform.size
