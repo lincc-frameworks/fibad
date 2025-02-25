@@ -1,10 +1,16 @@
 import functools
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Union
 
 import ignite.distributed as idist
-import mlflow
+import numpy as np
+
+with warnings.catch_warnings():
+    warnings.simplefilter(action="ignore", category=DeprecationWarning)
+    import mlflow
+
 import torch
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
@@ -12,6 +18,7 @@ from ignite.handlers.tqdm_logger import ProgressBar
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.sampler import SubsetRandomSampler
 
 from fibad.config_utils import ConfigDict
 from fibad.data_sets.data_set_registry import fetch_data_set_class
@@ -39,7 +46,7 @@ def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Datase
 
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
-    data_set = data_set_cls(config, split)  # type: ignore[call-arg]
+    data_set = data_set_cls(config)  # type: ignore[call-arg]
 
     return data_set
 
@@ -67,8 +74,14 @@ def setup_model(config: ConfigDict, dataset: Dataset) -> torch.nn.Module:
     return model
 
 
-def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):
-    """Create a Pytorch Ignite distributed data loader
+def dist_data_loader(
+    data_set: Dataset,
+    config: ConfigDict,
+    split: Union[str, list[str], bool] = False,
+):
+    """Create Pytorch Ignite distributed data loaders
+
+    It is recommended that each verb needing dataloaders only call this function once.
 
     Parameters
     ----------
@@ -76,26 +89,138 @@ def dist_data_loader(data_set: Dataset, config: ConfigDict, split: str):
         A Pytorch Dataset object
     config : ConfigDict
         Fibad runtime configuration
-    split : str
-        The name of the split we want to use from the data set.
+    split : Union[str, list[str]], Optional
+        The name(s) of the split we want to use from the data set.
+        If this is false or not passed, then a single data loader is returned
+        that corresponds to the entire dataset.
 
     Returns
     -------
     Dataloader (or an ignite-wrapped equivalent)
         This is the distributed dataloader, formed by calling ignite.distributed.auto_dataloader
+
+    For multiple splits, we return a dictionary where the keys are the names of the splits
+    and the value is either a Dataloader as described above or the value None if the split
+    was not configured.
     """
+    # Handle case where no split is needed.
+    if isinstance(split, bool):
+        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"])
 
-    #! Here we are allowing `train_sampler` and `validation_sampler` to become magic words.
-    #! It would be nice to find a way to do this that doesn't require external libraries to
-    #! know about these.
-    if hasattr(data_set, "train_sampler") and split == "train":
-        sampler = data_set.train_sampler
-    elif hasattr(data_set, "validation_sampler") and split == "validate":
-        sampler = data_set.validation_sampler
-    else:
-        sampler = None
+    # Sanitize split argument
+    if isinstance(split, str):
+        split = [split]
 
-    return idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
+    # Configure the torch rng
+    torch_rng = torch.Generator()
+    seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
+    if seed is not None:
+        torch_rng.manual_seed(seed)
+
+    # Create the indexes for all splits based on config.
+    indexes = create_splits(data_set, config)
+
+    # Create samplers and dataloaders for each split we are interested in
+    samplers = {
+        s: SubsetRandomSampler(indexes[s], generator=torch_rng) if indexes.get(s) else None for s in split
+    }
+
+    dataloaders = {
+        split: idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"]) if sampler else None
+        for split, sampler in samplers.items()
+    }
+
+    # Return only one if we were only passed one split in, return the dictionary otherwise.
+    return dataloaders[split[0]] if len(split) == 1 else dataloaders
+
+
+def create_splits(data_set: Dataset, config: ConfigDict):
+    """Returns train, test, and validation indexes constructed to be used with the passed in
+    dataset. The allocation of indexes in the underlying dataset to samplers depends on
+    the data_set section of the config dict.
+
+    Parameters
+    ----------
+    data_set : Dataset
+        The data set to use
+    config : ConfigDict
+        Configuration that defines dataset splits
+    split : str
+        Name of the split to use.
+    """
+    data_set_size = len(data_set)  # type: ignore[arg-type]
+
+    # Init the splits based on config values
+    train_size = config["data_set"]["train_size"] if config["data_set"]["train_size"] else None
+    test_size = config["data_set"]["test_size"] if config["data_set"]["test_size"] else None
+    validate_size = config["data_set"]["validate_size"] if config["data_set"]["validate_size"] else None
+
+    # Convert all values specified as counts into ratios of the underlying container
+    if isinstance(train_size, int):
+        train_size = train_size / data_set_size
+    if isinstance(test_size, int):
+        test_size = test_size / data_set_size
+    if isinstance(validate_size, int):
+        validate_size = validate_size / data_set_size
+
+    # Initialize Test size when not provided
+    if test_size is None:
+        if train_size is None:
+            train_size = 0.25
+
+        if validate_size is None:  # noqa: SIM108
+            test_size = 1.0 - train_size
+        else:
+            test_size = 1.0 - (train_size + validate_size)
+
+    # Initialize train size when not provided, and can be inferred from test_size and validate_size.
+    if train_size is None:
+        if validate_size is None:  # noqa: SIM108
+            train_size = 1.0 - test_size
+        else:
+            train_size = 1.0 - (test_size + validate_size)
+
+    # If splits cover more than the entire dataset, error out.
+    if validate_size is None:
+        if np.round(train_size + test_size, decimals=5) > 1.0:
+            raise RuntimeError("Split fractions add up to more than 1.0")
+    elif np.round(train_size + test_size + validate_size, decimals=5) > 1.0:
+        raise RuntimeError("Split fractions add up to more than 1.0")
+
+    # If any split is less than 0.0 also error out
+    if (
+        np.round(test_size, decimals=5) < 0.0
+        or np.round(train_size, decimals=5) < 0.0
+        or (validate_size is not None and np.round(validate_size, decimals=5) < 0.0)
+    ):
+        raise RuntimeError("One of the Split fractions configured is negative.")
+
+    indices = list(range(data_set_size))
+
+    # shuffle the indices
+    seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
+    np.random.seed(seed)
+    np.random.shuffle(indices)
+
+    # Given the number of samples in the dataset and the ratios of the splits
+    # we can calculate the number of samples in each split.
+    num_test = int(np.round(data_set_size * test_size))
+    num_train = int(np.round(data_set_size * train_size))
+
+    # split the indices
+    test_idx = indices[:num_test]
+    train_idx = indices[num_test : num_test + num_train]
+
+    # assume that validate gets all the remaining indices
+    if validate_size:
+        num_validate = int(np.round(data_set_size * validate_size))
+        valid_idx = indices[num_test + num_train : num_test + num_train + num_validate]
+
+    split_inds = {"train": train_idx, "test": test_idx}
+    if validate_size:
+        split_inds["validate"] = valid_idx
+
+    return split_inds
 
 
 def create_engine(funcname: str, device: torch.device, model: torch.nn.Module) -> Engine:

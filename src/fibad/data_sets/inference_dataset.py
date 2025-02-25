@@ -22,7 +22,6 @@ class InferenceDataSet(Dataset):
     def __init__(
         self,
         config,
-        split: Union[str, bool],
         results_dir: Optional[Union[Path, str]] = None,
         verb: Optional[str] = None,
     ):
