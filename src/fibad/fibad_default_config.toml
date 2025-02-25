@@ -129,6 +129,13 @@ experiment_name = "notebook"
 # If false, uses result directory string, <timestamp>-train-<uid>, as run name.
 run_name = false
 
+[onnx]
+
+# The operator set version to use when exporting a model. See the following for info:
+# https://onnxruntime.ai/docs/reference/compatibility.html#onnx-opset-support
+opset_version = 20
+
+
 [data_set]
 # Name of the built-in data loader to use or the import path to an external data
 # loader. e.g. "HSCDataSet", "user_pkg.data_set.ExternalDataSet"
@@ -183,9 +190,6 @@ use_cache = true
 # The number of data points to load at once.
 batch_size = 512
 
-# Number of subprocesses for data loading. Typically between 2 and the number of CPUs.
-num_workers = 2
-
 
 [infer]
 # The path to the model weights file to use for inference.
@@ -197,9 +201,11 @@ split = false
 # Whether to generate a chromadb vector database of inference results
 chromadb = true
 
+
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
 inference_dir = false
+
 
 [umap]
 # Number of data points used to fit the umap transform.
