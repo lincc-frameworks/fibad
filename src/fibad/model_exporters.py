@@ -33,7 +33,7 @@ def export_to_onnx(model, sample, config, ctx):
     # use the "ml_framework" context value to determine how to convert to ONNX.
     sample_out = None
     if ctx["ml_framework"] == "pytorch":
-        sample_out = _export_pytorch_to_onnx(model, sample, onnx_output_filepath, onnx_opset_version)
+        sample, sample_out = _export_pytorch_to_onnx(model, sample, onnx_output_filepath, onnx_opset_version)
     else:
         logger.warning("No ONNX export implementation for the given ML framework.")
         return
@@ -45,23 +45,25 @@ def export_to_onnx(model, sample, config, ctx):
     except:  # noqa E722
         logger.error(f"Failed to create ONNX model. {ctx['ml_framework']} implementation has been saved.")
 
-    # check the ONNX model against the PyTorch model
-    ort_session = onnxruntime.InferenceSession(onnx_output_filepath, providers=["CPUExecutionProvider"])
-    ort_inputs = {ort_session.get_inputs()[0].name: sample.cpu().numpy()}
+    # Check the ONNX model against the PyTorch model. Note that `sample` was
+    # converted to numpy array when the model was converted to ONNX
+    ort_session = onnxruntime.InferenceSession(onnx_output_filepath)
+    ort_inputs = {ort_session.get_inputs()[0].name: sample}
     ort_outs = ort_session.run(None, ort_inputs)
 
     # verify ONNX model inference produces results close to the the original model
-    if not allclose(sample_out.detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05):
+    if not allclose(sample_out, ort_outs[0], rtol=1e-03, atol=1e-05):
         logger.warning("The outputs from the PyTorch model and the ONNX model are not close.")
 
     logger.info(f"Exported model to ONNX format: {onnx_output_filepath}")
 
 
-# Very tempting to use @singledispatch on the type of model here, but that
-# would necessitate importing all the ML frameworks in order to get their datatypes,
-# which is what we want to avoid in order to reduce the start up time.
 def _export_pytorch_to_onnx(model, sample, output_filepath, opset_version):
-    """Specific implementation to convert PyTorch model to ONNX format."""
+    """Specific implementation to convert PyTorch model to ONNX format. This
+    function will also:
+    -  Run `sample` through the model before converting the model to ONNX
+    -  Convert `sample` to a numpy array
+    """
 
     # deferred import to reduce start up time
     from torch.onnx import export
@@ -85,4 +87,6 @@ def _export_pytorch_to_onnx(model, sample, output_filepath, opset_version):
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
     )
 
-    return sample_out
+    # return the input sample as a numpy array and the output of the sample run
+    # through the model as numpy array
+    return sample.numpy(), sample_out.detach().numpy()
