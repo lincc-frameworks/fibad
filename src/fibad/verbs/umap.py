@@ -33,7 +33,7 @@ class Umap(Verb):
     # superclass to build the call to run based on what the subclass verb defined in setup_parser
     def run_cli(self, args: Optional[Namespace] = None):
         """Stub CLI implementation"""
-        logger.info("Search run from cli")
+        logger.info("umap run from cli")
         if args is None:
             raise RuntimeError("Run CLI called with no arguments.")
 
@@ -74,7 +74,7 @@ class Umap(Verb):
         umap_results = InferenceDataSetWriter(results_dir)
 
         # Load all the latent space data.
-        inference_results = InferenceDataSet(self.config, split=False, results_dir=input_dir)
+        inference_results = InferenceDataSet(self.config, results_dir=input_dir)
         total_length = len(inference_results)
 
         # Sample the data to fit

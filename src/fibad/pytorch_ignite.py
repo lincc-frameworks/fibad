@@ -2,7 +2,7 @@ import functools
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Union
 
 import ignite.distributed as idist
 import numpy as np
@@ -77,7 +77,7 @@ def setup_model(config: ConfigDict, dataset: Dataset) -> torch.nn.Module:
 def dist_data_loader(
     data_set: Dataset,
     config: ConfigDict,
-    split: Optional[Union[str, list[str]]] = None,
+    split: Union[str, list[str], bool] = False,
 ):
     """Create Pytorch Ignite distributed data loaders
 
@@ -91,7 +91,8 @@ def dist_data_loader(
         Fibad runtime configuration
     split : Union[str, list[str]], Optional
         The name(s) of the split we want to use from the data set.
-        If this is not passed, you get all three
+        If this is false or not passed, then a single data loader is returned
+        that corresponds to the entire dataset.
 
     Returns
     -------
@@ -102,15 +103,16 @@ def dist_data_loader(
     and the value is either a Dataloader as described above or the value None if the split
     was not configured.
     """
+    # Handle case where no split is needed.
+    if isinstance(split, bool):
+        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"])
 
     # Sanitize split argument
-    if split is None:
-        split = ["train", "validate", "test"]
     if isinstance(split, str):
         split = [split]
 
     # Configure the torch rng
-    torch_rng = torch.Generator(device=idist.device())
+    torch_rng = torch.Generator()
     seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
     if seed is not None:
         torch_rng.manual_seed(seed)

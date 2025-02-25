@@ -91,7 +91,7 @@ class Lookup(Verb):
         if isinstance(results_dir, str):
             results_dir = Path(results_dir)
 
-        inference_dataset = InferenceDataSet(self.config, split=False, results_dir=results_dir)
+        inference_dataset = InferenceDataSet(self.config, results_dir=results_dir)
 
         all_ids = np.array([i for i in inference_dataset.ids()])
         lookup_index = np.argwhere(all_ids == id)

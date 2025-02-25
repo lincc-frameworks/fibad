@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-
 from holoviews import Points, Table
 
 from .verb_registry import Verb, fibad_verb
@@ -58,7 +57,7 @@ class Visualize(Verb):
         from fibad.data_sets.inference_dataset import InferenceDataSet
 
         # Get the umap data and put it in a kdtree for indexing.
-        self.umap_results = InferenceDataSet(self.config, split=False, results_dir=input_dir, verb="umap")
+        self.umap_results = InferenceDataSet(self.config, results_dir=input_dir, verb="umap")
         self.tree = KDTree(self.umap_results)
 
         # Initialize holoviews with bokeh.
