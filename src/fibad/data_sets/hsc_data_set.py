@@ -6,9 +6,8 @@ import os
 import re
 import resource
 from collections.abc import Generator
-from copy import copy, deepcopy
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import torch
@@ -16,7 +15,6 @@ from astropy.io import fits
 from astropy.table import Table
 from schwimmbad import MultiPool
 from torch.utils.data import Dataset
-from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
 from fibad.download import Downloader
@@ -33,290 +31,14 @@ from fibad.downloadCutout.downloadCutout import (
 from .data_set_registry import fibad_data_set
 
 logger = logging.getLogger(__name__)
+dim_dict = dict[str, list[tuple[int, int]]]
+files_dict = dict[str, dict[str, str]]
 
 
 @fibad_data_set
 class HSCDataSet(Dataset):
     _called_from_test = False
 
-    """Interface object to allow simple access to splits on a corpus of HSC data files
-
-    f/s operations and management are handled in HSCDatSetContainer
-    splits on the dataset and their generation are handled by HSCDataSetSplit
-
-    """
-
-    def __init__(self, config, split: Union[str, bool]):
-        split_parsed = split if isinstance(split, str) else None
-
-        # initialize the filesystem references
-        self.container = HSCDataSetContainer(config)
-
-        # initialize our splits from configuration
-        self._create_splits(config)
-
-        # Set the split to what was requested.
-        self._set_split(split_parsed)
-
-    def _create_splits(self, config):
-        seed = config["data_set"]["seed"] if config["data_set"]["seed"] else None
-
-        # Init the splits based on config values
-        train_size = config["data_set"]["train_size"] if config["data_set"]["train_size"] else None
-        test_size = config["data_set"]["test_size"] if config["data_set"]["test_size"] else None
-        validate_size = config["data_set"]["validate_size"] if config["data_set"]["validate_size"] else None
-
-        # Convert all values specified as counts into ratios of the underlying container
-        if isinstance(train_size, int):
-            train_size = train_size / len(self.container)
-        if isinstance(test_size, int):
-            test_size = test_size / len(self.container)
-        if isinstance(validate_size, int):
-            validate_size = validate_size / len(self.container)
-
-        # Initialize Test size when not provided
-        if test_size is None:
-            if train_size is None:
-                train_size = 0.25
-
-            if validate_size is None:  # noqa: SIM108
-                test_size = 1.0 - train_size
-            else:
-                test_size = 1.0 - (train_size + validate_size)
-
-        # Initialize train size when not provided, and can be inferred from test_size and validate_size.
-        if train_size is None:
-            if validate_size is None:  # noqa: SIM108
-                train_size = 1.0 - test_size
-            else:
-                train_size = 1.0 - (test_size + validate_size)
-
-        # If splits cover more than the entire dataset, error out.
-        if validate_size is None:
-            if np.round(train_size + test_size, decimals=5) > 1.0:
-                raise RuntimeError("Split fractions add up to more than 1.0")
-        elif np.round(train_size + test_size + validate_size, decimals=5) > 1.0:
-            raise RuntimeError("Split fractions add up to more than 1.0")
-
-        # Generate splits
-        self.splits = {}
-        self.splits["test"] = HSCDataSetSplit(self.container, test_size, seed=seed)
-        rest = copy(self.splits["test"]).complement()
-        self.splits["train"] = HSCDataSetSplit(rest, train_size, seed=seed)
-
-        # Validate is only generated if it is provided, or if both test and train are provided.
-        if validate_size:
-            rest = rest.logical_and(copy(self.splits["train"]).complement())
-            self.splits["validate"] = HSCDataSetSplit(rest, validate_size, seed=seed)
-
-        for key, value in self.splits.items():
-            logger.info(f"{key} split contains {len(value)} items")
-
-        num_samples = len(self.container)
-        indices = list(range(num_samples))
-
-        # shuffle the indices
-        np.random.seed(seed)
-        np.random.shuffle(indices)
-
-        # Given the number of samples in the dataset and the ratios of the splits
-        # we can calculate the number of samples in each split.
-        num_test = int(np.round(len(self.container) * test_size))
-        num_train = int(np.round(len(self.container) * train_size))
-
-        # split the indices
-        test_idx = indices[:num_test]
-        train_idx = indices[num_test : num_test + num_train]
-
-        # assume that validate gets all the remaining indices
-        if validate_size:
-            valid_idx = indices[num_test + num_train :]
-
-        # create the samplers
-        self.train_sampler = SubsetRandomSampler(train_idx)
-        self.test_sampler = SubsetRandomSampler(test_idx)
-        if validate_size:
-            self.validation_sampler = SubsetRandomSampler(valid_idx)
-
-        self.split_inds = {"train": train_idx, "test": test_idx}
-        if validate_size:
-            self.split_inds["validate"] = valid_idx
-
-    def _set_split(self, split: Union[str, None] = None):
-        self.current_split = self.splits.get(split, self.container)
-
-        if split is not None and self.current_split == self.container:
-            splits = list(self.splits.keys())
-            raise RuntimeError(f"Split {split} does not exist. valid split names are {splits}")
-
-    def shape(self) -> tuple[int, int, int]:
-        return self.container.shape()
-
-    def ids(self) -> Generator[str, None, None]:
-        return self.container.ids()
-
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        # return self.current_split[idx]
-        return self.container[idx]
-
-    def __len__(self) -> int:
-        return len(self.current_split)
-
-    def rebuild_manifest(self, config):
-        return self.container._rebuild_manifest(config)
-
-
-class HSCDataSetSplit(Dataset):
-    def __init__(
-        self,
-        data: Union["HSCDataSetContainer", "HSCDataSetSplit"],
-        ratio: float,
-        seed: Union[int, None] = None,
-    ):
-        """
-        This class represents a split of an HSCDataset.
-
-        It should only get created by passing in an existing HSCDataSetContainer (or HSCDataSetSplit)
-        and splitting it according to the train_test_split like parameters. When you split a split,
-        all splits end up referring to the same uderlying HSCDataSetContainer object.
-
-        Each encodes a subset of the underlying HSCDataSetContainer by keeping a list of boolean values.
-
-        Parameters
-        ----------
-        data : Union[HSCDataSetContainer, &quot;HSCDataSetSplit&quot;]
-            The underlying HSCDataSet or split to operate on. Creating a split from an existing split ends up
-            referring to a subset of the data selected by the original split, but the new object only refers
-            to an underlying HSCDataSet object, not any other split object.
-        ratio : float
-            Ratio of the underlying data source to use for this split. This is expressed as a fraction of the
-            HSCDataSetContainer even when an HSCDataSetSplit is passed.
-        seed : Union[int, None] , optional
-            The seed value to provide to the random number generator, or None if you would like to use system
-            entropy to generate a seed. None by default.
-        shuffle : bool, optional
-            Whether to shuffle the order of the underlying data when accessing the split object, by default
-            True
-        """
-        self.rng = np.random.default_rng(seed)
-
-        if ratio > 1.0 or ratio < 0.0:
-            msg = f"Split provided for HSCDatSetSplit as a ratio is {ratio}, which is not between 0.0 and 1.0"
-            raise RuntimeError(msg)
-
-        self.data: HSCDataSetContainer = data.data if isinstance(data, HSCDataSetSplit) else data
-
-        # The length of this split once constructed
-        length = int(np.round(len(self.data) * ratio))
-
-        if not isinstance(data, HSCDataSetSplit):
-            # If we're splitting a normal hscdataset we generate a single mask with the appropriate values
-            self.mask: np.ndarray[tuple[int], np.dtype[Any]] = np.zeros(len(data), dtype=bool)
-            self._flip_mask_values(length, "false_to_true")
-        else:
-            # If we're splitting a split we need to modify the existing mask of the prior split
-            # Namely we switch some true values to false to more of the underlying dataset
-            split = data
-            self.mask = copy(split.mask)
-            remove_count = len(split) - length
-            if remove_count > 0:
-                self._flip_mask_values(remove_count, "true_to_false")
-
-        self.indexes = np.nonzero(self.mask)[0]
-
-    def _flip_mask_values(self, num: int, mode: Literal["false_to_true", "true_to_false"]):
-        """
-        Private helper to flips some values of self.mask. The direction to flip is controlled by the
-        mode parameter. Either the function randomly finds `num` true values to flip to false, or `num` false
-        values to flip to true.
-
-        This function is used during object construction to create a set number of randomly selected true
-        values in the mask.
-
-        Parameters
-        ----------
-        num : int
-            The number of values to flip
-        mode : Literal[&quot;false_to_true&quot;, &quot;true_to_false&quot;]
-            The mode to work in, either flipping True values false or the reverse
-
-        Raises
-        ------
-        RuntimeError
-            It is a RuntimeError to try to flip more values than the mask has of that type.
-
-        """
-        mask_tmp = np.logical_not(self.mask) if mode == "false_to_true" else self.mask
-        target_val = mode == "false_to_true"
-        target_indexes = np.nonzero(mask_tmp)[0]
-
-        if num > len(target_indexes):
-            msg_mode = mode.replace("_", " ")
-            num_tgt = len(target_indexes)
-            msg = f"Cannot flip {num} values {msg_mode} when only {num_tgt} {target_val} values exist in mask"
-            raise RuntimeError(msg)
-
-        change_indexes = self.rng.permutation(target_indexes)[:num]
-        for i in change_indexes:
-            self.mask[i] = target_val
-
-    def complement(self) -> "HSCDataSetSplit":
-        """Mutates the split by inverting it with respect to the underlying dataset.
-
-        e.g. if you have an underlying dataset with 5 members, and indexes 1,2, and 4 are part of this split
-        The compliment would be a dataset selecting indexes 0 and 3.
-        """
-        self.mask = np.logical_not(self.mask)
-        self.indexes = np.nonzero(self.mask)[0]
-        return self
-
-    def logical_and(self, obj: "HSCDataSetSplit") -> "HSCDataSetSplit":
-        """Takes the logical and of this object and the passed in object. self is modified, the passed in
-        object is not
-
-        If the self object selects indicies 1,2 and 4 and the passed in object selects indicies 2, 4, and 0
-        the self object would be modified to select indicies 2, and 4 only.
-
-        It is a RuntimeError to and two split objects that do not reference the same underlying HSCDataSet
-
-        Parameters
-        ----------
-        obj : HSCDataSetSplit
-            The object to and with
-        """
-        if self.data != obj.data:
-            msg = "Tried to take logical and of two HSCDataSetSplits with different HSCDataSet objects"
-            raise RuntimeError(msg)
-
-        np.logical_and(self.mask, obj.mask, out=self.mask)
-        self.indexes = np.nonzero(self.mask)[0]
-        return self
-
-    def __copy__(self) -> "HSCDataSetSplit":
-        # Create a HSCDataSetSplit with no data selected, but the same data source as self
-        copy_object = HSCDataSetSplit(self.data, 0.0)
-
-        # Copy mask and indexes over
-        copy_object.mask = self.mask.copy()
-        copy_object.indexes = self.indexes.copy()
-
-        # Copy RNG state over.
-        copy_object.rng = deepcopy(self.rng)
-
-        return copy_object
-
-    def __len__(self) -> int:
-        return len(self.indexes)
-
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        return self.data[self.indexes[idx]]
-
-
-dim_dict = dict[str, list[tuple[int, int]]]
-files_dict = dict[str, dict[str, str]]
-
-
-class HSCDataSetContainer(Dataset):
     def __init__(self, config):
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
@@ -575,14 +297,14 @@ class HSCDataSetContainer(Dataset):
         # Ideally we would use ~75 processes per CPU to attempt to saturate
         # I/O bandwidth using a small number of CPUs.
         numproc = 1 if HSCDataSet._called_from_test else 75 * cpu_count
-        numproc = HSCDataSetContainer._fixup_limit(
+        numproc = HSCDataSet._fixup_limit(
             numproc,
             resource.RLIMIT_NOFILE,
             lambda proc: int(4 * proc + 10),
             lambda nofile: int((nofile - 10) / 4),
         )
 
-        numproc = HSCDataSetContainer._fixup_limit(
+        numproc = HSCDataSet._fixup_limit(
             numproc, resource.RLIMIT_NPROC, lambda proc: proc, lambda proc: proc
         )
         return numproc
@@ -614,7 +336,7 @@ class HSCDataSetContainer(Dataset):
         logger.info("Scanning for dimensions...")
 
         retval = {}
-        with MultiPool(processes=HSCDataSetContainer._determine_numprocs()) as pool:
+        with MultiPool(processes=HSCDataSet._determine_numprocs()) as pool:
             args = (
                 (object_id, list(self._object_files(object_id)))
                 for object_id in self.ids(log_every=1_000_000)
@@ -625,7 +347,7 @@ class HSCDataSetContainer(Dataset):
     @staticmethod
     def _scan_file_dimension(processing_unit: tuple[str, list[str]]) -> tuple[str, list[tuple[int, int]]]:
         object_id, filenames = processing_unit
-        return (object_id, [HSCDataSetContainer._fits_file_dims(filepath) for filepath in filenames])
+        return (object_id, [HSCDataSet._fits_file_dims(filepath) for filepath in filenames])
 
     @staticmethod
     def _fits_file_dims(filepath) -> tuple[int, int]:

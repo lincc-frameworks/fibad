@@ -38,15 +38,14 @@ def run(config):
     data_set = setup_dataset(config, split=config["train"]["split"])
     model = setup_model(config, data_set)
 
-    # Create a data loader for the training set
-    train_data_loader = dist_data_loader(data_set, config, "train")
-
+    # Create a data loader for the training set (and validation split if configured)
+    data_loaders = dist_data_loader(data_set, config, ["train", "validate"])
+    train_data_loader = data_loaders["train"]
+    validation_data_loader = data_loaders["validate"]
+    
     # Get a sample of input data. If the data is labeled, only return the input data.
     batch_sample = next(iter(train_data_loader))
     sample = batch_sample[0] if isinstance(batch_sample, (list, tuple)) else batch_sample
-
-    # Create validation_data_loader if a validation split is defined in data_set
-    validation_data_loader = dist_data_loader(data_set, config, "validate")
 
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model, config, results_dir, tensorboardx_logger)
