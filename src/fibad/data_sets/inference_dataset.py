@@ -1,5 +1,4 @@
 import logging
-import re
 from collections.abc import Generator
 from multiprocessing import Pool
 from pathlib import Path
@@ -24,7 +23,6 @@ class InferenceDataSet(Dataset):
     def __init__(
         self,
         config,
-        split: Union[str, bool],
         results_dir: Optional[Union[Path, str]] = None,
         verb: Optional[str] = None,
     ):
@@ -35,7 +33,8 @@ class InferenceDataSet(Dataset):
         # Loop over files and create if it does not exist
         batch_index_path = self.results_dir / "batch_index.npy"
         if not batch_index_path.exists():
-            self._create_index(self.results_dir)
+            msg = f"{self.results_dir} is corrupt and lacks a batch index file."
+            raise RuntimeError(msg)
 
         self.batch_index = np.load(self.results_dir / "batch_index.npy")
         self.length = len(self.batch_index)
@@ -155,34 +154,6 @@ class InferenceDataSet(Dataset):
 
         return retval
 
-    # This functionality (and its linkage to InferenceDataSetWriter) can be considered deprecated
-    # as of Feb 2025 and ought be removed shortly thereafter. Including this code was a way to
-    # be backwards compatibile with science being done as this subsystem was being developed.
-    def _create_index(self, results_dir: Path):
-        """Recreate the index into the batch numpy files
-
-        Parameters
-        ----------
-        results_dir : Path
-            Path to the batch numpy files
-        """
-        ids = []
-        batch_nums = []
-        # Use the batched numpy files to assemble an index.
-        logger.info("Recreating index...")
-        for file in results_dir.glob("batch_*.npy"):
-            print(".", end="", flush=True)
-            m = re.match(r"batch_([0-9]+).npy", file.name)
-            if m is None:
-                logger.warn(f"Could not find batch number for {file}")
-                continue
-            batch_num = int(m[1])
-            recarray = np.load(file)
-            ids += list(recarray["id"])
-            batch_nums += [batch_num] * len(recarray["id"])
-
-        InferenceDataSetWriter.save_batch_index(results_dir, np.array(ids), np.array(batch_nums))
-
 
 class InferenceDataSetWriter:
     """Class to write out inference datasets. Used by infer, umap to consistently write out numpy
@@ -262,13 +233,13 @@ class InferenceDataSetWriter:
             The corresponding batch numbers for the IDs provided.
         """
         batch_index_dtype = np.dtype([("id", np.int64), ("batch_num", np.int64)])
-        batch_index = np.zeros(len(all_ids), batch_index_dtype)
-        batch_index["id"] = np.array(all_ids)
-        batch_index["batch_num"] = np.array(all_batch_nums)
+        batch_index = np.zeros(len(self.all_ids), batch_index_dtype)
+        batch_index["id"] = np.array(self.all_ids)
+        batch_index["batch_num"] = np.array(self.all_batch_nums)
         batch_index.sort(order="id")
 
         filename = "batch_index.npy"
-        savepath = result_dir / filename
+        savepath = self.result_dir / filename
         if savepath.exists():
             RuntimeError("The path to save batch index already exists.")
         np.save(savepath, batch_index, allow_pickle=False)

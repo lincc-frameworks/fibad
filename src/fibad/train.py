@@ -37,11 +37,10 @@ def run(config):
     data_set = setup_dataset(config, split=config["train"]["split"])
     model = setup_model(config, data_set)
 
-    # Create a data loader for the training set
-    train_data_loader = dist_data_loader(data_set, config, "train")
-
-    # Create validation_data_loader if a validation split is defined in data_set
-    validation_data_loader = dist_data_loader(data_set, config, "validate")
+    # Create a data loader for the training set (and validation split if configured)
+    data_loaders = dist_data_loader(data_set, config, ["train", "validate"])
+    train_data_loader = data_loaders["train"]
+    validation_data_loader = data_loaders["validate"]
 
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model, config, results_dir, tensorboardx_logger)
