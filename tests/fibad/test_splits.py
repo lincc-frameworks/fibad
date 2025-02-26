@@ -1,5 +1,4 @@
 import pytest
-
 from fibad.pytorch_ignite import create_splits
 
 

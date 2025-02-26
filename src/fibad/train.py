@@ -6,6 +6,7 @@ from tensorboardX import SummaryWriter
 
 from fibad.config_utils import create_results_dir, log_runtime_config
 from fibad.gpu_monitor import GpuMonitor
+from fibad.model_exporters import export_to_onnx
 from fibad.pytorch_ignite import (
     create_trainer,
     create_validator,
@@ -42,6 +43,10 @@ def run(config):
     train_data_loader = data_loaders["train"]
     validation_data_loader = data_loaders["validate"]
 
+    # Get a sample of input data. If the data is labeled, only return the input data.
+    batch_sample = next(iter(train_data_loader))
+    sample = batch_sample[0] if isinstance(batch_sample, (list, tuple)) else batch_sample
+
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model, config, results_dir, tensorboardx_logger)
 
@@ -76,6 +81,13 @@ def run(config):
 
     logger.info("Finished Training")
     tensorboardx_logger.close()
+
+    context = {
+        "ml_framework": "pytorch",
+        "results_dir": results_dir,
+    }
+
+    export_to_onnx(model, sample, config, context)
 
 
 def _log_params(config):

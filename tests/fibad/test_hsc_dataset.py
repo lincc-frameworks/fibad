@@ -4,9 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from torchvision.transforms.v2 import CenterCrop, Lambda
-
 from fibad.data_sets.hsc_data_set import HSCDataSet
+from torchvision.transforms.v2 import CenterCrop, Lambda
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 

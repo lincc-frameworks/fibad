@@ -157,3 +157,6 @@ example_model.pth
 # Common location to stash personal or notebook example config
 fibad_config.toml
 credentials.ini
+
+# MLFlow data directory
+mlruns/
