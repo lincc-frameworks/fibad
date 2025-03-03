@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Generator
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional, Union
 
@@ -168,6 +169,7 @@ class InferenceDataSetWriter:
 
         self.all_ids = np.array([], dtype=np.int64)
         self.all_batch_nums = np.array([], dtype=np.int64)
+        self.writer_pool = Pool()
 
     def write_batch(self, ids: np.ndarray, tensors: list[np.ndarray]):
         """Write a batch of tensors into the dataset. This writes the whole batch immediately.
@@ -197,22 +199,47 @@ class InferenceDataSetWriter:
         if savepath.exists():
             RuntimeError(f"Writing objects in batch {self.batch_index} but {filename} already exists.")
 
-        np.save(savepath, structured_batch, allow_pickle=False)
+        self.writer_pool.apply_async(
+            func=np.save, args=(savepath, structured_batch), kwds={"allow_pickle": False}
+        )
+
         self.all_ids = np.append(self.all_ids, ids)
         self.all_batch_nums = np.append(self.all_batch_nums, np.full(batch_len, self.batch_index))
 
         self.batch_index += 1
 
     def write_index(self):
-        """Writes out the batch index built up by this object over multiple write_batch calls."""
+        """Writes out the batch index built up by this object over multiple write_batch calls.
+        See save_batch_index for details.
+        """
+        # First ensure we are done writing out all batches
+        self.writer_pool.close()
+        self.writer_pool.join()
+
+        # Then write out the batch index.
+        InferenceDataSetWriter.save_batch_index(self.result_dir, self.all_ids, self.all_batch_nums)
+
+    @staticmethod
+    def save_batch_index(result_dir: Path, all_ids: np.ndarray, all_batch_nums: np.ndarray):
+        """Save a batch index in the result directory provided
+
+        Parameters
+        ----------
+        result_dir : Path
+            The results directory
+        all_ids : np.ndarray
+            All IDs to write out.
+        all_batch_nums : np.ndarray
+            The corresponding batch numbers for the IDs provided.
+        """
         batch_index_dtype = np.dtype([("id", np.int64), ("batch_num", np.int64)])
-        batch_index = np.zeros(len(self.all_ids), batch_index_dtype)
-        batch_index["id"] = np.array(self.all_ids)
-        batch_index["batch_num"] = np.array(self.all_batch_nums)
+        batch_index = np.zeros(len(all_ids), batch_index_dtype)
+        batch_index["id"] = np.array(all_ids)
+        batch_index["batch_num"] = np.array(all_batch_nums)
         batch_index.sort(order="id")
 
         filename = "batch_index.npy"
-        savepath = self.result_dir / filename
+        savepath = result_dir / filename
         if savepath.exists():
             RuntimeError("The path to save batch index already exists.")
         np.save(savepath, batch_index, allow_pickle=False)
