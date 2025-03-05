@@ -64,7 +64,7 @@ class ChromaDB(VectorDB):
 
         self.collection.add(ids=ids, embeddings=vectors)
 
-    def search_by_id(self, id: Union[str | int], k: int = 1) -> list[Union[str | int]]:
+    def search_by_id(self, id: Union[str | int], k: int = 1) -> dict[int, list[Union[str | int]]]:
         """Get the ids of the k nearest neighbors for a given id in the database.
         Should use the provided id to look up the vector, then call search_by_vector.
 
@@ -79,8 +79,9 @@ class ChromaDB(VectorDB):
 
         Returns
         -------
-        list[Union[str,int]]
-            The ids of the k nearest neighbors
+        dict[int, list[Union[str, int]]]
+            Dictionary with input vector index as the key and the ids of the k
+            nearest neighbors as the value.
 
         Raises
         ------
@@ -88,8 +89,14 @@ class ChromaDB(VectorDB):
             If more than one vector is found for the given id
         """
 
+        #! Fix the definition of the return type here!!!
+
+        if k < 1:
+            raise ValueError("k must be greater than 0")
+
         # create the database connection
-        self.chromadb_client = self.connect()
+        if self.chromadb_client is None:
+            self.connect()
 
         # get all the shards
         shards = self.chromadb_client.list_collections()
@@ -102,10 +109,10 @@ class ChromaDB(VectorDB):
 
             vectors.extend(results["embeddings"])
 
-        query_results: list[Union[str | int]] = []
+        query_results: dict[int, list[Union[str | int]]] = {}
         # no matching id found in database
         if len(vectors) == 0:
-            query_results = []
+            query_results = {}
 
         # multiple matching ids found in database
         elif len(vectors) > 1:
@@ -113,16 +120,16 @@ class ChromaDB(VectorDB):
 
         # single matching id found in database
         else:
-            query_results = self.search_by_vector(vectors[0], k=k)
+            query_results = self.search_by_vector(vectors, k=k)
 
         return query_results
 
-    def search_by_vector(self, vector: np.ndarray, k: int = 1) -> list[Union[str | int]]:
+    def search_by_vector(self, vectors: list[np.ndarray], k: int = 1) -> dict[int, list[Union[str | int]]]:
         """Get the ids of the k nearest neighbors for a given vector.
 
         Parameters
         ----------
-        vector : np.ndarray
+        vectors : np.ndarray
             The vector to use when searching for nearest neighbors
         k : int, optional
             The number of nearest neighbors to return, by default 1, return only
@@ -130,32 +137,42 @@ class ChromaDB(VectorDB):
 
         Returns
         -------
-        list[Union[str,int]]
-            The ids of the k nearest neighbors
+        dict[int, list[Union[str, int]]]
+            Dictionary with input vector index as the key and the ids of the k
+            nearest neighbors as the value.
         """
 
+        if k < 1:
+            raise ValueError("k must be greater than 0")
+
         # create the database connection
-        self.chromadb_client = self.connect()
+        if self.chromadb_client is None:
+            self.connect()
 
         # get all the shards
         shards = self.chromadb_client.list_collections()
 
-        # Query each shard, return the k nearest neighbors from each shard.
-        ids = []
-        distances = []
-        for shard in shards:
-            # Get the vector for the id
-            collection = self.chromadb_client.get_collection(id=shard.id)
-            results = collection.query(query_embeddings=vector, n_results=k)
+        # This dictionary will hold the k nearest neighbors ids for each input vector
+        result_dict: dict[int, list[Union[str | int]]] = {i: [] for i in range(len(vectors))}
 
-            ids.extend(results["ids"][0])
-            distances.extend(results["distances"][0])
+        # Intermediate results holds all of the query results from all shards.
+        # These results will be sorted and trimmed to the appropriate length before
+        # being added to `result_dict`.
+        intermediate_results: dict[int, dict[str, list[Union[str | int]]]] = {
+            i: {"ids": [], "distances": []} for i in range(len(vectors))
+        }
+
+        # Query each shard, return the k nearest neighbors from each shard.
+        for shard in shards:
+            collection = self.chromadb_client.get_collection(name=shard.name)
+            results = collection.query(query_embeddings=vectors, n_results=k)
+            for i in range(len(results["ids"])):
+                intermediate_results[i]["ids"].extend(results["ids"][i])
+                intermediate_results[i]["distances"].extend(results["distances"][i])
 
         # Sort the distances ascending
-        sorted_indicies = np.argsort(distances, stable=True)
+        for i in range(len(intermediate_results)):
+            sorted_indicies = np.argsort(intermediate_results[i]["distances"], stable=True)
+            result_dict[i] = [intermediate_results[i]["ids"][j] for j in sorted_indicies][:k]
 
-        # Apply the sorting to the ids
-        sorted_ids: list[Union[str | int]] = np.asarray(ids)[sorted_indicies].tolist()
-
-        # Return the k nearest neighbors as a python list
-        return sorted_ids[:k]
+        return result_dict

@@ -44,7 +44,7 @@ class VectorDB(ABC):
         pass
 
     @abstractmethod
-    def search_by_id(self, id: Union[str | int], k: int = 1) -> list[Union[str, int]]:
+    def search_by_id(self, id: Union[str | int], k: int = 1) -> dict[int, list[Union[str, int]]]:
         """Get the ids of the k nearest neighbors for a given id in the database.
         Should use the provided id to look up the vector, then call search_by_vector.
 
@@ -59,18 +59,19 @@ class VectorDB(ABC):
 
         Returns
         -------
-        list[Union[str,int]]
-            The ids of the k nearest neighbors
+        dict[int, list[Union[str, int]]]
+            Dictionary with input vector index as the key and the ids of the k
+            nearest neighbors as the value.s
         """
         pass
 
     @abstractmethod
-    def search_by_vector(self, vector: np.ndarray, k: int = 1) -> list[Union[str, int]]:
+    def search_by_vector(self, vectors: list[np.ndarray], k: int = 1) -> dict[int, list[Union[str, int]]]:
         """Get the ids of the k nearest neighbors for a given vector.
 
         Parameters
         ----------
-        vector : np.ndarray
+        vectors : np.ndarray
             The vector to use when searching for nearest neighbors
         k : int, optional
             The number of nearest neighbors to return, by default 1, return only
@@ -78,7 +79,8 @@ class VectorDB(ABC):
 
         Returns
         -------
-        list[Union[str,int]]
-            The ids of the k nearest neighbors
+        dict[int, list[Union[str, int]]]
+            Dictionary with input vector index as the key and the ids of the
+            k nearest neighbors as the value.
         """
         pass
