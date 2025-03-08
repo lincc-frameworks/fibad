@@ -49,15 +49,32 @@ class Visualize(Verb):
         Holoview
             Combined holoview object
         """
-        from holoviews import DynamicMap, Table, extension
+        from holoviews import DynamicMap, extension
         from holoviews.operation.datashader import dynspread, rasterize
         from holoviews.streams import Lasso, RangeXY, SelectionXY, Tap
         from scipy.spatial import KDTree
 
         from fibad.data_sets.inference_dataset import InferenceDataSet
 
+        # TODO Is this an argument or config to visualize?
+        fields = ["object_id", "ra", "dec"]
+
         # Get the umap data and put it in a kdtree for indexing.
         self.umap_results = InferenceDataSet(self.config, results_dir=input_dir, verb="umap")
+
+        available_fields = self.umap_results.metadata_fields()
+        for field in fields.copy():
+            if field not in available_fields:
+                logger.warning(f"Field {field} is unavailable for this dataset")
+                fields.remove(field)
+
+        if "object_id" not in fields:
+            msg = "Umap dataset much support object_id field"
+            raise RuntimeError(msg)
+
+        self.data_fields = fields.copy()
+        self.data_fields.remove("object_id")
+
         self.tree = KDTree(self.umap_results)
 
         # Initialize holoviews with bokeh.
@@ -97,7 +114,10 @@ class Visualize(Verb):
         ]
 
         # Setup the table pane
-        self.table = Table(([0], [0], [0]), ["object_id"], ["x", "y"])
+        # self.table = Table(tuple([[0]]*(3+len(self.data_fields))), ["object_id"], self.data_fields)
+        self.points = np.array([])
+        self.points_id = np.array([])
+        self.table = self._table_from_points()
         table_options = {"width": plot_options["width"]}
         table_pane = DynamicMap(self.selected_objects, streams=table_streams).opts(**table_options)
 
@@ -145,30 +165,51 @@ class Visualize(Verb):
         hv.Table
             Table with Object ID, x, y locations of the selected objects
         """
-        from holoviews import Table
 
         if self._called_lasso(kwargs):
-            points, points_id = self.poly_select_points(kwargs["geometry"])
+            self.points, self.points_id, self.points_idx = self.poly_select_points(kwargs["geometry"])
         elif self._called_tap(kwargs):
-            _, id = self.tree.query([kwargs["x"], kwargs["y"]])
-            points = np.array([self.umap_results[id].numpy()])
-            points_id = np.array([str(id)])
+            _, idx = self.tree.query([kwargs["x"], kwargs["y"]])
+            self.points = np.array([self.umap_results[idx].numpy()])
+            self.points_id = np.array([list(self.umap_results.ids())[idx]])
+            self.points_idx = np.array([idx])
         elif self._called_box_select(kwargs):
-            points, points_id = self.box_select_points(kwargs["x_selection"], kwargs["y_selection"])
+            self.points, self.points_id, self.points_idx = self.box_select_points(
+                kwargs["x_selection"], kwargs["y_selection"]
+            )
         else:
             # We return whatever cached table state we have if we were not called by any event
             # This normally happens during initialization.
             self.prev_kwargs = kwargs
             return self.table
 
-        # Basic table with x/y pairs
-        if len(points_id):
-            self.table = Table((points_id, points.T[0], points.T[1]), ["id"], ["x", "y"])
-        else:
-            self.table = Table(([0], [0], [0]), ["id"], ["x", "y"])
+        self.table = self._table_from_points()
 
         self.prev_kwargs = kwargs
         return self.table
+
+    def _table_from_points(self) -> Table:
+        # Basic table with x/y pairs
+        key_dims = ["object_id"]
+        value_dims = ["x", "y"] + self.data_fields
+
+        if not len(self.points_id):
+            columns = [[1]] * (len(key_dims) + len(value_dims))
+            return Table(tuple(columns), key_dims, value_dims)
+
+        # these are the object_id, x, and y columns
+        columns = [self.points_id, self.points.T[0], self.points.T[1]]  # type: ignore[list-item]
+
+        # These are the rest of the columns, pulled from metadata
+        try:
+            metadata = self.umap_results.metadata(self.points_idx, self.data_fields)
+        except Exception as e:
+            # Leave in this try/catch beause some notebook implementations dont
+            # allow us to return an exception to the console.
+            return Table(([str(e)]), ["message"])
+
+        columns += [metadata[field] for field in self.data_fields]  # type: ignore[call-overload,misc,index]
+        return Table(tuple(columns), key_dims, value_dims)
 
     def _called_lasso(self, kwargs):
         return kwargs["geometry"] is not None and (
@@ -197,7 +238,7 @@ class Visualize(Verb):
             )
         )
 
-    def poly_select_points(self, geometry) -> tuple[np.ndarray, np.ndarray]:
+    def poly_select_points(self, geometry) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Select points inside a polygon.
 
         Parameters
@@ -227,13 +268,13 @@ class Visualize(Verb):
             points = points_coarse[mask]
             point_indexes = np.array(point_indexes_coarse)[mask]
             points_id = np.array(list(self.umap_results.ids()))[point_indexes]
-            return points, points_id
+            return points, points_id, point_indexes
         else:
-            return np.array([[]]), np.array([])
+            return np.array([[]]), np.array([]), np.array([])
 
     def box_select_points(
         self, x_range: Union[tuple, list], y_range: Union[tuple, list]
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Return the points and IDs for a box in the latent space
 
         Parameters
@@ -251,7 +292,7 @@ class Visualize(Verb):
         """
         indexes = self.box_select_indexes(x_range, y_range)
         ids = np.array(list(self.umap_results.ids()))[indexes]
-        return self.umap_results[indexes].numpy(), ids
+        return self.umap_results[indexes].numpy(), ids, indexes
 
     def box_select_indexes(self, x_range: Union[tuple, list], y_range: Union[tuple, list]):
         """Return the indexes inside of a particular box in the latent space

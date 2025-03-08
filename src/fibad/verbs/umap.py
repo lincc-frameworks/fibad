@@ -78,14 +78,14 @@ class Umap(Verb):
 
         self.reducer = umap.UMAP(**self.config["umap.UMAP"])
 
-        # Set up the results directory where we will store our umapped output
-        results_dir = create_results_dir(self.config, "umap")
-        logger.info(f"Saving UMAP results to {results_dir}")
-        umap_results = InferenceDataSetWriter(results_dir)
-
         # Load all the latent space data.
         inference_results = InferenceDataSet(self.config, results_dir=input_dir)
         total_length = len(inference_results)
+
+        # Set up the results directory where we will store our umapped output
+        results_dir = create_results_dir(self.config, "umap")
+        logger.info(f"Saving UMAP results to {results_dir}")
+        umap_results = InferenceDataSetWriter(inference_results, results_dir)
 
         # Sample the data to fit
         config_sample_size = self.config["umap"]["fit_sample_size"]
@@ -129,7 +129,7 @@ class Umap(Verb):
             # imap returns results as they complete so writing should complete in parallel for large datasets
             for batch_ids, transformed_batch in tqdm(
                 pool.imap(self._transform_batch, args),
-                desc="Creating LowerDimensional Representation using UMAP:",
+                desc="Creating lower dimensional representation using UMAP:",
                 total=num_batches,
             ):
                 logger.debug("Writing a batch out async...")

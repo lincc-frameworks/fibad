@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
+import numpy.typing as npt
 from torch import Tensor, from_numpy
 from torch.utils.data import Dataset
 
@@ -13,6 +14,8 @@ from fibad.config_utils import find_most_recent_results_dir
 from .data_set_registry import fibad_data_set
 
 logger = logging.getLogger(__name__)
+
+ORIGINAL_DATASET_CONFIG_FILENAME = "original_dataset_config.toml"
 
 
 @fibad_data_set
@@ -26,6 +29,9 @@ class InferenceDataSet(Dataset):
         results_dir: Optional[Union[Path, str]] = None,
         verb: Optional[str] = None,
     ):
+        from fibad.config_utils import ConfigManager
+        from fibad.pytorch_ignite import setup_dataset
+
         self.config = config
         self.results_dir = self._resolve_results_dir(config, results_dir, verb)
 
@@ -45,6 +51,13 @@ class InferenceDataSet(Dataset):
         self.shape_element = self._load_from_batch_file(
             self.batch_index["batch_num"][0], self.batch_index["id"][0]
         )[0]
+
+        # Initialize the original dataset using the old config, so we have it
+        # around for metadata calls
+        self.original_dataset_config = ConfigManager(
+            self.results_dir / ORIGINAL_DATASET_CONFIG_FILENAME
+        ).config
+        self.original_dataset = setup_dataset(self.original_dataset_config)
 
     def shape(self):
         """The shape of the dataset (Discovered from files)
@@ -111,6 +124,52 @@ class InferenceDataSet(Dataset):
     def __len__(self) -> int:
         return self.length
 
+    def original_config(self) -> dict:
+        """Get the original configuration for the dataset used to generate this inference dataset
+
+        Since this sort of dataset is definitionally an intermediate product, this returns the
+        runtime config used to construct that dataset rather than this one.
+
+        Returns
+        -------
+        ConfigDict
+            Configuration that can be used to create the original dataset that was used
+            as input for whatever inference process created this dataset.
+        """
+        return self.original_dataset_config
+
+    def metadata_fields(self) -> list[str]:
+        """Get the metadata fields associted with the original dataset used to generate this one
+
+        Returns
+        -------
+        list[str]
+            List of valid field names for metadata queries
+        """
+        return self.original_dataset.metadata_fields()  # type: ignore[no-any-return,attr-defined]
+
+    def metadata(self, idxs: npt.ArrayLike, fields: list[str]) -> npt.ArrayLike:
+        """Get metadata associated with the data in the InferenceDataSet. This metadata comes from
+        the original dataset, but is indexed according to the InferenceDataSet.
+
+        Parameters
+        ----------
+        idxs : npt.ArrayLike
+            Indexes in the InferenceDataSet for which metadata is desired
+        fields : list[str]
+            Metadata fields requested
+
+        Returns
+        -------
+        npt.ArrayLike
+            An array where the rows correspond to the passed list of indexes and the columns
+            correspond to the fields passed.
+        """
+        ids_requested = np.array(list(self.ids()))[idxs]  # type: ignore[index]
+        original_ids = np.array(list(self.original_dataset.ids()))  # type: ignore[attr-defined]
+        original_idxs = np.array([str(id) in ids_requested for id in original_ids]).nonzero()[0]
+        return self.original_dataset.metadata(original_idxs, fields)  # type: ignore[attr-defined,no-any-return]
+
     def _load_from_batch_file(self, batch_num: int, ids=Union[int, np.ndarray]) -> np.ndarray:
         """Hands back an array of tensors given a set of IDs in a particular batch and the given
         batch number"""
@@ -163,13 +222,14 @@ class InferenceDataSetWriter:
     manipulate the filesystem directly as their primary effect.
     """
 
-    def __init__(self, result_dir: Union[str, Path]):
+    def __init__(self, original_dataset: Dataset, result_dir: Union[str, Path]):
         self.result_dir = result_dir if isinstance(result_dir, Path) else Path(result_dir)
         self.batch_index = 0
 
         self.all_ids = np.array([], dtype=np.int64)
         self.all_batch_nums = np.array([], dtype=np.int64)
         self.writer_pool = Pool()
+        self.original_dataset_config = original_dataset.original_config()  # type: ignore[attr-defined]
 
     def write_batch(self, ids: np.ndarray, tensors: list[np.ndarray]):
         """Write a batch of tensors into the dataset. This writes the whole batch immediately.
@@ -212,34 +272,28 @@ class InferenceDataSetWriter:
         """Writes out the batch index built up by this object over multiple write_batch calls.
         See save_batch_index for details.
         """
+        from fibad.config_utils import log_runtime_config
+
         # First ensure we are done writing out all batches
         self.writer_pool.close()
         self.writer_pool.join()
 
         # Then write out the batch index.
-        InferenceDataSetWriter.save_batch_index(self.result_dir, self.all_ids, self.all_batch_nums)
+        self._save_batch_index()
 
-    @staticmethod
-    def save_batch_index(result_dir: Path, all_ids: np.ndarray, all_batch_nums: np.ndarray):
-        """Save a batch index in the result directory provided
+        # Write out the config needed to re-constitute the original dataset we came from.
+        log_runtime_config(self.original_dataset_config, self.result_dir, ORIGINAL_DATASET_CONFIG_FILENAME)
 
-        Parameters
-        ----------
-        result_dir : Path
-            The results directory
-        all_ids : np.ndarray
-            All IDs to write out.
-        all_batch_nums : np.ndarray
-            The corresponding batch numbers for the IDs provided.
-        """
+    def _save_batch_index(self):
+        """Save a batch index in the result directory provided"""
         batch_index_dtype = np.dtype([("id", np.int64), ("batch_num", np.int64)])
-        batch_index = np.zeros(len(all_ids), batch_index_dtype)
-        batch_index["id"] = np.array(all_ids)
-        batch_index["batch_num"] = np.array(all_batch_nums)
+        batch_index = np.zeros(len(self.all_ids), batch_index_dtype)
+        batch_index["id"] = np.array(self.all_ids)
+        batch_index["batch_num"] = np.array(self.all_batch_nums)
         batch_index.sort(order="id")
 
         filename = "batch_index.npy"
-        savepath = result_dir / filename
+        savepath = self.result_dir / filename
         if savepath.exists():
             RuntimeError("The path to save batch index already exists.")
         np.save(savepath, batch_index, allow_pickle=False)

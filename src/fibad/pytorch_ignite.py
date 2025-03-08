@@ -27,7 +27,7 @@ from fibad.models.model_registry import fetch_model_class
 logger = logging.getLogger(__name__)
 
 
-def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Dataset:
+def setup_dataset(config: Union[ConfigDict, dict], split: Union[str, bool] = False) -> Dataset:
     """Create a dataset object based on the configuration.
 
     Parameters

@@ -17,7 +17,7 @@ def fibad_data_set(cls):
     type
         The original, unmodified class.
     """
-    required_methods = ["shape", "__getitem__", "__len__"]
+    required_methods = ["shape", "__getitem__", "__len__", "ids"]
     for name in required_methods:
         if not hasattr(cls, name):
             logger.error(f"Fibad data set {cls.__name__} missing required method {name}.")

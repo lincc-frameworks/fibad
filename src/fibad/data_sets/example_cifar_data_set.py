@@ -1,8 +1,14 @@
 # ruff: noqa: D101, D102
 import logging
+from collections.abc import Generator
+from typing import Optional
 
+import numpy as np
+import numpy.typing as npt
 import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
+
+from fibad.config_utils import ConfigDict
 
 from .data_set_registry import fibad_data_set
 
@@ -18,12 +24,34 @@ class CifarDataSet(CIFAR10):
     into Train/test/Validate according to configuration.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: ConfigDict):
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
-
+        self.config = config
         super().__init__(root=config["general"]["data_dir"], train=True, download=True, transform=transform)
+
+    def ids(self) -> Generator[str]:
+        return (str(x) for x in range(len(self)))
 
     def shape(self):
         return (3, 32, 32)
+
+    def original_config(self) -> ConfigDict:
+        return self.config
+
+    def metadata_fields(self) -> list[str]:
+        return ["label"]
+
+    def metadata(self, idxs: npt.ArrayLike, fields: Optional[list[str]] = None) -> npt.ArrayLike:
+        if np.isscalar(idxs):
+            idxs = np.array([idxs])
+
+        if fields is None:
+            fields = self.metadata_fields()
+
+        if len(fields) == 0 or fields != ["label"]:
+            msg = "For CifarDataSet 'label' is the only supported field."
+            raise RuntimeError(msg)
+
+        return np.array([self[index][1] for index in np.array(idxs)])
