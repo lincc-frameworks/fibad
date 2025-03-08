@@ -56,7 +56,7 @@ class Visualize(Verb):
 
         from fibad.data_sets.inference_dataset import InferenceDataSet
 
-        # TODO xcxc Is this an argument?
+        # TODO Is this an argument or config to visualize?
         fields = ["object_id", "ra", "dec"]
 
         # Get the umap data and put it in a kdtree for indexing.

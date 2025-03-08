@@ -35,25 +35,6 @@ logger = logging.getLogger(__name__)
 dim_dict = dict[str, list[tuple[int, int]]]
 files_dict = dict[str, dict[str, str]]
 
-# Notes on metadata interface
-# What I think I want for visualization:
-#  - You send me a list of IDs (preferably as a numpy array)
-#  - You also send me a set of fields you want
-#
-#  - I give you back a rec array thats ID, Field1, field2, ... with everything you want
-#  - If I don't have what you want you get a warning on partial, and an error when I have nothing for you
-#
-# Another interface we need: Tell me all the fields you have dataset!
-#
-# Alternate interface: You send me a list of indexes and same as above (Same same... but different)
-#
-# But also for HSCDataSet we're looking up in a fits file catalog regardless
-# And the fits file catalog indexes aren't necessarilty the index order of the dataset object
-# (but they might be)
-#
-# There is not a way to make metadata work here unless there's a fits file catalog with the relevant fields
-# So we need to check for that along the metadata call-path and just be like "we have nothing"
-
 
 @fibad_data_set
 class HSCDataSet(Dataset):
