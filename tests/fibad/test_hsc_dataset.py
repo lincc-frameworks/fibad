@@ -1,6 +1,7 @@
 import logging
 import unittest.mock as mock
 from pathlib import Path
+from typing import Any, Optional
 
 import numpy as np
 import pytest
@@ -28,8 +29,8 @@ class FakeFitsFS:
     more filesystem operations without a really good reason.
     """
 
-    def __init__(self, test_files: dict):
-        self.patchers: list[mock._patch[mock.Mock]] = []
+    def __init__(self, test_files: dict, filter_catalog: Optional[dict] = None):
+        self.patchers: list[mock._patch[Any]] = []
 
         self.test_files = test_files
 
@@ -39,6 +40,17 @@ class FakeFitsFS:
 
         mock_fits_open = mock.Mock(side_effect=self._open_file)
         self.patchers.append(mock.patch("astropy.io.fits.open", mock_fits_open))
+
+        if filter_catalog is not None:
+            mock_read_filter_catalog = mock.patch(
+                "fibad.data_sets.hsc_data_set.HSCDataSet._read_filter_catalog",
+                lambda x, y: "Not a real table",
+            )
+            self.patchers.append(mock_read_filter_catalog)
+            mock_parse_filter_catalog = mock.patch(
+                "fibad.data_sets.hsc_data_set.HSCDataSet._parse_filter_catalog", lambda x, y: filter_catalog
+            )
+            self.patchers.append(mock_parse_filter_catalog)
 
     def _open_file(self, filename: Path, **kwargs) -> mock.Mock:
         shape = self.test_files[filename.name]
@@ -116,6 +128,42 @@ def generate_files(
             test_files[f"{object_id:017d}_{infill_str}_{filter}.fits"] = shape
 
     return test_files
+
+
+def generate_filter_catalog(test_files: dict, config: dict) -> dict:
+    """Generates a filter catalog dict for use with FakeFitsFS from a filesystem dictionary
+    created by generate_files.
+
+    This allows tests to alter the parsed filter_catalog, and interrogate what decisions HSCDataSet makes
+    when a manifest or filter_catalog file contains corrupt information.
+
+    Caveats:
+    Always Run this prior to creating any mocks, or using a FakeFitsFS
+
+    This function calls the HSCDataSet parsing code to actually assemble the files array, which means:
+    1) This test setup is fairly tightly coupled to the internals of HSCDataSet
+    2) When writing tests using this, ensure any functionality you depend on from the slow file-scan
+       initialization codepath is tested indepently.
+
+    Parameters
+    ----------
+    test_files : dict
+        Test files dictionary created with generate_files.
+    config : dict
+        The config you will use to initialize the test HSCDataSet object in your test.
+        Create this with mkconfig()
+
+    Returns
+    -------
+    dict
+        Dictionary from ObjectID -> (Dictionary from Filter -> Filename)
+    """
+    # Ensure the filter_catalog codepath won't be triggered
+    config["data_set"]["filter_catalog"] = False
+
+    # Use our initialization code to create a parsed files object
+    with FakeFitsFS(test_files):
+        return HSCDataSet(config).files
 
 
 def test_load(caplog):
@@ -312,6 +360,52 @@ def test_prune_size(caplog):
         # We should warn that we are dropping objects and the reason
         assert "Dropping object" in caplog.text
         assert "too small" in caplog.text
+
+
+def test_prune_filter_size_mismatch(caplog):
+    """Test to ensure images with different sizes per filter will be dropped"""
+    caplog.set_level(logging.WARNING)
+    test_files = {}
+    test_files.update(generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0))
+    test_files["00000000000000000_all_filters_HSC-R.fits"] = (99, 99)
+
+    with FakeFitsFS(test_files):
+        a = HSCDataSet(mkconfig(crop_to=(99, 99)))
+
+        assert len(a) == 9
+        assert a.shape() == (5, 99, 99)
+
+        # We should warn that we are dropping objects and the reason
+        assert "Dropping object" in caplog.text
+        assert "first filter" in caplog.text
+
+
+def test_prune_bad_filename(caplog):
+    """Test to ensure images with filenames set wrong will be dropped"""
+    caplog.set_level(logging.WARNING)
+    test_files = {}
+    test_files.update(generate_files(num_objects=10, num_filters=5, shape=(100, 100), offset=0))
+
+    config = mkconfig(crop_to=(99, 99), filter_catalog="notarealfile.fits")
+
+    # Create a filter catalog with wrong file information.
+    filter_catalog = generate_filter_catalog(test_files, config)
+    filters = list(filter_catalog["00000000000000000"].keys())
+    filter_catalog["00000000000000000"][filters[0]] = filter_catalog["00000000000000001"][filters[0]]
+
+    with FakeFitsFS(test_files, filter_catalog):
+        # Initialize HSCDataset exercising the filter_catalog provided initialization pathway
+        a = HSCDataSet(config)
+
+        # Verify that the broken object has been dropped
+        assert len(a) == 9
+
+        # Verify the shape is correct.
+        assert a.shape() == (5, 99, 99)
+
+        # We should warn that we are dropping objects and the correct reason
+        assert "Dropping object" in caplog.text
+        assert "manifest is likely corrupt" in caplog.text
 
 
 def test_partial_filter(caplog):
