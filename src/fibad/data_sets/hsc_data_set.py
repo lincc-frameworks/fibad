@@ -413,8 +413,8 @@ class HSCDataSet(Dataset):
                 logger.info(f"Filters for object {object_id} were {filters_unsorted}")
                 logger.debug(f"Reference filters were {filters_ref}")
 
-            # Drop objects that can't meet the coutout size provided
             elif cutout_shape is not None:
+                # Drop objects that can't meet the cutout size provided
                 for shape in self.dims[object_id]:
                     if shape[0] < cutout_shape[0] or shape[1] < cutout_shape[1]:
                         msg = f"A file for object {object_id} has shape ({shape[1]}px, {shape[1]}px)"
@@ -422,6 +422,29 @@ class HSCDataSet(Dataset):
                         msg += f"({cutout_shape[0]}px, {cutout_shape[1]}px)"
                         self._mark_for_prune(object_id, msg)
                         break
+
+                # Drop objects where the cutouts are not the same size
+                first_shape = None
+                for shape in self.dims[object_id]:
+                    first_shape = shape if first_shape is None else first_shape
+                    if shape != first_shape:
+                        msg = f"The first filter for object {object_id} has a shape of "
+                        msg += f"({first_shape[0]}px,{first_shape[1]}px) another filter has shape of"
+                        msg += f"({shape[0]}px,{shape[1]}px)"
+                        self._mark_for_prune(object_id, msg)
+                        break
+
+                # Drop objects where parsing the filenames does not reveal the object IDs
+                for filter, filepath in filters_unsorted.items():
+                    filename = Path(filepath).name
+                    # Check beginning of filename vs object_id
+                    if filename[:17] != object_id:
+                        msg = f"Filter {filter} for object id {object_id} has filename {filepath} listed"
+                        msg += "The filename does not match the object_id, and the filter_catalog or "
+                        msg += "manifest is likely corrupt."
+                        self._mark_for_prune(object_id, msg)
+                        break
+
             if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Processed {index} objects for pruning")
         else:
