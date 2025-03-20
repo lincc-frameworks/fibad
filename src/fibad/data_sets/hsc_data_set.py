@@ -1,5 +1,6 @@
 # ruff: noqa: D101, D102
 
+import datetime
 import logging
 import multiprocessing
 import os
@@ -564,8 +565,17 @@ class HSCDataSet(Dataset):
 
         logger.info("Writing rebuilt manifest...")
         manifest_table = Table(columns)
-        rebuilt_manifest_path = Path(config["general"]["data_dir"]) / "rebuilt_manifest.fits"
-        manifest_table.write(rebuilt_manifest_path, overwrite=True, format="fits")
+
+        manifest_file_path = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
+
+        # Rename the old manifest
+        if manifest_file_path.exists():
+            filename_safe_now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            new_file_name = Downloader.MANIFEST_FILE_NAME + f".archived.at.{filename_safe_now}"
+            manifest_file_path.rename(Path(config["general"]["data_dir"]) / new_file_name)
+
+        # Replace the old manifest
+        manifest_table.write(manifest_file_path, overwrite=True, format="fits")
 
     def shape(self) -> tuple[int, int, int]:
         """Shape of the individual cutouts this will give to a model
