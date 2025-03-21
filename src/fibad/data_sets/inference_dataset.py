@@ -57,7 +57,7 @@ class InferenceDataSet(Dataset):
         self.original_dataset_config = ConfigManager(
             self.results_dir / ORIGINAL_DATASET_CONFIG_FILENAME
         ).config
-        self.original_dataset = setup_dataset(self.original_dataset_config)
+        self.original_dataset = setup_dataset(self.original_dataset_config)  # type: ignore[arg-type]
 
     def shape(self):
         """The shape of the dataset (Discovered from files)
