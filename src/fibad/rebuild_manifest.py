@@ -18,7 +18,7 @@ def run(config):
 
     config["rebuild_manifest"] = True
 
-    data_set = setup_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config)
 
     if not isinstance(data_set, HSCDataSet):
         msg = "Invalid to run rebuild manafest except on an HSCDataSet."

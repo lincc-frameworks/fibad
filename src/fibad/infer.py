@@ -4,6 +4,7 @@ from typing import Optional, Union
 
 import chromadb
 import numpy as np
+from tensorboardX import SummaryWriter
 from torch import Tensor
 
 from fibad.config_utils import (
@@ -31,14 +32,17 @@ def run(config: ConfigDict):
     config : ConfigDict
         The parsed config file as a nested dict
     """
+    # Create a results directory and dump our config there
+    results_dir = create_results_dir(config, "infer")
 
-    data_set = setup_dataset(config, split=config["infer"]["split"])
+    # Create a tensorboardX logger
+    tensorboardx_logger = SummaryWriter(log_dir=results_dir)
+
+    data_set = setup_dataset(config, tensorboardx_logger)
     model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
     data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
-    # Create a results directory and dump our config there
-    results_dir = create_results_dir(config, "infer")
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
 
@@ -92,6 +96,9 @@ def run(config: ConfigDict):
 
     # Write out a dictionary to map IDs->Batch
     data_writer.write_index()
+
+    # Write out our tensorboard stuff
+    tensorboardx_logger.close()
 
     # Log completion
     logger.info(f"Inference results saved in: {results_dir}")
