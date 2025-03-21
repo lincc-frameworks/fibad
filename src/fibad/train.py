@@ -35,7 +35,7 @@ def run(config):
     tensorboardx_logger = SummaryWriter(log_dir=results_dir)
 
     # Instantiate the model and dataset
-    data_set = setup_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config, tensorboardx_logger)
     model = setup_model(config, data_set)
 
     # Create a data loader for the training set (and validation split if configured)

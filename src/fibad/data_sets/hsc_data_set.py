@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import re
 import resource
+import time
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
@@ -172,6 +173,8 @@ class HSCDataSet(Dataset):
         self.transform = Compose([crop, self.transform]) if self.transform is not None else crop
 
         self.tensors: dict[str, torch.Tensor] = {}
+        self.tensorboard_start_ns = time.monotonic_ns()
+        self.tensorboardx_logger = None
 
         logger.info(f"HSC Data set loader has {len(self)} objects")
 
@@ -776,6 +779,68 @@ class HSCDataSet(Dataset):
         """
         return Path(self.path) / Path(filename)
 
+    def _log_duration_tensorboard(self, name: str, start_time: int):
+        """Log a duration to tensorboardX. NOOP if no tensorboard logger configured
+
+        The time logged is a floating point number of seconds derived from integer
+        monotonic nanosecond measurements. time.monotonic_ns() is used for the current time
+
+        The step number for the scalar series is an integer number of microseonds.
+
+        Parameters
+        ----------
+        name : str
+            The name of the scalar to log to tensorboard
+        start_time : int
+            integer number of nanoseconds. Should be from time.monotonic_ns() when the duration started
+
+        """
+        now = time.monotonic_ns()
+        if self.tensorboardx_logger:
+            since_tensorboard_start_us = (start_time - self.tensorboard_start_ns) / 1.0e3
+
+            duration_s = (now - start_time) / 1.0e9
+            self.tensorboardx_logger.add_scalar(name, duration_s, since_tensorboard_start_us)
+
+    def _check_object_id_to_tensor_cache(self, object_id: str) -> Optional[torch.Tensor]:
+        return self.tensors.get(object_id, None)
+
+    def _populate_object_id_to_tensor_cache(self, object_id: str) -> torch.Tensor:
+        data_torch = self._read_object_id(object_id)
+        self.tensors[object_id] = data_torch
+        return data_torch
+
+    def _read_object_id(self, object_id: str) -> torch.Tensor:
+        start_time = time.monotonic_ns()
+
+        # Read all the files corresponding to this object
+        data = []
+
+        for filepath in self._object_files_filters_ref(object_id):
+            file_start_time = time.monotonic_ns()
+            raw_data = fits.getdata(filepath, memmap=False)
+            data.append(raw_data)
+            self._log_duration_tensorboard("HSCDataSet/file_read_time_s", file_start_time)
+
+        self._log_duration_tensorboard("HSCDataSet/object_read_time_s", start_time)
+
+        data_torch = self._convert_to_torch(data)
+        self._log_duration_tensorboard("HSCDataSet/object_total_read_time_s", start_time)
+        return data_torch
+
+    def _convert_to_torch(self, data: list[npt.ArrayLike]) -> torch.Tensor:
+        start_time = time.monotonic_ns()
+
+        # Push all the filter data into a tensor object
+        data_np = np.array(data)
+        data_torch = torch.from_numpy(data_np.astype(np.float32))
+
+        # Apply our transform stack
+        data_torch = self.transform(data_torch) if self.transform is not None else data_torch
+
+        self._log_duration_tensorboard("HSCDataSet/object_convert_tensor_time_s", start_time)
+        return data_torch
+
     # TODO: Performance Change when files are read/cache pytorch tensors?
     #
     # This function loads from a file every time __getitem__ is called
@@ -801,28 +866,18 @@ class HSCDataSet(Dataset):
         torch.Tensor
             A tensor with dimension (self.num_filters, self.cutout_shape[0], self.cutout_shape[1])
         """
-        if self.use_cache is True:
-            data_torch = self.tensors.get(object_id, None)
-            if data_torch is not None:
-                return data_torch
+        start_time = time.monotonic_ns()
 
-        # Read all the files corresponding to this object
-        data = []
+        if self.use_cache is False:
+            return self._read_object_id(object_id)
 
-        for filepath in self._object_files_filters_ref(object_id):
-            raw_data = fits.getdata(filepath, memmap=False)
-            data.append(raw_data)
+        data_torch = self._check_object_id_to_tensor_cache(object_id)
+        if data_torch is not None:
+            self._log_duration_tensorboard("HSCDataSet/cache_hit_s", start_time)
+            return data_torch
 
-        # Push all the filter data into a tensor object
-        data_np = np.array(data)
-        data_torch = torch.from_numpy(data_np.astype(np.float32))
-
-        # Apply our transform stack
-        data_torch = self.transform(data_torch) if self.transform is not None else data_torch
-
-        if self.use_cache is True:
-            self.tensors[object_id] = data_torch
-
+        data_torch = self._populate_object_id_to_tensor_cache(object_id)
+        self._log_duration_tensorboard("HSCDataSet/cache_miss_s", start_time)
         return data_torch
 
     def original_config(self) -> dict:
