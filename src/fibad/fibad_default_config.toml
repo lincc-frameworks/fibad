@@ -190,6 +190,10 @@ seed = false
 # first epoch. Set to `false` when running inference or on memory-constrained systems.
 use_cache = true
 
+# If `true`, preload the in memory cache using many worker threads when the dataset is constructed 
+# to reduce the effect of filesystem latency on first epoch runtime. 
+# Warning: Only suitable for situations where the entire dataset fits in system memory
+preload_cache = true
 
 [data_loader]
 # The number of data points to load at once.
