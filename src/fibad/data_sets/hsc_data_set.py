@@ -78,7 +78,7 @@ class HSCDataSet(Dataset):
             filter_catalog=filter_catalog,
         )
 
-        if config["data_set"]["preload_cache"]:
+        if config["data_set"]["preload_cache"] and self.use_cache:
             self.preload_thread = Thread(
                 name="HSCDataSet-preload-tensor-cache",
                 daemon=True,
@@ -809,8 +809,8 @@ class HSCDataSet(Dataset):
                 self.tensors[id] = tensor
 
                 # Output timing every 1k tensors
-                if idx % 1_00 == 0 and idx != 0:
-                    self._log_duration_tensorboard("HSCDataSet/preload_100_obj_s", start_time)
+                if idx % 1_000 == 0 and idx != 0:
+                    self._log_duration_tensorboard("HSCDataSet/preload_1k_obj_s", start_time)
                     start_time = time.monotonic_ns()
 
     def _lazy_map_executor(self, executor: Executor, ids: Iterable[str]) -> Iterator[torch.Tensor]:
