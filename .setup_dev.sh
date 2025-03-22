@@ -34,7 +34,7 @@ python -m pip install -e . > /dev/null
 echo "Installing developer dependencies in local environment"
 echo "This might take a few minutes. Only errors will be printed to stdout"
 python -m pip install -e .'[dev]' > /dev/null
-if [ -f docs/requirements.txt ]; then python -m pip install -r docs/requirements.txt; fi
+if [ -f docs/requirements.txt ]; then python -m pip install -r docs/requirements.txt > /dev/null; fi
 
 echo "Installing pre-commit"
 pre-commit install > /dev/null
