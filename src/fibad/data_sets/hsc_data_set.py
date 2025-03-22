@@ -7,8 +7,10 @@ import os
 import re
 import resource
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Iterable, Iterator
+from concurrent.futures import Executor
 from pathlib import Path
+from threading import Thread
 from typing import Any, Callable, Optional, Union
 
 import numpy as np
@@ -76,6 +78,17 @@ class HSCDataSet(Dataset):
             filters=filters if filters else None,
             filter_catalog=filter_catalog,
         )
+
+        if config["data_set"]["preload_cache"] and self.use_cache:
+            self.preload_thread = Thread(
+                name="HSCDataSet-preload-tensor-cache",
+                daemon=True,
+                # Note we are passing only the function and self explicitly to the thread
+                # This ensures the current object is in shared thread memory.
+                target=self._preload_tensor_cache.__func__,  # type: ignore[attr-defined]
+                args=(self,),
+            )
+            self.preload_thread.start()
 
     def _get_np_function(self, transform_str: str) -> Callable[..., Any]:
         """
@@ -281,7 +294,7 @@ class HSCDataSet(Dataset):
             dim_catalog: dim_dict = {}
 
         for row in table:
-            object_id = row["object_id"]
+            object_id = str(row["object_id"])
             filter = row["filter"]
             filename = row["filename"]
             if "dim" in colnames:
@@ -811,6 +824,84 @@ class HSCDataSet(Dataset):
             A full path that is openable.
         """
         return Path(self.path) / Path(filename)
+
+    def _preload_tensor_cache(self):
+        """
+        When preloading the tensor cache is configured, this is called on a separate thread by __init__()
+        to perform a preload of every tensor in the dataset.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        logger.info("Preloading HSCDataSet cache...")
+
+        with ThreadPoolExecutor(max_workers=HSCDataSet._determine_numprocs()) as executor:
+            tensors = self._lazy_map_executor(executor, self.ids(log_every=1_000_000))
+
+            start_time = time.monotonic_ns()
+            for idx, (id, tensor) in enumerate(zip(self.ids(), tensors)):
+                self.tensors[id] = tensor
+
+                # Output timing every 1k tensors
+                if idx % 1_000 == 0 and idx != 0:
+                    self._log_duration_tensorboard("HSCDataSet/preload_1k_obj_s", start_time)
+                    start_time = time.monotonic_ns()
+
+    def _lazy_map_executor(self, executor: Executor, ids: Iterable[str]) -> Iterator[torch.Tensor]:
+        """This is a version of concurrent.futures.Executor map() which lazily evaluates the iterator passed
+        We do this because we do not want all of the tensors to remain in memory during pre-loading. We would
+        prefer a smaller set of in-flight tensors.
+
+        The total number of in progress jobs is set at HSCDataSet._determine_numprocs().
+
+        The total number of tensors is slightly greater than that owing to out-of-order execution.
+
+        This approach was copied from:
+        https://gist.github.com/CallumJHays/0841c5fdb7b2774d2a0b9b8233689761
+
+        Parameters
+        ----------
+        executor : concurrent.futures.Executor
+            An executour for running our futures
+        work_fn : Callable[[str], torch.Tensor]
+            The function that makes tensors out of object_ids
+        ids : Iterable[str]
+            An iterable list of object IDs.
+
+        Yields
+        ------
+        Iterator[torch.Tensor]
+            An iterator over torch tensors, lazily loaded by running the work_fn as needed.
+        """
+
+        from concurrent.futures import FIRST_COMPLETED, Future, wait
+
+        max_futures = HSCDataSet._determine_numprocs()
+        queue: list[Future[torch.Tensor]] = []
+        in_progress: set[Future[torch.Tensor]] = set()
+        ids_iter = iter(ids)
+
+        try:
+            while True:
+                for _ in range(max_futures - len(in_progress)):
+                    id = next(ids_iter)
+                    future = executor.submit(self._read_object_id.__func__, self, id)  # type: ignore[attr-defined]
+                    queue.append(future)
+                    in_progress.add(future)
+
+                _, in_progress = wait(in_progress, return_when=FIRST_COMPLETED)
+
+                while queue and queue[0].done():
+                    yield queue.pop(0).result()
+
+        except StopIteration:
+            wait(queue)
+            for future in queue:
+                try:
+                    result = future.result()
+                except Exception as e:
+                    raise e
+                else:
+                    yield result
 
     def _log_duration_tensorboard(self, name: str, start_time: int):
         """Log a duration to tensorboardX. NOOP if no tensorboard logger configured

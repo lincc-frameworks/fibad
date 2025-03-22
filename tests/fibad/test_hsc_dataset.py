@@ -86,6 +86,7 @@ def mkconfig(
             "filter_catalog": filter_catalog,
             "use_cache": use_cache,
             "transform": transform,
+            "preload_cache": False,  # Don't run the preloading in unit tests, because it needs real data.
         },
     }
 
