@@ -4,6 +4,7 @@ from typing import Union
 import chromadb
 import numpy as np
 from chromadb.api.types import IncludeEnum
+
 from fibad.vector_dbs.vector_db_interface import VectorDB
 
 MIN_SHARDS_FOR_PARALLELIZATION = 50
