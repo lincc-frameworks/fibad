@@ -17,8 +17,8 @@ class VectorDB(ABC):
         context : dict, optional
             An instance of the context object, by default None
         """
-        self.config = config
-        self.context = context
+        self.config = config if config else {}
+        self.context = context if context else {}
 
     @abstractmethod
     def connect(self):

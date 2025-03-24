@@ -1,8 +1,61 @@
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Union
 
 import chromadb
 import numpy as np
+from chromadb.api.types import IncludeEnum
 from fibad.vector_dbs.vector_db_interface import VectorDB
+
+MIN_SHARDS_FOR_PARALLELIZATION = 50
+
+
+def _query_for_nn(results_dir: str, shard_name: str, vectors: list[np.ndarray], k: int):
+    """The query function for the ProcessPoolExecutor to query a shard for the
+    nearest neighbors of a set of vectors.
+
+    Parameters
+    ----------
+    results_dir : str
+        The directory where the ChromaDB results are stored
+    shard_name : str
+        The name of the ChromaDB shard to load and query
+    vectors : np.ndarray
+        The vectors used as inputs for the nearest neighbor search
+    k : int
+        The number of nearest neighbors to return
+
+    Returns
+    -------
+    dict
+        The results of the nearest neighbor search for the given vectors in the
+        given shard.
+    """
+    chromadb_client = chromadb.PersistentClient(path=str(results_dir))
+    collection = chromadb_client.get_collection(name=shard_name)
+    return collection.query(query_embeddings=vectors, n_results=k)
+
+
+def _query_for_id(results_dir: str, shard_name: str, id: str):
+    """The query function for the ProcessPoolExecutor to query a shard for the
+    vector associated with a given id.
+
+    Parameters
+    ----------
+    results_dir : str
+        The directory where the ChromaDB results are stored
+    shard_name : str
+        The name of the ChromaDB shard to load and query
+    id : str
+        The id of the vector in the database shard we are trying to retrieve
+
+    Returns
+    -------
+    dict
+        The results of the id query for the given id in the given shard.
+    """
+    chromadb_client = chromadb.PersistentClient(path=str(results_dir))
+    collection = chromadb_client.get_collection(name=shard_name)
+    return collection.get(id, include=[IncludeEnum.embeddings])
 
 
 class ChromaDB(VectorDB):
@@ -17,7 +70,7 @@ class ChromaDB(VectorDB):
         self.shard_size = 0  # The number of vectors in the current shard
 
         # The approximate maximum size of a shard before a new one is created
-        self.shard_size_limit = 41_666
+        self.shard_size_limit = 512
 
     def connect(self):
         """Create a database connection"""
@@ -66,30 +119,29 @@ class ChromaDB(VectorDB):
 
     def search_by_id(self, id: Union[str | int], k: int = 1) -> dict[int, list[Union[str | int]]]:
         """Get the ids of the k nearest neighbors for a given id in the database.
-        Should use the provided id to look up the vector, then call search_by_vector.
 
         Parameters
         ----------
         id : Union[str | int]
             The id of the vector in the database for which we want to find the
-            k nearest neighbors
+            k nearest neighbors. If type `int` is provided, it will be converted
+            to a string.
         k : int, optional
-            The number of nearest neighbors to return, by default 1, return only
-            the closest neighbor
+            The number of nearest neighbors to return. By default 1, return only
+            the closest neighbor - this is almost always the same as the input.
 
         Returns
         -------
         dict[int, list[Union[str, int]]]
-            Dictionary with input vector index as the key and the ids of the k
-            nearest neighbors as the value.
+            Dictionary with input id index as the key and the ids of the k
+            nearest neighbors as the value. Because this function accepts only 1
+            id, the key will always be 0. i.e. {0: [id1, id2, ...]}
 
         Raises
         ------
         ValueError
             If more than one vector is found for the given id
         """
-
-        #! Fix the definition of the return type here!!!
 
         if k < 1:
             raise ValueError("k must be greater than 0")
@@ -98,16 +150,33 @@ class ChromaDB(VectorDB):
         if self.chromadb_client is None:
             self.connect()
 
+        if isinstance(id, int):
+            id = str(id)
+
         # get all the shards
         shards = self.chromadb_client.list_collections()
 
         vectors = []
-        for shard in shards:
-            # Get the vector for the id
-            collection = self.chromadb_client.get_collection(id=shard.id)
-            results = collection.get(id, include=["embeddings"])
 
-            vectors.extend(results["embeddings"])
+        # ~ ProcessPoolExecutor parallelized
+        if len(shards) > MIN_SHARDS_FOR_PARALLELIZATION:
+            with ProcessPoolExecutor() as executor:
+                futures = {
+                    executor.submit(_query_for_id, self.context["results_dir"], shard.name, id): shard
+                    for shard in shards
+                }
+                for future in as_completed(futures):
+                    results = future.result()
+                    vectors.extend(results["embeddings"])
+
+        # ~ Non-parallelized implementation, faster for smaller number of shards
+        else:
+            # Query each shard, return vector for the given id.
+            for shard in shards:
+                # Get the vector for the id
+                collection = self.chromadb_client.get_collection(name=shard.name)
+                results = collection.get(id, include=["embeddings"])
+                vectors.extend(results["embeddings"])
 
         query_results: dict[int, list[Union[str | int]]] = {}
         # no matching id found in database
@@ -162,13 +231,28 @@ class ChromaDB(VectorDB):
             i: {"ids": [], "distances": []} for i in range(len(vectors))
         }
 
-        # Query each shard, return the k nearest neighbors from each shard.
-        for shard in shards:
-            collection = self.chromadb_client.get_collection(name=shard.name)
-            results = collection.query(query_embeddings=vectors, n_results=k)
-            for i in range(len(results["ids"])):
-                intermediate_results[i]["ids"].extend(results["ids"][i])
-                intermediate_results[i]["distances"].extend(results["distances"][i])
+        # ~ ProcessPoolExecutor parallelized
+        if len(shards) > MIN_SHARDS_FOR_PARALLELIZATION:
+            with ProcessPoolExecutor() as executor:
+                futures = {
+                    executor.submit(_query_for_nn, self.context["results_dir"], shard.name, vectors, k): shard
+                    for shard in shards
+                }
+                for future in as_completed(futures):
+                    results = future.result()
+                    for i in range(len(results["ids"])):
+                        intermediate_results[i]["ids"].extend(results["ids"][i])
+                        intermediate_results[i]["distances"].extend(results["distances"][i])
+
+        # ~ Non-parallelized implementation, faster for smaller number of shards
+        else:
+            # Query each shard, return the k nearest neighbors from each shard.
+            for shard in shards:
+                collection = self.chromadb_client.get_collection(name=shard.name)
+                results = collection.query(query_embeddings=vectors, n_results=k)
+                for i in range(len(results["ids"])):
+                    intermediate_results[i]["ids"].extend(results["ids"][i])
+                    intermediate_results[i]["distances"].extend(results["distances"][i])
 
         # Sort the distances ascending
         for i in range(len(intermediate_results)):
