@@ -1,4 +1,5 @@
 import pytest
+
 from fibad import plugin_utils
 from fibad.models import fibad_model
 from fibad.models.model_registry import fetch_model_class

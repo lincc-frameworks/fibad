@@ -1187,7 +1187,7 @@ def _download(
             except Exception as exception:
                 # Humans count attempts from 1, this loop counts from zero.
                 logger.warning(
-                    f"Attempt {attempt + 1} of {retries} to request rects [{i}:{i+chunksize}] has error:"
+                    f"Attempt {attempt + 1} of {retries} to request rects [{i}:{i + chunksize}] has error:"
                 )
                 logger.warning(exception)
 
@@ -1272,12 +1272,8 @@ def _download_chunk(
         coordlist.append(" ".join(_format_rect_member[field](getattr(rect, field)) for field in fields))
 
     boundary = "Boundary"
-    header = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="list"; filename="coordlist.txt"\r\n'
-        f"\r\n"
-    )
-    footer = f"\r\n" f"--{boundary}--\r\n"
+    header = f'--{boundary}\r\nContent-Disposition: form-data; name="list"; filename="coordlist.txt"\r\n\r\n'
+    footer = f"\r\n--{boundary}--\r\n"
 
     data = (header + "\n".join(coordlist) + footer).encode("utf-8")
     secret = base64.standard_b64encode(f"{user}:{password}".encode()).decode("ascii")
@@ -1424,7 +1420,7 @@ def make_filename(metadata: dict) -> str:
     args = dataclasses.asdict(rect)
     type = args["type"]
     if type == "warp":
-        args["name"] = f'{args["name"]}_{metadata["visit"]:06d}'
+        args["name"] = f"{args['name']}_{metadata['visit']:06d}"
     if type == "coadd/bg":
         args["type"] = "coadd+bg"
 

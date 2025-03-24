@@ -279,7 +279,7 @@ def extract_model_method(model, method_name):
     Callable
         The method extracted from the model
     """
-    wrapped = type(model) == DistributedDataParallel or type(model) == DataParallel
+    wrapped = type(model) is DistributedDataParallel or type(model) is DataParallel
     return getattr(model.module if wrapped else model, method_name)
 
 
