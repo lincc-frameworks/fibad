@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional, Union
 
-import chromadb
 import numpy as np
 from tensorboardX import SummaryWriter
 from torch import Tensor
@@ -20,6 +19,7 @@ from fibad.pytorch_ignite import (
     setup_dataset,
     setup_model,
 )
+from fibad.vector_dbs.vector_db_factory import vector_db_factory
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,8 @@ def run(config: ConfigDict):
     config : ConfigDict
         The parsed config file as a nested dict
     """
+    context = {}
+
     # Create a results directory and dump our config there
     results_dir = create_results_dir(config, "infer")
 
@@ -39,25 +41,18 @@ def run(config: ConfigDict):
     tensorboardx_logger = SummaryWriter(log_dir=results_dir)
 
     data_set = setup_dataset(config, tensorboardx_logger)
+
     model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
     data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
+    context["results_dir"] = results_dir
 
-    # Create a chromadb in results dir
-    if config["infer"]["chromadb"]:
-        chromadb_client = chromadb.PersistentClient(path=str(results_dir))
-        collection = chromadb_client.create_collection(
-            name="fibad",
-            metadata={
-                # These are all chromdb defaults. We may want to configure them
-                "hsnw:space": "l2",
-                "hsnw:construction_ef": 100,
-                "hsnw:search_ef": 100,
-            },
-        )
+    vector_db = vector_db_factory(config, context)
+    if vector_db:
+        vector_db.create()
 
     data_writer = InferenceDataSetWriter(data_set, results_dir)
 
@@ -79,12 +74,12 @@ def run(config: ConfigDict):
         batch_results = batch_results.detach().to("cpu")
         batch_object_ids = [object_ids[id] for id in range(write_index, write_index + len(batch_results))]
 
-        # Save results to ChromaDB vector database
-        if config["infer"]["chromadb"]:
-            nonlocal collection
-            chroma_ids: list[str] = [str(id) for id in batch_object_ids]
-            embeddings: list[np.ndarray] = [t.flatten().numpy() for t in batch_results]
-            collection.add(embeddings=embeddings, ids=chroma_ids)
+        # Save results to vector database
+        nonlocal vector_db
+        if vector_db:
+            ids: list[str | int] = [str(id) for id in batch_object_ids]
+            vectors: list[np.ndarray] = [t.flatten().numpy() for t in batch_results]
+            vector_db.insert(ids=ids, vectors=vectors)
 
         # Save results from this batch in a numpy file as a structured array
         data_writer.write_batch(np.array(batch_object_ids), [t.numpy() for t in batch_results])

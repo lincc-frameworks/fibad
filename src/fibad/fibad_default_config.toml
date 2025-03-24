@@ -203,9 +203,6 @@ model_weights_file = false
 # The data_set split to use for inference. Use `false` for entire dataset.
 split = false
 
-# Whether to generate a chromadb vector database of inference results
-chromadb = true
-
 
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
@@ -228,3 +225,8 @@ n_components = 2
 # Controls how UMAP balances local versus global structure in the data.
 # See official documentation for details.
 n_neighbors = 15
+
+
+[vector_db]
+# The type of vector db to use. Use "false" to disable vector database.
+name = "chromadb"
