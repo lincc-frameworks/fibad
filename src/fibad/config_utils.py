@@ -27,6 +27,10 @@ class ConfigDict(dict):
     # values? i.e. a method to make a config dictionary fully immutable (or very difficult/annoying to
     # mutate) before we pass control to possibly external module code that is relying on the dictionary
     # to be static throughout the run.
+    #
+    # Note that we currently modify configdict objects in HSCDataSet as a matter of course
+    # This is to serialize the config used to create them, so it can be kept around in InferenceDatasets
+    # and re-constituted for visualization purposes
 
     __slots__ = ()  # we don't need __dict__ on this object at all.
 

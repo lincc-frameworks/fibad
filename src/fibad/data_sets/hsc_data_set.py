@@ -1,15 +1,18 @@
 # ruff: noqa: D101, D102
 
+import datetime
 import logging
 import multiprocessing
 import os
 import re
 import resource
+import time
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
 import numpy as np
+import numpy.typing as npt
 import torch
 from astropy.io import fits
 from astropy.table import Table
@@ -39,7 +42,9 @@ files_dict = dict[str, dict[str, str]]
 class HSCDataSet(Dataset):
     _called_from_test = False
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
+        self.config = config
+
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
         transform_str = config["data_set"]["transform"]
@@ -60,16 +65,16 @@ class HSCDataSet(Dataset):
         elif not rebuild_manifest:
             filter_catalog = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
             if not filter_catalog.exists():
-                filter_catalog = False
+                filter_catalog = None
         else:
-            filter_catalog = False
+            filter_catalog = None
 
         self._init_from_path(
             config["general"]["data_dir"],
             transform=transform,
             cutout_shape=crop_to if crop_to else None,
             filters=filters if filters else None,
-            filter_catalog=Path(filter_catalog) if filter_catalog else None,
+            filter_catalog=filter_catalog,
         )
 
     def _get_np_function(self, transform_str: str) -> Callable[..., Any]:
@@ -134,7 +139,14 @@ class HSCDataSet(Dataset):
         self.path = path
         self.transform = transform
 
-        self.filter_catalog = self._read_filter_catalog(filter_catalog)
+        self.filter_catalog_table = self._read_filter_catalog(filter_catalog)
+
+        self.filter_catalog = (
+            None
+            if self.filter_catalog_table is None
+            else self._parse_filter_catalog(self.filter_catalog_table)
+        )
+
         if isinstance(self.filter_catalog, tuple):
             self.files = self.filter_catalog[0]
             self.dims = self.filter_catalog[1]
@@ -162,6 +174,8 @@ class HSCDataSet(Dataset):
         self.transform = Compose([crop, self.transform]) if self.transform is not None else crop
 
         self.tensors: dict[str, torch.Tensor] = {}
+        self.tensorboard_start_ns = time.monotonic_ns()
+        self.tensorboardx_logger = None
 
         logger.info(f"HSC Data set loader has {len(self)} objects")
 
@@ -224,9 +238,7 @@ class HSCDataSet(Dataset):
 
         return files
 
-    def _read_filter_catalog(
-        self, filter_catalog_path: Optional[Path]
-    ) -> Optional[Union[list[str], files_dict, tuple[files_dict, dim_dict]]]:
+    def _read_filter_catalog(self, filter_catalog_path: Optional[Path]) -> Table:
         if filter_catalog_path is None:
             return None
 
@@ -236,19 +248,31 @@ class HSCDataSet(Dataset):
 
         table = Table.read(filter_catalog_path, format="fits")
         colnames = table.colnames
+
         if "object_id" not in colnames:
             logger.error(f"Filter catalog file {filter_catalog_path} has no column object_id")
             return None
 
+        table.add_index("object_id")
+        table.add_index("filter")
+
+        if ("filter" not in colnames) ^ ("filename" not in colnames):
+            msg = f"Filter catalog file {filter_catalog_path} provides one of filters or filenames "
+            msg += "without the other. Filesystem scan will still occur without both defined."
+            logger.warning(msg)
+
+        return table
+
+    def _parse_filter_catalog(
+        self, table: Table
+    ) -> Optional[Union[list[str], files_dict, tuple[files_dict, dim_dict]]]:
+        colnames = table.colnames
         # We are dealing with just a list of object_ids
         if "filter" not in colnames and "filename" not in colnames:
             return list(table["object_id"])
 
         # Or a table that lacks both filter and filename
         elif "filter" not in colnames or "filename" not in colnames:
-            msg = f"Filter catalog file {filter_catalog_path} provides one of filters or filenames "
-            msg += "without the other. Filesystem scan will still occur without both defined."
-            logger.warning(msg)
             return list(set(table["object_id"]))
 
         # We have filter and filename defined so we can assemble the catalog at file level.
@@ -564,8 +588,17 @@ class HSCDataSet(Dataset):
 
         logger.info("Writing rebuilt manifest...")
         manifest_table = Table(columns)
-        rebuilt_manifest_path = Path(config["general"]["data_dir"]) / "rebuilt_manifest.fits"
-        manifest_table.write(rebuilt_manifest_path, overwrite=True, format="fits")
+
+        manifest_file_path = Path(config["general"]["data_dir"]) / Downloader.MANIFEST_FILE_NAME
+
+        # Rename the old manifest
+        if manifest_file_path.exists():
+            filename_safe_now = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            new_file_name = Downloader.MANIFEST_FILE_NAME + f".archived.at.{filename_safe_now}"
+            manifest_file_path.rename(Path(config["general"]["data_dir"]) / new_file_name)
+
+        # Replace the old manifest
+        manifest_table.write(manifest_file_path, overwrite=True, format="fits")
 
     def shape(self) -> tuple[int, int, int]:
         """Shape of the individual cutouts this will give to a model
@@ -643,7 +676,7 @@ class HSCDataSet(Dataset):
         filter = filter_names[index % self.num_filters]
         return self._file_to_path(filters[filter])
 
-    def ids(self, log_every=None) -> Generator[str, None, None]:
+    def ids(self, log_every=None) -> Generator[str]:
         """Public read-only iterator over all object_ids that enforces a strict total order across
         objects. Will not work prior to self.files initialization in __init__
 
@@ -656,7 +689,7 @@ class HSCDataSet(Dataset):
         for index, object_id in enumerate(self.files):
             if log and index != 0 and index % log_every == 0:
                 logger.info(f"Processed {index} objects")
-            yield object_id
+            yield str(object_id)
         else:
             if log:
                 logger.info(f"Processed {index} objects")
@@ -756,6 +789,68 @@ class HSCDataSet(Dataset):
         """
         return Path(self.path) / Path(filename)
 
+    def _log_duration_tensorboard(self, name: str, start_time: int):
+        """Log a duration to tensorboardX. NOOP if no tensorboard logger configured
+
+        The time logged is a floating point number of seconds derived from integer
+        monotonic nanosecond measurements. time.monotonic_ns() is used for the current time
+
+        The step number for the scalar series is an integer number of microseonds.
+
+        Parameters
+        ----------
+        name : str
+            The name of the scalar to log to tensorboard
+        start_time : int
+            integer number of nanoseconds. Should be from time.monotonic_ns() when the duration started
+
+        """
+        now = time.monotonic_ns()
+        if self.tensorboardx_logger:
+            since_tensorboard_start_us = (start_time - self.tensorboard_start_ns) / 1.0e3
+
+            duration_s = (now - start_time) / 1.0e9
+            self.tensorboardx_logger.add_scalar(name, duration_s, since_tensorboard_start_us)
+
+    def _check_object_id_to_tensor_cache(self, object_id: str) -> Optional[torch.Tensor]:
+        return self.tensors.get(object_id, None)
+
+    def _populate_object_id_to_tensor_cache(self, object_id: str) -> torch.Tensor:
+        data_torch = self._read_object_id(object_id)
+        self.tensors[object_id] = data_torch
+        return data_torch
+
+    def _read_object_id(self, object_id: str) -> torch.Tensor:
+        start_time = time.monotonic_ns()
+
+        # Read all the files corresponding to this object
+        data = []
+
+        for filepath in self._object_files_filters_ref(object_id):
+            file_start_time = time.monotonic_ns()
+            raw_data = fits.getdata(filepath, memmap=False)
+            data.append(raw_data)
+            self._log_duration_tensorboard("HSCDataSet/file_read_time_s", file_start_time)
+
+        self._log_duration_tensorboard("HSCDataSet/object_read_time_s", start_time)
+
+        data_torch = self._convert_to_torch(data)
+        self._log_duration_tensorboard("HSCDataSet/object_total_read_time_s", start_time)
+        return data_torch
+
+    def _convert_to_torch(self, data: list[npt.ArrayLike]) -> torch.Tensor:
+        start_time = time.monotonic_ns()
+
+        # Push all the filter data into a tensor object
+        data_np = np.array(data)
+        data_torch = torch.from_numpy(data_np.astype(np.float32))
+
+        # Apply our transform stack
+        data_torch = self.transform(data_torch) if self.transform is not None else data_torch
+
+        self._log_duration_tensorboard("HSCDataSet/object_convert_tensor_time_s", start_time)
+        return data_torch
+
     # TODO: Performance Change when files are read/cache pytorch tensors?
     #
     # This function loads from a file every time __getitem__ is called
@@ -781,26 +876,79 @@ class HSCDataSet(Dataset):
         torch.Tensor
             A tensor with dimension (self.num_filters, self.cutout_shape[0], self.cutout_shape[1])
         """
-        if self.use_cache is True:
-            data_torch = self.tensors.get(object_id, None)
-            if data_torch is not None:
-                return data_torch
+        start_time = time.monotonic_ns()
 
-        # Read all the files corresponding to this object
-        data = []
+        if self.use_cache is False:
+            return self._read_object_id(object_id)
 
-        for filepath in self._object_files_filters_ref(object_id):
-            raw_data = fits.getdata(filepath, memmap=False)
-            data.append(raw_data)
+        data_torch = self._check_object_id_to_tensor_cache(object_id)
+        if data_torch is not None:
+            self._log_duration_tensorboard("HSCDataSet/cache_hit_s", start_time)
+            return data_torch
 
-        # Push all the filter data into a tensor object
-        data_np = np.array(data)
-        data_torch = torch.from_numpy(data_np.astype(np.float32))
-
-        # Apply our transform stack
-        data_torch = self.transform(data_torch) if self.transform is not None else data_torch
-
-        if self.use_cache is True:
-            self.tensors[object_id] = data_torch
-
+        data_torch = self._populate_object_id_to_tensor_cache(object_id)
+        self._log_duration_tensorboard("HSCDataSet/cache_miss_s", start_time)
         return data_torch
+
+    def original_config(self) -> dict:
+        # Resolve the paths on configs which we depend on to initialize repeatably.
+        # This allows this method to be used to serialize the config used to create this dataset
+        # so that it can be repeatably re-created no matter what cwd is in future fibad invocations
+        config = self.config
+        config["data_set"]["filter_catalog"] = (
+            str(Path(config["data_set"]["filter_catalog"]).resolve())
+            if config["data_set"]["filter_catalog"]
+            else False
+        )
+        config["general"]["data_dir"] = (
+            str(Path(config["general"]["data_dir"]).resolve()) if config["general"]["data_dir"] else False
+        )
+
+        return config
+
+    def metadata_fields(self) -> list[str]:
+        """Metadata field names for the HSCDataSet.
+
+        This will return an empty list of fields if there was no filter catalog, and is inherently limited
+        to fields in the filter catalog provided.
+
+        Returns
+        -------
+        list[str]
+            Strings with the names of all metadata fields that can be looked up for a given
+            datum in this dataset
+        """
+        if self.filter_catalog_table is None:
+            return []
+
+        colnames = list(self.filter_catalog_table.colnames)
+
+        # We don't expose these per object_id, because they have a multiplicy of values for each object_id
+        colnames.remove("filename")
+        colnames.remove("filter")
+
+        return colnames
+
+    def metadata(self, idxs: npt.ArrayLike, fields: list[str]) -> npt.ArrayLike:
+        # Determine what fields we will be processing
+        metadata_fields = self.metadata_fields()
+        for field in fields:
+            if field not in metadata_fields:
+                msg = f"Field {field} is not available for this HSCDataSet."
+                logger.error(msg)
+
+        columns = [field for field in fields if field in metadata_fields]
+
+        if len(columns) == 0:
+            msg = f"None of the metadata fields passed [{fields}] are available for this HSCDataSet."
+            raise RuntimeError(msg)
+
+        # Find the object IDs corresponding to indicies passed
+        object_ids = np.array(list(self.files.keys()))[idxs]  # type: ignore[index]
+
+        # Query our catalog table based on the object IDs, deduplicating by filter
+        metadata_filter_dup = self.filter_catalog_table.loc["object_id", object_ids]
+        metadata_slice = metadata_filter_dup.loc["filter", self.filters_ref[0]]
+
+        # Slice out only the columns asked for.
+        return metadata_slice[columns].as_array()  # type: ignore[no-any-return]

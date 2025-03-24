@@ -1,6 +1,8 @@
 import logging
 import pickle
+import warnings
 from argparse import ArgumentParser, Namespace
+from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Optional, Union
 
@@ -60,22 +62,30 @@ class Umap(Verb):
         None
             The method does not return anything but saves the UMAP representations to disk.
         """
+        with warnings.catch_warnings():
+            warnings.simplefilter(action="ignore", category=FutureWarning)
+            return self._run(input_dir)
+
+    def _run(self, input_dir: Optional[Union[Path, str]] = None):
+        """See run()"""
+        from multiprocessing import Pool
+
         import umap
         from tqdm.auto import tqdm
 
         from fibad.config_utils import create_results_dir
         from fibad.data_sets.inference_dataset import InferenceDataSet, InferenceDataSetWriter
 
-        reducer = umap.UMAP(**self.config["umap.UMAP"])
-
-        # Set up the results directory where we will store our umapped output
-        results_dir = create_results_dir(self.config, "umap")
-        logger.info(f"Saving UMAP results to {results_dir}")
-        umap_results = InferenceDataSetWriter(results_dir)
+        self.reducer = umap.UMAP(**self.config["umap.UMAP"])
 
         # Load all the latent space data.
         inference_results = InferenceDataSet(self.config, results_dir=input_dir)
         total_length = len(inference_results)
+
+        # Set up the results directory where we will store our umapped output
+        results_dir = create_results_dir(self.config, "umap")
+        logger.info(f"Saving UMAP results to {results_dir}")
+        umap_results = InferenceDataSetWriter(inference_results, results_dir)
 
         # Sample the data to fit
         config_sample_size = self.config["umap"]["fit_sample_size"]
@@ -87,11 +97,11 @@ class Umap(Verb):
         data_sample = inference_results[index_choices].numpy().reshape((sample_size, -1))
 
         # Fit a single reducer on the sampled data
-        reducer.fit(data_sample)
+        self.reducer.fit(data_sample)
 
         # Save the reducer to our results directory
         with open(results_dir / "umap.pickle", "wb") as f:
-            pickle.dump(reducer, f)
+            pickle.dump(self.reducer, f)
 
         # Run all data through the reducer in batches, writing it out as we go.
         batch_size = self.config["data_loader"]["batch_size"]
@@ -99,17 +109,53 @@ class Umap(Verb):
 
         all_indexes = np.arange(0, total_length)
         all_ids = np.array([int(i) for i in inference_results.ids()])
-        for batch_indexes in tqdm(
-            np.array_split(all_indexes, num_batches),
-            desc="Creating Lower Dimensional Representation using UMAP",
-            total=num_batches,
-        ):
-            # We flatten all dimensions of the input array except the dimension
-            # corresponding to batch elements. This ensures that all inputs to
-            # the UMAP algorithm are flattend per input item in the batch
-            batch = inference_results[batch_indexes].reshape(len(batch_indexes), -1)
-            batch_ids = all_ids[batch_indexes]
-            transformed_batch = reducer.transform(batch)
-            umap_results.write_batch(batch_ids, transformed_batch)
+
+        # Process pool to do all the transforms
+        with Pool(processes=cpu_count()) as pool:
+            # Generator expression that gives a batch tuple composed of:
+            # batch ids, inference results
+            args = (
+                (
+                    all_ids[batch_indexes],
+                    # We flatten all dimensions of the input array except the dimension
+                    # corresponding to batch elements. This ensures that all inputs to
+                    # the UMAP algorithm are flattend per input item in the batch
+                    inference_results[batch_indexes].reshape(len(batch_indexes), -1),
+                )
+                for batch_indexes in np.array_split(all_indexes, num_batches)
+            )
+
+            # iterate over the mapped results to write out the umapped points
+            # imap returns results as they complete so writing should complete in parallel for large datasets
+            for batch_ids, transformed_batch in tqdm(
+                pool.imap(self._transform_batch, args),
+                desc="Creating lower dimensional representation using UMAP:",
+                total=num_batches,
+            ):
+                logger.debug("Writing a batch out async...")
+                umap_results.write_batch(batch_ids, transformed_batch)
 
         umap_results.write_index()
+
+    def _transform_batch(self, batch_tuple: tuple):
+        """Private helper to transform a single batch
+
+        Parameters
+        ----------
+        batch_tuple : tuple()
+            first element is the IDs of the batch as a numpy array
+            second element is the inference results to transform as a numpy array with shape (batch_len, N)
+            where N is the total number of dimensions in the inference result. Caller flattens all inference
+            result axes for us.
+
+        Returns
+        -------
+        tuple
+            first element is the ids of the batch as a numpy array
+            second element is the results of running the umap transform on the input as a numpy array.
+        """
+        batch_ids, batch = batch_tuple
+        with warnings.catch_warnings():
+            warnings.simplefilter(action="ignore", category=FutureWarning)
+            logger.debug("Transforming a batch ...")
+            return (batch_ids, self.reducer.transform(batch))

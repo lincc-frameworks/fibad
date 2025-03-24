@@ -2,7 +2,7 @@ import functools
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union
 
 import ignite.distributed as idist
 import numpy as np
@@ -27,16 +27,15 @@ from fibad.models.model_registry import fetch_model_class
 logger = logging.getLogger(__name__)
 
 
-def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Dataset:
+def setup_dataset(config: ConfigDict, tensorboardx_logger: Optional[SummaryWriter] = None) -> Dataset:
     """Create a dataset object based on the configuration.
 
     Parameters
     ----------
     config : ConfigDict
         The entire runtime configuration
-    split : Union[str,bool], optional
-        The name of the split that we want to use. If False, use the entire
-        dataset, by default False
+    tensorboardx_logger : SummaryWriter, optional
+        If Tensorboard is in use, the tensorboard logger so the dataset can log things
 
     Returns
     -------
@@ -47,6 +46,10 @@ def setup_dataset(config: ConfigDict, split: Union[str, bool] = False) -> Datase
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
     data_set = data_set_cls(config)  # type: ignore[call-arg]
+
+    # TODO base dataset class: A base class for datasets ought have this as a property defined simply
+    # to document its existance in a central location.
+    data_set.tensorboardx_logger = tensorboardx_logger  # type: ignore[attr-defined]
 
     return data_set
 

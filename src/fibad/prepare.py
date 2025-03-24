@@ -15,7 +15,7 @@ def run(config):
         dict
     """
 
-    data_set = setup_dataset(config, split=config["train"]["split"])
+    data_set = setup_dataset(config)
 
     logger.info("Finished Prepare")
     return data_set

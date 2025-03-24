@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
+from tensorboardX import SummaryWriter
 from torch import Tensor
 
 from fibad.config_utils import (
@@ -32,13 +33,19 @@ def run(config: ConfigDict):
         The parsed config file as a nested dict
     """
     context = {}
-    data_set = setup_dataset(config, split=config["infer"]["split"])
+
+    # Create a results directory and dump our config there
+    results_dir = create_results_dir(config, "infer")
+
+    # Create a tensorboardX logger
+    tensorboardx_logger = SummaryWriter(log_dir=results_dir)
+
+    data_set = setup_dataset(config, tensorboardx_logger)
+
     model = setup_model(config, data_set)
     logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
     data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
-    # Create a results directory and dump our config there
-    results_dir = create_results_dir(config, "infer")
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
     context["results_dir"] = results_dir
@@ -47,16 +54,12 @@ def run(config: ConfigDict):
     if vector_db:
         vector_db.create()
 
-    data_writer = InferenceDataSetWriter(results_dir)
+    data_writer = InferenceDataSetWriter(data_set, results_dir)
 
     # These are values the _save_batch callback needs to run
     write_index = 0
     batch_index = 0
-    object_ids: list[int] = []
-    if hasattr(data_set, "ids"):
-        object_ids = list(int(id) for id in data_set.ids())
-    else:
-        object_ids = list(range(len(data_set)))  # type: ignore[arg-type]
+    object_ids = list(int(id) for id in data_set.ids())  # type: ignore[attr-defined]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately
@@ -88,6 +91,9 @@ def run(config: ConfigDict):
 
     # Write out a dictionary to map IDs->Batch
     data_writer.write_index()
+
+    # Write out our tensorboard stuff
+    tensorboardx_logger.close()
 
     # Log completion
     logger.info(f"Inference results saved in: {results_dir}")
