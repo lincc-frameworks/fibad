@@ -234,7 +234,7 @@ class HSCDataSet(Dataset):
             if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Processed {index} files.")
         else:
-            logger.info(f"Processed {index+1} files")
+            logger.info(f"Processed {index + 1} files")
 
         return files
 
@@ -584,7 +584,7 @@ class HSCDataSet(Dataset):
             if index != 0 and index % 1_000_000 == 0:
                 logger.info(f"Addeed {index} objects to manifest")
         else:
-            logger.info(f"Addeed {index+1} objects to manifest")
+            logger.info(f"Addeed {index + 1} objects to manifest")
 
         logger.info("Writing rebuilt manifest...")
         manifest_table = Table(columns)

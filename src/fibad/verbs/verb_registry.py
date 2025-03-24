@@ -8,7 +8,7 @@ from fibad.plugin_utils import update_registry
 logger = logging.getLogger(__name__)
 
 
-class Verb(ABC):
+class Verb(ABC):  # noqa: B024
     """Base class for all fibad verbs"""
 
     # Verbs get to define how their parser gets added to the main parser
