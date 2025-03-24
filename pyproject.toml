@@ -24,7 +24,10 @@ dependencies = [
     "torchvision", # Used in hsc data loader, example autoencoder, and CNN model data set
     "tensorboardX", # Used to log training metrics
     "tensorboard", # Used to log training metrics
-    "GPUtil", # Used to gather GPU usage information
+    # GPUtil is on a branch because it does not install. 
+    # fixed by https://github.com/anderskm/gputil/pull/60
+    # 1.4.0 and earlier are affected.
+    "GPUtil @ git+https://github.com/Samoed/gputil.git@patch-1", # Used to gather GPU usage information
     "schwimmbad", # Used to speedup hsc data loader file scans
     "chromadb", # Used for similarity search
     "holoviews", # Used in Holoviews visualization prototype
