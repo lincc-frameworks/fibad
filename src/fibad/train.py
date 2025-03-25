@@ -43,10 +43,6 @@ def run(config):
     train_data_loader = data_loaders["train"]
     validation_data_loader = data_loaders["validate"]
 
-    # Get a sample of input data. If the data is labeled, only return the input data.
-    batch_sample = next(iter(train_data_loader))
-    sample = batch_sample[0] if isinstance(batch_sample, (list, tuple)) else batch_sample
-
     # Create trainer, a pytorch-ignite `Engine` object
     trainer = create_trainer(model, config, results_dir, tensorboardx_logger)
 
@@ -86,6 +82,10 @@ def run(config):
         "ml_framework": "pytorch",
         "results_dir": results_dir,
     }
+
+    # Get a sample of input data. If the data is labeled, only return the input data.
+    batch_sample = next(iter(train_data_loader))
+    sample = batch_sample[0] if isinstance(batch_sample, (list, tuple)) else batch_sample
 
     export_to_onnx(model, sample, config, context)
 

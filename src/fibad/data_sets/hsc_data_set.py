@@ -825,6 +825,16 @@ class HSCDataSet(Dataset):
         """
         return Path(self.path) / Path(filename)
 
+    @staticmethod
+    def _determine_numprocs_preload():
+        # This is hardcoded to a reasonable value for hyak
+        # TODO: Unify this function and _determine_numprocs(). Ideally we would have
+        # either a multiprocessing.Pool or concurrent.futures.Executor interface taking
+        # an i/o bound callable which returns a number of bytes read. This reusable
+        # component would titrate the number of worker threads/processes to achieve a
+        # maximal throughput as measured by returns from the callable vs wall-clock time.
+        return 50
+
     def _preload_tensor_cache(self):
         """
         When preloading the tensor cache is configured, this is called on a separate thread by __init__()
@@ -834,7 +844,7 @@ class HSCDataSet(Dataset):
 
         logger.info("Preloading HSCDataSet cache...")
 
-        with ThreadPoolExecutor(max_workers=HSCDataSet._determine_numprocs()) as executor:
+        with ThreadPoolExecutor(max_workers=HSCDataSet._determine_numprocs_preload()) as executor:
             tensors = self._lazy_map_executor(executor, self.ids(log_every=1_000_000))
 
             start_time = time.monotonic_ns()
@@ -875,7 +885,7 @@ class HSCDataSet(Dataset):
 
         from concurrent.futures import FIRST_COMPLETED, Future, wait
 
-        max_futures = HSCDataSet._determine_numprocs()
+        max_futures = HSCDataSet._determine_numprocs_preload()
         queue: list[Future[torch.Tensor]] = []
         in_progress: set[Future[torch.Tensor]] = set()
         ids_iter = iter(ids)
