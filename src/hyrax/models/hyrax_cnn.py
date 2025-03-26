@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @hyrax_model
-class ExampleCNN(nn.Module):
+class HyraxCNN(nn.Module):
     def __init__(self, config, shape):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)

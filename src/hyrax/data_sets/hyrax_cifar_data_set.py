@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @hyrax_data_set
-class CifarDataSet(CIFAR10):
+class HyraxCifarDataSet(CIFAR10):
     """This is simply a version of CIFAR10 that has our needed shape method, and is initialized using
     Hyrax config with a transformation that works well for example code.
 

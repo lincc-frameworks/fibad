@@ -71,7 +71,7 @@ class ChromaDB(VectorDB):
         self.shard_size = 0  # The number of vectors in the current shard
 
         # The approximate maximum size of a shard before a new one is created
-        self.shard_size_limit = 512
+        self.shard_size_limit = 65_536
 
     def connect(self):
         """Create a database connection"""

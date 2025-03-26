@@ -1,14 +1,14 @@
 # Hyrax
 [![Template](https://img.shields.io/badge/Template-LINCC%20Frameworks%20Python%20Project%20Template-brightgreen)](https://lincc-ppt.readthedocs.io/en/latest/)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/lincc-frameworks/fibad/smoke-test.yml)](https://github.com/lincc-frameworks/fibad/actions/workflows/smoke-test.yml)
-[![codecov](https://codecov.io/gh/lincc-frameworks/fibad/branch/main/graph/badge.svg)](https://codecov.io/gh/lincc-frameworks/fibad)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/lincc-frameworks/hyrax/smoke-test.yml)](https://github.com/lincc-frameworks/hyrax/actions/workflows/smoke-test.yml)
+[![codecov](https://codecov.io/gh/lincc-frameworks/hyrax/branch/main/graph/badge.svg)](https://codecov.io/gh/lincc-frameworks/hyrax)
 
 <hr>
 
 ## Introduction
-The **Framework for Image-Based Anomaly Detection** (FIBAD) is an efficient tool
+Hyrax is an efficient tool
 to hunt for rare and anomalous sources in large astronomical imaging surveys
-(e.g., Rubin-LSST, HSC, Euclid, NGRST, etc.). 
+(e.g., Rubin-LSST, HSC, Euclid, NGRST, etc.).
 Hyrax is designed to support four primary steps in the anomaly detection workflow:
 
 * Downloading large numbers of cutouts from public data repositories
@@ -27,8 +27,8 @@ To get started with Hyrax, clone the repository and create a new virtual environ
 If you plan to develop code, run the ``.setup_dev.sh`` script.
 
 ```
->> git clone https://github.com/lincc-frameworks/fibad.git
->> conda create -n fibad python=3.10
+>> git clone https://github.com/lincc-frameworks/hyrax.git
+>> conda create -n hyrax python=3.10
 >> bash .setup_dev.sh (Optional, for developers)
 ```
 

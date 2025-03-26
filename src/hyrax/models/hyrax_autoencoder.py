@@ -15,7 +15,7 @@ from hyrax.models.model_registry import hyrax_model
 
 
 @hyrax_model
-class ExampleAutoencoder(nn.Module):
+class HyraxAutoencoder(nn.Module):
     def __init__(self, config, shape=(5, 250, 250)):
         super().__init__()
         self.config = config

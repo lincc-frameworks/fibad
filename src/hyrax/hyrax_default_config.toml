@@ -80,8 +80,8 @@ mask = false
 
 [model]
 # The name of the model to use. Option are a built-in model class name or import path
-# to an external model. e.g. "ExampleAutoencoder", "user_pkg.model.ExternalModel"
-name = "ExampleAutoencoder"
+# to an external model. e.g. "HyraxAutoencoder", "user_pkg.model.ExternalModel"
+name = "HyraxAutoencoder"
 
 # The number of output channels from the first layer.
 base_channel_size = 32
@@ -144,7 +144,7 @@ opset_version = 20
 [data_set]
 # Name of the built-in data loader to use or the import path to an external data
 # loader. e.g. "HSCDataSet", "user_pkg.data_set.ExternalDataSet"
-name = "CifarDataSet"
+name = "HyraxCifarDataSet"
 
 # Crop pixel dimensions for images, e.g., [100, 100]. If false, scans for the
 # smallest image size in [general].data_dir and uses it.

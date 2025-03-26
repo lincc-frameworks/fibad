@@ -1,8 +1,8 @@
 Welcome to Hyrax's documentation!
 =================================
 
-Hyrax - the Framework for Image-Base Anomaly Detection
-------------------------------------------------------
+Hyrax - A framework for machine learning in astronomy
+-----------------------------------------------------
 Hyrax is a powerful and extensible machine learning framework that automates data
 acquisition, scales seamlessly from laptops to HPC, and ensures reproducibility 
 — freeing astronomers to focus on discovery instead of infrastructure.
