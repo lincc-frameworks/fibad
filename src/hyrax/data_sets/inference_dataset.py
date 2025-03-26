@@ -6,20 +6,19 @@ from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
+import torch.utils.data as td
 from torch import Tensor, from_numpy
-from torch.utils.data import Dataset
 
 from hyrax.config_utils import find_most_recent_results_dir
 
-from .data_set_registry import hyrax_data_set
+from .data_set_registry import Dataset
 
 logger = logging.getLogger(__name__)
 
 ORIGINAL_DATASET_CONFIG_FILENAME = "original_dataset_config.toml"
 
 
-@hyrax_data_set
-class InferenceDataSet(Dataset):
+class InferenceDataSet(Dataset, td.Dataset):
     """This is a dataset class to represent the situations where we wish to treat the output of inference
     as a dataset. e.g. when performing umap/visualization operations"""
 
@@ -32,7 +31,7 @@ class InferenceDataSet(Dataset):
         from hyrax.config_utils import ConfigManager
         from hyrax.pytorch_ignite import setup_dataset
 
-        self.config = config
+        super().__init__(config)
         self.results_dir = self._resolve_results_dir(config, results_dir, verb)
 
         # Open the batch index numpy file.
