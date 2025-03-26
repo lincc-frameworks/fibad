@@ -1,14 +1,14 @@
 Model evaluation
 ================
 
-One goal of fibad is to make model evaluation easier. Many tools exist for visualization
-and evaluation of models. Fibad integrates with TensorBoard and MLFlow to provide
+One goal of Hyrax is to make model evaluation easier. Many tools exist for visualization
+and evaluation of models. Hyrax integrates with TensorBoard and MLFlow to provide
 easy access to these tools.
 
 TensorBoard
 -----------
 
-Fibad automatically logs training, validation and gpu metrics (when available) to
+Hyrax automatically logs training, validation and gpu metrics (when available) to
 TensorBoard while training a model.
 This allows for easy visualization of the training process.
 
@@ -18,7 +18,7 @@ For more information about TensorBoard see the
 MLFlow
 ------
 
-Fibad supports MLFlow for model tracking and experiment management.
+Hyrax supports MLFlow for model tracking and experiment management.
 By default the data collected for each run will be nested under the experiment
 "notebook" using a run name that is the same as the results directory,
 i.e. <timestampe>-train-<uid>.

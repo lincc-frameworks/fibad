@@ -149,13 +149,13 @@ _html/
 # Project initialization script
 .initialize_new_project.sh
 
-# Default save locations for fibad
+# Default save locations for hyrax
 data/
 results/
 example_model.pth
 
 # Common location to stash personal or notebook example config
-fibad_config.toml
+hyrax_config.toml
 credentials.ini
 
 # MLFlow data directory

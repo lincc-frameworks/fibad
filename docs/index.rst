@@ -1,24 +1,24 @@
-Welcome to FIBAD's documentation!
+Welcome to Hyrax's documentation!
 =================================
 
-FIBAD - the Framework for Image-Base Anomaly Detection
+Hyrax - the Framework for Image-Base Anomaly Detection
 ------------------------------------------------------
-FIBAD is a powerful and extensible machine learning framework that automates data
+Hyrax is a powerful and extensible machine learning framework that automates data
 acquisition, scales seamlessly from laptops to HPC, and ensures reproducibility 
 — freeing astronomers to focus on discovery instead of infrastructure.
 
 
 Getting Started
 ==================
-To get started, we recommend creating a virtual environment (e.g., venv or conda) and installing Fibad using ``pip``.
+To get started, we recommend creating a virtual environment (e.g., venv or conda) and installing Hyrax using ``pip``.
 
 .. code-block:: console
 
-   >> conda create env -n fibad python=3.10
-   >> conda activate fibad
-   >> pip install fibad
+   >> conda create env -n hyrax python=3.10
+   >> conda activate hyrax
+   >> pip install hyrax
 
-With FIBAD installed in your environment, you can train a built in autoencoder right away.
+With Hyrax installed in your environment, you can train a built in autoencoder right away.
 
 .. tabs::
 
@@ -26,10 +26,10 @@ With FIBAD installed in your environment, you can train a built in autoencoder r
 
         .. code-block:: python
 
-           from fibad import Fibad
+           from hyrax import Hyrax
 
-           # Create an instance of the Fibad object
-           f = Fibad()
+           # Create an instance of the Hyrax object
+           f = Hyrax()
 
            # Train the default autoencoder model
            f.train()
@@ -38,7 +38,7 @@ With FIBAD installed in your environment, you can train a built in autoencoder r
 
         .. code-block:: bash
 
-           >> fibad train
+           >> hyrax train
 
 Without any additional specification, the model is trained using the
 `CiFAR dataset <https://www.cs.toronto.edu/~kriz/cifar.html>`_.
@@ -58,9 +58,9 @@ Once the model is trained, we can immediately use it for inference.
 
         .. code-block:: bash
 
-           >> fibad infer
+           >> hyrax infer
 
-FIBAD will automatically use the most recently trained model to infer on the CiFAR test dataset.
+Hyrax will automatically use the most recently trained model to infer on the CiFAR test dataset.
 
 The results of inference will be 64 element floating point vectors saved as .npy
 files in a timestamped directory under the default ``./results/`` directory.
@@ -80,7 +80,7 @@ To visualize the results, we should created an embedded lower dimensional space.
 
         .. code-block:: bash
 
-           >> fibad umap
+           >> hyrax umap
 
 The `UMAP <https://umap-learn.readthedocs.io/en/latest/>`_ algorithm is used to
 create a 2D representation of the 64 element vectors.
@@ -98,10 +98,10 @@ withing a Jupyter notebook.
 
    An example UMAP visualization of the CiFAR dataset.
 
-This example shows how FIBAD can be used to quickly train, infer, and visualize
+This example shows how Hyrax can be used to quickly train, infer, and visualize
 data.
 To dive deeper, start with the :doc:`Configuration <configuration>`
-section to learn how to configure FIBAD for your specific use case.
+section to learn how to configure Hyrax for your specific use case.
 
 
 .. toctree::

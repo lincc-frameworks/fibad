@@ -4,7 +4,7 @@ Data set splits (subsets)
 
 Datasets used in machine learning are typically split in order to avoid overfitting a particular dataset of 
 interest, and to perform various sorts of checking that the model is learning what the researcher intends. 
-In FIBAD there are default conventions for splitting data, which can be configured to the liking of the 
+In Hyrax there are default conventions for splitting data, which can be configured to the liking of the 
 investigator.
 
 Splits in training
@@ -23,8 +23,8 @@ or a ratio of the dataset, where 1.0 represents the entire dataset. For example:
 
         .. code-block:: python
 
-            import fibad
-            f = fibad.Fibad()
+            import hyrax
+            f = hyrax.Hyrax()
             f.config["data_set"]["train_size"] = 0.6
             f.config["data_set"]["validate_size"] = 0.2
             f.config["data_set"]["test_size"] = 0.2
@@ -33,7 +33,7 @@ or a ratio of the dataset, where 1.0 represents the entire dataset. For example:
 
         .. code-block:: bash
             
-            $ cat fibad_config.toml
+            $ cat hyrax_config.toml
 
             [data_set]
             train_size = 600
@@ -63,8 +63,8 @@ infer on only the test split:
 
         .. code-block:: python
 
-            import fibad
-            f = fibad.Fibad()
+            import hyrax
+            f = hyrax.Hyrax()
             f.config["infer"]["split"] = "test"
 
             f.infer()
@@ -73,11 +73,11 @@ infer on only the test split:
 
         .. code-block:: bash
 
-            $ cat fibad_config.toml
+            $ cat hyrax_config.toml
             [infer]
             split = test
 
-            $ fibad infer -c fibad_config.toml
+            $ hyrax infer -c hyrax_config.toml
 
 
 Randomness in splits
@@ -93,14 +93,14 @@ You can specify a random seed with the ``[data_set]`` ``seed`` configuration key
 
         .. code-block:: python
 
-            import fibad
-            f = fibad.Fibad()
+            import hyrax
+            f = hyrax.Hyrax()
             f.config["data_set"]["seed"] = 1
 
     .. group-tab:: CLI
 
         .. code-block:: bash
 
-            $ cat fibad_config.toml
+            $ cat hyrax_config.toml
             [data_set]
             seed = 1

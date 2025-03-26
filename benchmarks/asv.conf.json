@@ -4,9 +4,9 @@
     // you know what you are doing.
     "version": 1,
     // The name of the project being benchmarked.
-    "project": "fibad",
+    "project": "hyrax",
     // The project's homepage.
-    "project_url": "https://github.com/lincc-frameworks/fibad",
+    "project_url": "https://github.com/lincc-frameworks/hyrax",
     // The URL or local path of the source code repository for the
     // project being benchmarked.
     "repo": "..",
@@ -33,7 +33,7 @@
     // variable.
     "environment_type": "virtualenv",
     // the base URL to show a commit for the project.
-    "show_commit_url": "https://github.com/lincc-frameworks/fibad/commit/",
+    "show_commit_url": "https://github.com/lincc-frameworks/hyrax/commit/",
     // The Pythons you'd like to test against. If not provided, defaults
     // to the current version of Python used to run `asv`.
     "pythons": [

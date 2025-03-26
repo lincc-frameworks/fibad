@@ -1,0 +1,16 @@
+# this is the default config file
+[general]
+# set dev_mode to true when developing
+# set to false for production use
+dev_mode = true
+
+[train]
+model_name = "example_model" # Use a built-in Hyrax model
+model_class = "new_thing.cool_model.CoolModel" # Use a custom model
+
+[train.model]
+weights_filepath = "example_model.pth"
+layers = 3
+
+[infer]
+batch_size = 32
