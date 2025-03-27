@@ -1,11 +1,11 @@
 External libraries
 ==================
 
-Fibad supports external libraries for models and data sets.
+Hyrax supports external libraries for models and data sets.
 
 Two basic conditions must be met to use an external model or dataset library:
-#. The relevant class must be defined under the appropriate decorator (``@fibad_model`` or ``@fibad_dataset``)
-#. The name of the class must be noted in the fibad config. ``[model]`` ``name`` for models, or ``[data_set]`` ``name`` for data sets
+#. The relevant class must be defined under the appropriate decorator (``@hyrax_model`` or ``@hyrax_dataset``)
+#. The name of the class must be noted in the hyrax config. ``[model]`` ``name`` for models, or ``[data_set]`` ``name`` for data sets
 
 Configuring an external class
 -----------------------------
@@ -20,33 +20,33 @@ is in a package called ``mydataset``, then you would configure as follows:
 
         .. code-block:: python
 
-            import fibad
-            f = fibad.Fibad()
+            import hyrax
+            f = hyrax.Hyrax()
             f.config["data_set"]["name"] = "mydataset.MyDataSet"
 
     .. group-tab:: CLI
 
         .. code-block:: bash
 
-            $ cat fibad_config.toml
+            $ cat hyrax_config.toml
             [data_set]
             name = "mydataset.MyDataSet"
 
 Datasets in the current notebook, or within your own package can simply be referred to by their class names without any dots.
 
 It is a valid usage of this extensibility to write your own dataset or model inline in the notebook where you 
-are using Fibad. Just be sure to re-run the cell where your model class is defined when you change it!
+are using Hyrax. Just be sure to re-run the cell where your model class is defined when you change it!
 
 Defining a model
 ----------------
 
 Models must (for now) be written as a subclasses of ``torch.nn.Module`` and use pytorch for computation, and 
-be decorated with ``@fibad_model``. Models must minimally define ``__init__``, ``forward``, and ``train_step`` 
+be decorated with ``@hyrax_model``. Models must minimally define ``__init__``, ``forward``, and ``train_step`` 
 methods.
 
 ``__init__(self, config, shape)``
 .................................
-On creation of your model FIBAD passes the entire FIBAD config as a nested dictionry in the ``config`` argument
+On creation of your model Hyrax passes the entire Hyrax config as a nested dictionry in the ``config`` argument
 as well as the shape of each item in the dataset we intend to run on in the ``shape`` argument. This data is provided 
 to allow your model class to adjust architecture or check that the provided dataset will work appropriately.
 
@@ -57,7 +57,7 @@ the first iterable axis of the tensor.
 
 ``forward(self, x)``
 ....................
-FIBAD calls this function evaluates your model on a single input ``x``. ``x`` is gauranteed to be a tensor with 
+Hyrax calls this function evaluates your model on a single input ``x``. ``x`` is gauranteed to be a tensor with 
 the shape passed to ``__init__``. 
 
 ``forward()`` ought return a tensor with the output of your model.
@@ -76,13 +76,13 @@ Defining a dataset class
 ------------------------
 
 Dataset classes are written (for now) as subclasses of ``torch.utils.data.Dataset``, and decorated with the 
-``@fibad_model`` decorator. Datasets must minimally define the methods below. These are similar in form to 
+``@hyrax_model`` decorator. Datasets must minimally define the methods below. These are similar in form to 
 Torch's `Map-style datasets <https://pytorch.org/docs/stable/data.html#map-style-datasets>`_
 
 ``__init__(self, config, split)``
 .................................
-On creation of your dataset FIBAD passes the entire FIBAD config as a nested dictionry in the ``config`` 
-argument. FIBAD also passes you the name of the dataset split this object will be iterating over with 
+On creation of your dataset Hyrax passes the entire Hyrax config as a nested dictionry in the ``config`` 
+argument. Hyrax also passes you the name of the dataset split this object will be iterating over with 
 ``__getitem__`` and ``__len__`` below. The split will be either ``"train"``, ``"validate"``, ``"test"``, 
 or ``None`` meaning the entire dataset.
 

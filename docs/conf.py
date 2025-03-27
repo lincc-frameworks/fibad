@@ -6,7 +6,7 @@
 
 import os
 import sys
-from importlib.metadata import version as metadata_version
+from importlib.metadata import version
 
 # Define path to the code to be documented **relative to where conf.py (this file) is kept**
 sys.path.insert(0, os.path.abspath("../src/"))
@@ -14,10 +14,10 @@ sys.path.insert(0, os.path.abspath("../src/"))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "fibad"
+project = "hyrax"
 copyright = "2024, LINCC Frameworks"
 author = "LINCC Frameworks"
-release = metadata_version("fibad")
+release = version("hyrax")
 # for example take major/minor
 version = ".".join(release.split(".")[:2])
 

@@ -23,7 +23,7 @@ development using the following commands:
 
 .. code-block:: console
 
-   >> git clone https://github.com/lincc-frameworks/fibad.git
+   >> git clone https://github.com/lincc-frameworks/hyrax.git
    >> pip install -e .'[dev]'
    >> pre-commit install
    >> conda install pandoc

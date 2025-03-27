@@ -3,7 +3,7 @@
 For more information on writing benchmarks:
 https://asv.readthedocs.io/en/stable/writing_benchmarks.html."""
 
-from fibad import example_benchmarks
+from hyrax import example_benchmarks
 
 
 def time_computation():

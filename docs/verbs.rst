@@ -1,6 +1,6 @@
-FIBAD Verbs
+Hyrax Verbs
 ===========
-The term "verb" is used to describe the functions that FIBAD supports.
+The term "verb" is used to describe the functions that Hyrax supports.
 For instance, the ``train`` verb is used to train a model.
 Each of the builtin verbs are detailed here.
 
@@ -15,10 +15,10 @@ Train a model
 
         .. code-block:: python
 
-           from fibad import Fibad
+           from hyrax import Hyrax
 
-           # Create an instance of the Fibad object
-           f = Fibad()
+           # Create an instance of the Hyrax object
+           f = Hyrax()
 
            # Train the model specified in the configuration file
            f.train()
@@ -27,7 +27,7 @@ Train a model
 
         .. code-block:: bash
 
-           >> fibad train
+           >> hyrax train
 
 
 ``infer``
@@ -40,10 +40,10 @@ Run inference using a model
 
         .. code-block:: python
 
-           from fibad import Fibad
+           from hyrax import Hyrax
 
-           # Create an instance of the Fibad object
-           f = Fibad()
+           # Create an instance of the Hyrax object
+           f = Hyrax()
 
            # Train the model specified in the configuration file
            f.infer()
@@ -52,7 +52,7 @@ Run inference using a model
 
         .. code-block:: bash
 
-           >> fibad infer
+           >> hyrax infer
 
 
 ``umap``
@@ -65,10 +65,10 @@ Run UMAP on the output of inference or a dataset
 
         .. code-block:: python
 
-           from fibad import Fibad
+           from hyrax import Hyrax
 
-           # Create an instance of the Fibad object
-           f = Fibad()
+           # Create an instance of the Hyrax object
+           f = Hyrax()
 
            # Train the model specified in the configuration file
            f.umap()
@@ -77,7 +77,7 @@ Run UMAP on the output of inference or a dataset
 
         .. code-block:: bash
 
-           >> fibad umap
+           >> hyrax umap
 
 ``visualize``
 -------------
@@ -86,10 +86,10 @@ Due to the fact that the visualization is interactive, it is not available in th
 
 .. code-block:: python
 
-    from fibad import Fibad
+    from hyrax import Hyrax
 
-    # Create an instance of the Fibad object
-    f = Fibad()
+    # Create an instance of the Hyrax object
+    f = Hyrax()
 
     # Train the model specified in the configuration file
     f.visualize()

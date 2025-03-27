@@ -1,0 +1,236 @@
+[general]
+# Set to `true` during development to skip checking for default config values
+# in external libraries. Use `false` otherwise.
+dev_mode = false
+
+# Destination of log messages. Options: 'stderr', 'stdout' specify the console,
+# "path/to/hyrax.log" specifies a file.
+log_destination = "stderr"
+
+# Lowest log level to emit. Options: "critical", "error", "warning", "info", "debug".
+log_level = "info"
+
+# Directory where data is stored.
+data_dir = "./data"
+
+#Top level directory for writing results.
+results_dir = "./results"
+
+
+[download]
+# Cut out width in arcseconds.
+sw = "22asec"
+
+# Cut out height in arcseconds.
+sh = "22asec"
+
+# The filters to download.
+filter = ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+
+# The type of data to download.
+type = "coadd"
+
+# The data release to download from.
+rerun = "pdr3_wide"
+
+# Path to credentials.ini file for the downloader. File contents should be:
+# username = "<your username>"
+# password = "<your password>"
+credentials_file = "./credentials.ini"
+
+# Alternate way to pass credentials to the downloader. Users should prefer a
+# credentials.ini file to avoid exposing credentials with source control.
+username = false
+password = false
+
+# The number of sources to download from the catalog. Default is -1, which
+# downloads all sources in the catalog.
+num_sources = -1
+
+# The number of concurrent connections to use when downloading data.
+concurrent_connections = 4
+
+# The number of seconds between printing download statistics.
+stats_print_interval = 60
+
+# The path to the catalog file that defines which cutouts to download.
+fits_file = "./catalog.fits"
+
+# The number of seconds to wait before retrying a failed HTTP request in seconds.
+retry_wait = 30
+
+# How many times to retry a failed HTTP request before moving on to the next one.
+retries = 3
+
+# Number of seconds to wait for a full HTTP response from the server.
+timeout = 3600
+
+# The number of sky location rectangles should we request in a single request.
+chunk_size = 990
+
+# Request the image layer from the cutout service
+image = true
+
+# Request the variance layer from the cutout service
+variance = false
+
+# Request the mask layer from the cutout service
+mask = false
+
+
+[model]
+# The name of the model to use. Option are a built-in model class name or import path
+# to an external model. e.g. "HyraxAutoencoder", "user_pkg.model.ExternalModel"
+name = "HyraxAutoencoder"
+
+# The number of output channels from the first layer.
+base_channel_size = 32
+
+# The length of the latent space vector.
+latent_dim = 64
+HSCDCAE_final_layer = "tanh"
+
+
+[criterion]
+# The name of the built-in criterion to use or the import path to an external criterion
+name = "torch.nn.CrossEntropyLoss"
+
+
+[optimizer]
+# The name of the built-in optimizer to use or the import path to an external optimizer
+name = "torch.optim.SGD"
+
+
+["torch.optim.SGD"]
+# learning rate for torch.optim.SGD optimizer.
+lr = 0.01
+
+# momentum for torch.optim.SGD optimizer.
+momentum = 0.9
+
+["torch.optim.Adam"]
+# learning rate for torch.optim.SGD optimizer.
+lr = 0.01
+
+
+[train]
+# The name of the file were the model weights will be saved after training.
+weights_filepath = "example_model.pth"
+
+#The number of epochs to train for.
+epochs = 10
+
+# If resuming from a check point, set to the path of the checkpoint file.
+# Otherwise set to `false` to start training from the beginning.
+resume = false
+
+# The data_set split to use when training a model.
+split = "train"
+
+# The name of the experiment when logging training results to mlflow
+experiment_name = "notebook"
+
+# The name of the run when logging training results to mlflow.
+# If false, uses result directory string, <timestamp>-train-<uid>, as run name.
+run_name = false
+
+[onnx]
+
+# The operator set version to use when exporting a model. See the following for info:
+# https://onnxruntime.ai/docs/reference/compatibility.html#onnx-opset-support
+opset_version = 20
+
+
+[data_set]
+# Name of the built-in data loader to use or the import path to an external data
+# loader. e.g. "HSCDataSet", "user_pkg.data_set.ExternalDataSet"
+name = "HyraxCifarDataSet"
+
+# Crop pixel dimensions for images, e.g., [100, 100]. If false, scans for the
+# smallest image size in [general].data_dir and uses it.
+crop_to = false
+
+# Specific to `hsc_data_set`. Limit to only particular filters from the data set.
+# When `false`, use all filters. Options: ["HSC-G", "HSC-R", "HSC-I", "HSC-Z", "HSC-Y"]
+filters = false
+
+# Path to a fits file that specifies object IDs to use from the data stored in
+# [general].data_dir. Implementation is data_set class dependent. Use `false` for no filtering.
+filter_catalog = false
+
+# The transformation to be applied to images before being passed on to the model
+# This must be a valid Numpy function. Passing false will result in no transformations
+# (other than cropping) be applied to the images.  
+transform = "tanh"
+
+# train_size, validation_size, and test_size use these conventions:
+# * A `float` between `0.0` and `1.0` is the proportion of the dataset to include in the split.
+# * An `int`, represents the absolute number of samples in the particular split.
+# * It is an error for these values to add to more than 1.0 as ratios or the size
+#   of the dataset if expressed as integers.
+
+# Size of the train split. If `false`, the value is automatically set to the
+# complement of test_size plus validate_size (if any).
+train_size = 0.6
+
+# Size of the validation split. If `false`, and both train_size and test_size
+# are defined, the value is set to the complement of the other two sizes summed.
+# If `false`, and only one of the other sizes is defined, no validate split is created.
+validate_size = 0.2
+
+# Size of the test split. If `false`, the value is set to the complement of train_size plus
+# the validate_size (if any). If `false` and `train_size = false`, test_size is set to `0.25`.
+test_size = 0.2
+
+# Number to seed with for generating a random split. Use `false` to seed from a
+# system source at runtime.
+seed = false
+
+# If `true`, cache samples in memory during training to reduce runtime after the
+# first epoch. Set to `false` when running inference or on memory-constrained systems.
+use_cache = true
+
+# If `true`, preload the in memory cache using many worker threads when the dataset is constructed 
+# to reduce the effect of filesystem latency on first epoch runtime. 
+# Warning: Only suitable for situations where the entire dataset fits in system memory
+preload_cache = true
+
+[data_loader]
+# The number of data points to load at once.
+batch_size = 512
+
+
+[infer]
+# The path to the model weights file to use for inference.
+model_weights_file = false
+
+# The data_set split to use for inference. Use `false` for entire dataset.
+split = false
+
+
+[results]
+# Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
+inference_dir = false
+
+
+[umap]
+# Number of data points used to fit the umap transform.
+fit_sample_size = 1024
+
+# Name of the umap implementation to use
+name = "umap.UMAP"
+
+
+["umap.UMAP"]
+# Specify any parameter accepted by https://umap-learn.readthedocs.io/en/latest/api.html#umap
+# Dimension of the embedded space
+n_components = 2
+
+# Controls how UMAP balances local versus global structure in the data.
+# See official documentation for details.
+n_neighbors = 15
+
+
+[vector_db]
+# The type of vector db to use. Use "false" to disable vector database.
+name = "chromadb"

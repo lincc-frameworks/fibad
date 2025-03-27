@@ -60,19 +60,6 @@ repos:
       - id: ruff-format
         name: Format code using ruff
         types_or: [ python, pyi, jupyter ]
-    # Analyze type hints and report errors.
-  - repo: local
-    hooks:
-      - id: mypy
-        name: mypy (python files in src/ and tests/)
-        entry: mypy
-        language: system
-        types: [python]
-        files: ^(src|tests)/
-        args:
-          [
-            "--ignore-missing-imports", # Ignore imports without type hints
-          ]
     # Make sure Sphinx can build the documentation while explicitly omitting 
     # notebooks from the docs, so users don't have to wait through the execution 
     # of each notebook or each commit. By default, these will be checked in the 
