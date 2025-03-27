@@ -184,6 +184,18 @@ class ConfigManager:
     the runtime configuration.
     """
 
+    """
+    Hardcoded set of config keys which definitionally contain paths, and we resolve to global paths
+    duringin itialization in ConfigManager._resolve_config_paths().
+    """
+    PATH_CONFIG_KEYS = [
+        # TODO: external library config defaults
+        # However we define config defaults from external libraries ought allow them to designate config keys
+        # which contain relative paths. ultimately these should end up on the list and be resolved.
+        ["data_set", "filter_catalog"],
+        ["general", "data_dir"],
+    ]
+
     def __init__(
         self,
         runtime_config_filepath: Optional[Union[Path, str]] = None,
@@ -203,8 +215,9 @@ class ConfigManager:
 
         self.overall_default_config = TOMLDocument()
         self._merge_defaults()
-
         self.config = self.merge_configs(self.overall_default_config, self.user_specific_config)
+
+        ConfigManager._resolve_config_paths(self.config)
         if not self.config["general"]["dev_mode"]:
             ConfigManager._validate_runtime_config(self.config, self.overall_default_config)
 
@@ -352,6 +365,41 @@ class ConfigManager:
                     msg += "default config. Please choose another name for this section."
                     raise RuntimeError(msg)
                 ConfigManager._validate_runtime_config(runtime_config[key], default_config[key])
+
+    @staticmethod
+    def _resolve_config_paths(runtime_config: dict) -> None:
+        """Convert all paths in a runntime config to global paths in the current environment.
+        Uses the hardcoded list of paths in ConfigManager.PATH_CONFIG_KEYS
+
+        This mutates the config dictionary passed.
+
+        Parameters
+        ----------
+        runtime_config : dict
+           Current runtime config nested dictionary
+        """
+        for key_spec in ConfigManager.PATH_CONFIG_KEYS:
+            # Recursively look up a list of keys.
+            current_dict = runtime_config
+            current_key = None
+            current_val = None
+            # At the end of each loop current_* are always the dict, key, and value of the
+            # last lookup.
+            for key in key_spec:
+                current_key = key
+                try:
+                    current_val = current_dict[key]
+                except KeyError:
+                    break
+
+                if isinstance(current_val, dict):
+                    current_dict = current_val
+
+            # On the non-break end of the loop we do path resolution, preserving falsy values
+            # as false.
+            else:
+                new_val = str(Path(current_val).resolve()) if current_val else False
+                current_dict[current_key] = new_val
 
     @staticmethod
     def resolve_runtime_config(runtime_config_filepath: Union[Path, str, None] = None) -> Path:

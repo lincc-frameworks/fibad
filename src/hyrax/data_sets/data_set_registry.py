@@ -9,10 +9,10 @@ from hyrax.config_utils import ConfigDict
 from hyrax.plugin_utils import get_or_load_class, update_registry
 
 logger = logging.getLogger(__name__)
-DATA_SET_REGISTRY: dict[str, type["Dataset"]] = {}
+DATA_SET_REGISTRY: dict[str, type["HyraxDataset"]] = {}
 
 
-class Dataset(ABC):
+class HyraxDataset(ABC):
     """
     How to make a hyrax dataset:
 
@@ -56,7 +56,12 @@ class Dataset(ABC):
 
     def __init__(self, config: ConfigDict):
         """Overall initialization for all DataSets which saves the config"""
-        self.config = config
+        self._config = config
+        self.tensorboardx_logger = None
+
+    @property
+    def config(self):
+        return self._config
 
     def __init_subclass__(cls):
         from torch.utils.data import IterableDataset
@@ -72,25 +77,52 @@ class Dataset(ABC):
             msg += " torch.utils.data.Dataset (or torch.utils.data.IterableDataset) which will enforce this."
             raise RuntimeError(msg)
 
+        # TODO?:If the subclass has __iter__ and not __getitem__/__len__ perhaps add an __iter__ with a
+        #       warning Because to the extent the __getitem__/__len__ functions get used they'll exhaust the
+        #       iterator and possibly remove any benefit of having them around.
+
+        # TODO?:If the subclass has __getitem__/__len__ and not __iter__ add an __iter__. This is less
+        #       dangerous, and should probably just be an info log.
+        #
+        #       This might be better as a function on this base class, but doing it here gives us an
+        #       opportunity to do configuration or logging to help people navigate writing a dataset?
+
         # Ensure the class is in the registry so the config system can find it
         update_registry(DATA_SET_REGISTRY, cls.__name__, cls)
 
-    def set_metadata_table(self, table: npt.ArrayLike):
-        # This is the function child classes can call during construction to submit their metadata table
-        # TODO implement this or make it part of __init__ above.
-        pass
-
-    @abstractmethod
     def ids(self) -> Generator[str]:
-        # Perhaps make a default version which counts up
-        # This could be `return (str(x) for x in range(len(self)))` on map datasets and
-        # traversing the iterator and yielding increasing numbers on iterator datasets
-        pass
+        """This is the default IDs function you get when you derive from hyrax Dataset
 
-    @abstractmethod
+        Returns
+        -------
+        Generator[str]
+            A generator yielding all the string IDs of the dataset.
+
+        """
+        if hasattr(self, "__len__"):
+            return (str(x) for x in range(len(self)))
+        elif hasattr(self, "__iter__"):
+            for index, _ in enumerate(iter(self)):
+                yield (str(index))
+        else:
+            return NotImplementedError("You must define __len__ or __iter__ to use automatic id()")
+
     def shape(self) -> tuple:
-        # Implement using the 0th element (detect whether __iter__ or __getitem__ and do the right thing)
-        pass
+        """Returns the shape tuple of the tensors this dataset will return.
+
+        This default implementation uses the first item in the dataset to determine the shape.
+
+        Returns
+        -------
+        tuple
+            Shape tuple of the tensor that will be returned from the dataset.
+        """
+        if hasattr(self, "__getitem__"):
+            return self[0].shape
+        elif hasattr(self, "__iter__"):
+            return next(iter(self)).shape
+        else:
+            return NotImplementedError("You must define __getitem__ or __iter__ to use automatic shape()")
 
     @abstractmethod
     def metadata_fields(self) -> list[str]:
@@ -102,20 +134,13 @@ class Dataset(ABC):
         # Implement using a numpy array passed from child
         pass
 
-    @abstractmethod
-    def original_config(self) -> dict:
-        # Harder to implement generally, need to designate some configs as directories
-        # and resolve those directories.
-        #
-        # As a first pass we could hardcode these (they are already hardcoded in HSCDataSet)
-        # For future external datasets we'll need to allow datasets when they define their configs
-        # to designate "this is a path" so we know which ones to do path resolution on.
-        #
-        # For now ["general"]["data_dir"] and ["data_set"]["filter_catalog"] are known to be paths.
+    def set_metadata_table(self, table: npt.ArrayLike):
+        # This is the function child classes can call during construction to submit their metadata table
+        # TODO implement this or make it part of __init__ above.
         pass
 
 
-def fetch_data_set_class(runtime_config: dict) -> type[Dataset]:
+def fetch_data_set_class(runtime_config: dict) -> type[HyraxDataset]:
     """Fetch the data loader class from the registry.
 
     Parameters

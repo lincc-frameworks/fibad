@@ -10,12 +10,12 @@ from torchvision.datasets import CIFAR10
 
 from hyrax.config_utils import ConfigDict
 
-from .data_set_registry import Dataset
+from .data_set_registry import HyraxDataset
 
 logger = logging.getLogger(__name__)
 
 
-class HyraxCifarDataSet(Dataset, CIFAR10):
+class HyraxCifarDataSet(HyraxDataset, CIFAR10):
     """This is simply a version of CIFAR10 that has our needed shape method, and is initialized using
     Hyrax config with a transformation that works well for example code.
 
