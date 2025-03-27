@@ -10,13 +10,12 @@ from torchvision.datasets import CIFAR10
 
 from hyrax.config_utils import ConfigDict
 
-from .data_set_registry import hyrax_data_set
+from .data_set_registry import Dataset
 
 logger = logging.getLogger(__name__)
 
 
-@hyrax_data_set
-class HyraxCifarDataSet(CIFAR10):
+class HyraxCifarDataSet(Dataset, CIFAR10):
     """This is simply a version of CIFAR10 that has our needed shape method, and is initialized using
     Hyrax config with a transformation that works well for example code.
 
@@ -25,11 +24,13 @@ class HyraxCifarDataSet(CIFAR10):
     """
 
     def __init__(self, config: ConfigDict):
+        super().__init__(config)
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )
-        self.config = config
-        super().__init__(root=config["general"]["data_dir"], train=True, download=True, transform=transform)
+        CIFAR10.__init__(
+            self, root=config["general"]["data_dir"], train=True, download=True, transform=transform
+        )
 
     def ids(self) -> Generator[str]:
         return (str(x) for x in range(len(self)))

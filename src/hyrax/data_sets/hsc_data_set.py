@@ -19,9 +19,9 @@ import torch
 from astropy.io import fits
 from astropy.table import Table
 from schwimmbad import MultiPool
-from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
+from hyrax.config_utils import ConfigDict
 from hyrax.download import Downloader
 from hyrax.downloadCutout.downloadCutout import (
     parse_bool,
@@ -33,19 +33,18 @@ from hyrax.downloadCutout.downloadCutout import (
     parse_type,
 )
 
-from .data_set_registry import hyrax_data_set
+from .data_set_registry import Dataset
 
 logger = logging.getLogger(__name__)
 dim_dict = dict[str, list[tuple[int, int]]]
 files_dict = dict[str, dict[str, str]]
 
 
-@hyrax_data_set
-class HSCDataSet(Dataset):
+class HSCDataSet(Dataset, torch.utils.data.Dataset):
     _called_from_test = False
 
-    def __init__(self, config: dict):
-        self.config = config
+    def __init__(self, config: ConfigDict):
+        super().__init__(config)
 
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
