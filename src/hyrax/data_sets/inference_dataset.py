@@ -6,19 +6,19 @@ from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
-import torch.utils.data as td
 from torch import Tensor, from_numpy
+from torch.utils.data import Dataset
 
 from hyrax.config_utils import find_most_recent_results_dir
 
-from .data_set_registry import Dataset
+from .data_set_registry import HyraxDataset
 
 logger = logging.getLogger(__name__)
 
 ORIGINAL_DATASET_CONFIG_FILENAME = "original_dataset_config.toml"
 
 
-class InferenceDataSet(Dataset, td.Dataset):
+class InferenceDataSet(HyraxDataset, Dataset):
     """This is a dataset class to represent the situations where we wish to treat the output of inference
     as a dataset. e.g. when performing umap/visualization operations"""
 
@@ -53,10 +53,10 @@ class InferenceDataSet(Dataset, td.Dataset):
 
         # Initialize the original dataset using the old config, so we have it
         # around for metadata calls
-        self.original_dataset_config = ConfigManager(
+        self._original_dataset_config = ConfigManager(
             self.results_dir / ORIGINAL_DATASET_CONFIG_FILENAME
         ).config
-        self.original_dataset = setup_dataset(self.original_dataset_config)  # type: ignore[arg-type]
+        self.original_dataset = setup_dataset(self._original_dataset_config)  # type: ignore[arg-type]
 
     def shape(self):
         """The shape of the dataset (Discovered from files)
@@ -123,6 +123,7 @@ class InferenceDataSet(Dataset, td.Dataset):
     def __len__(self) -> int:
         return self.length
 
+    @property
     def original_config(self) -> dict:
         """Get the original configuration for the dataset used to generate this inference dataset
 
@@ -135,7 +136,7 @@ class InferenceDataSet(Dataset, td.Dataset):
             Configuration that can be used to create the original dataset that was used
             as input for whatever inference process created this dataset.
         """
-        return self.original_dataset_config
+        return self._original_dataset_config
 
     def metadata_fields(self) -> list[str]:
         """Get the metadata fields associted with the original dataset used to generate this one
@@ -228,7 +229,15 @@ class InferenceDataSetWriter:
         self.all_ids = np.array([], dtype=np.int64)
         self.all_batch_nums = np.array([], dtype=np.int64)
         self.writer_pool = Pool()
-        self.original_dataset_config = original_dataset.original_config()  # type: ignore[attr-defined]
+
+        # If we're being asked to write an InferenceDataset based on another InferenceDataset then we
+        # Use the backing InferenceDataset's original config, which is presumably a non-InferenceDataset
+        # Otherwise just use the config of the dataset given.
+        self.original_dataset_config = (
+            original_dataset.original_config
+            if hasattr(original_dataset, "original_config")
+            else original_dataset.config
+        )
 
     def write_batch(self, ids: np.ndarray, tensors: list[np.ndarray]):
         """Write a batch of tensors into the dataset. This writes the whole batch immediately.

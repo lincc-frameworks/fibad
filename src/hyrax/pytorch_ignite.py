@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from hyrax.config_utils import ConfigDict
-from hyrax.data_sets.data_set_registry import fetch_data_set_class
+from hyrax.data_sets.data_set_registry import HyraxDataset, fetch_data_set_class
 from hyrax.models.model_registry import fetch_model_class
 
 logger = logging.getLogger(__name__)
@@ -45,11 +45,9 @@ def setup_dataset(config: ConfigDict, tensorboardx_logger: Optional[SummaryWrite
 
     # Fetch data loader class specified in config and create an instance of it
     data_set_cls = fetch_data_set_class(config)
-    data_set = data_set_cls(config)  # type: ignore[call-arg]
+    data_set: HyraxDataset = data_set_cls(config)  # type: ignore[call-arg]
 
-    # TODO base dataset class: A base class for datasets ought have this as a property defined simply
-    # to document its existance in a central location.
-    data_set.tensorboardx_logger = tensorboardx_logger  # type: ignore[attr-defined]
+    data_set.tensorboardx_logger = tensorboardx_logger
 
     return data_set
 

@@ -15,10 +15,11 @@ from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
-import torch
 from astropy.io import fits
 from astropy.table import Table
 from schwimmbad import MultiPool
+from torch import Tensor, from_numpy
+from torch.utils.data import Dataset
 from torchvision.transforms.v2 import CenterCrop, Compose, Lambda
 
 from hyrax.config_utils import ConfigDict
@@ -33,14 +34,14 @@ from hyrax.downloadCutout.downloadCutout import (
     parse_type,
 )
 
-from .data_set_registry import Dataset
+from .data_set_registry import HyraxDataset
 
 logger = logging.getLogger(__name__)
 dim_dict = dict[str, list[tuple[int, int]]]
 files_dict = dict[str, dict[str, str]]
 
 
-class HSCDataSet(Dataset, torch.utils.data.Dataset):
+class HSCDataSet(HyraxDataset, Dataset):
     _called_from_test = False
 
     def __init__(self, config: ConfigDict):
@@ -185,7 +186,7 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
         crop = CenterCrop(size=self.cutout_shape)
         self.transform = Compose([crop, self.transform]) if self.transform is not None else crop
 
-        self.tensors: dict[str, torch.Tensor] = {}
+        self.tensors: dict[str, Tensor] = {}
         self.tensorboard_start_ns = time.monotonic_ns()
         self.tensorboardx_logger = None
 
@@ -658,7 +659,7 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
         """
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> Tensor:
         if idx >= len(self.files) or idx < 0:
             raise IndexError
 
@@ -855,7 +856,7 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
                     self._log_duration_tensorboard("HSCDataSet/preload_1k_obj_s", start_time)
                     start_time = time.monotonic_ns()
 
-    def _lazy_map_executor(self, executor: Executor, ids: Iterable[str]) -> Iterator[torch.Tensor]:
+    def _lazy_map_executor(self, executor: Executor, ids: Iterable[str]) -> Iterator[Tensor]:
         """This is a version of concurrent.futures.Executor map() which lazily evaluates the iterator passed
         We do this because we do not want all of the tensors to remain in memory during pre-loading. We would
         prefer a smaller set of in-flight tensors.
@@ -885,8 +886,8 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
         from concurrent.futures import FIRST_COMPLETED, Future, wait
 
         max_futures = HSCDataSet._determine_numprocs_preload()
-        queue: list[Future[torch.Tensor]] = []
-        in_progress: set[Future[torch.Tensor]] = set()
+        queue: list[Future[Tensor]] = []
+        in_progress: set[Future[Tensor]] = set()
         ids_iter = iter(ids)
 
         try:
@@ -935,15 +936,15 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
             duration_s = (now - start_time) / 1.0e9
             self.tensorboardx_logger.add_scalar(name, duration_s, since_tensorboard_start_us)
 
-    def _check_object_id_to_tensor_cache(self, object_id: str) -> Optional[torch.Tensor]:
+    def _check_object_id_to_tensor_cache(self, object_id: str) -> Optional[Tensor]:
         return self.tensors.get(object_id, None)
 
-    def _populate_object_id_to_tensor_cache(self, object_id: str) -> torch.Tensor:
+    def _populate_object_id_to_tensor_cache(self, object_id: str) -> Tensor:
         data_torch = self._read_object_id(object_id)
         self.tensors[object_id] = data_torch
         return data_torch
 
-    def _read_object_id(self, object_id: str) -> torch.Tensor:
+    def _read_object_id(self, object_id: str) -> Tensor:
         start_time = time.monotonic_ns()
 
         # Read all the files corresponding to this object
@@ -961,12 +962,12 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
         self._log_duration_tensorboard("HSCDataSet/object_total_read_time_s", start_time)
         return data_torch
 
-    def _convert_to_torch(self, data: list[npt.ArrayLike]) -> torch.Tensor:
+    def _convert_to_torch(self, data: list[npt.ArrayLike]) -> Tensor:
         start_time = time.monotonic_ns()
 
         # Push all the filter data into a tensor object
         data_np = np.array(data)
-        data_torch = torch.from_numpy(data_np.astype(np.float32))
+        data_torch = from_numpy(data_np.astype(np.float32))
 
         # Apply our transform stack
         data_torch = self.transform(data_torch) if self.transform is not None else data_torch
@@ -981,7 +982,7 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
     # Do we want to memoize them on first __getitem__ call?
     #
     # For now we just do it the naive way
-    def _object_id_to_tensor(self, object_id: str) -> torch.Tensor:
+    def _object_id_to_tensor(self, object_id: str) -> Tensor:
         """Converts an object_id to a pytorch tensor with dimenstions (self.num_filters, self.cutout_shape[0],
         self.cutout_shape[1]). This is done by reading the file and slicing away any excess pixels at the
         far corners of the image from (0,0).
@@ -1012,22 +1013,6 @@ class HSCDataSet(Dataset, torch.utils.data.Dataset):
         data_torch = self._populate_object_id_to_tensor_cache(object_id)
         self._log_duration_tensorboard("HSCDataSet/cache_miss_s", start_time)
         return data_torch
-
-    def original_config(self) -> dict:
-        # Resolve the paths on configs which we depend on to initialize repeatably.
-        # This allows this method to be used to serialize the config used to create this dataset
-        # so that it can be repeatably re-created no matter what cwd is in future hyrax invocations
-        config = self.config
-        config["data_set"]["filter_catalog"] = (
-            str(Path(config["data_set"]["filter_catalog"]).resolve())
-            if config["data_set"]["filter_catalog"]
-            else False
-        )
-        config["general"]["data_dir"] = (
-            str(Path(config["general"]["data_dir"]).resolve()) if config["general"]["data_dir"] else False
-        )
-
-        return config
 
     def metadata_fields(self) -> list[str]:
         """Metadata field names for the HSCDataSet.
