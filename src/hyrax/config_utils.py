@@ -186,7 +186,7 @@ class ConfigManager:
 
     """
     Hardcoded set of config keys which definitionally contain paths, and we resolve to global paths
-    duringin itialization in ConfigManager._resolve_config_paths().
+    during initialization in ConfigManager._resolve_config_paths().
     """
     PATH_CONFIG_KEYS = [
         # TODO: external library config defaults
