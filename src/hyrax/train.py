@@ -66,7 +66,7 @@ def run(config):
     run_name = str(config["train"]["run_name"]) if config["train"]["run_name"] else results_dir.name
 
     with mlflow.start_run(log_system_metrics=True, run_name=run_name):
-        _log_params(config)
+        _log_params(config, results_dir)
 
         # Run the training process
         trainer.run(train_data_loader, max_epochs=config["train"]["epochs"])
@@ -90,14 +90,20 @@ def run(config):
     export_to_onnx(model, sample, config, context)
 
 
-def _log_params(config):
+def _log_params(config, results_dir):
     """Log the various parameters to mlflow from the config file.
 
     Parameters
     ----------
     config : dict
         The main configuration dictionary
+
+    results_dir: str
+        The full path to the results sub-directory
     """
+
+    # Log full path to results subdirectory
+    mlflow.log_param("Results Directory", results_dir)
 
     # Log all model params
     mlflow.log_params(config["model"])
