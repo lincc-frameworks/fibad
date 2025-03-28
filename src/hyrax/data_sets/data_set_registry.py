@@ -1,9 +1,10 @@
 # ruff: noqa: D102, B027
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Generator
+from typing import Optional
 
 import numpy.typing as npt
+from astropy.table import Table
 
 from hyrax.config_utils import ConfigDict
 from hyrax.plugin_utils import get_or_load_class, update_registry
@@ -12,15 +13,15 @@ logger = logging.getLogger(__name__)
 DATA_SET_REGISTRY: dict[str, type["HyraxDataset"]] = {}
 
 
-class HyraxDataset(ABC):
+class HyraxDataset:
     """
     How to make a hyrax dataset:
 
     Start from this template and implement your functions.
 
     ```
-    import torch.utils.data as td
-    class MyDataSet(Dataset, td.Dataset):
+    from torch.utils.data import Dataset
+    class MyDataset(HyraxDataset, Dataset):
         def __init__(self, config: dict):
             super().__init__(config)
 
@@ -54,9 +55,48 @@ class HyraxDataset(ABC):
 
     """
 
-    def __init__(self, config: ConfigDict):
-        """Overall initialization for all DataSets which saves the config"""
+    def __init__(self, config: ConfigDict, metadata_table: Optional[Table] = None):
+        """Overall initialization for all DataSets which saves the config
+
+        Subclasses of HyraxDataSet ought call this at the end of their __init__ like:
+
+        ```
+        from hyrax.data_sets import HyraxDataset
+        from torch.utils.data import Dataset
+
+        class MyDataset(HyraxDataset, Dataset):
+            def __init__(config):
+                <your code>
+                super().__init__(config)
+        ```
+
+        If per tensor metadata is available, it is recommended that dataset authors create an
+        astropy Table of that data, in the same order as their data and pass that `metadata_table`
+        as shown below:
+
+        ```
+        from hyrax.data_sets import HyraxDataset
+        from torch.utils.data import Dataset
+        from astropy.table import Table
+
+        class MyDataset(HyraxDataset, Dataset):
+            def __init__(config):
+                <your code>
+                metadata_table = Table(<Your catalog data goes here>)
+                super().__init__(config, metadata_table)
+        ```
+
+        Parameters
+        ----------
+        config : ConfigDict, Optional
+            The runtime configuration for hyrax
+        metadata_table : Optional[Table], optional
+            An Astropy Table with
+            1. the metadata columns desired for visualization AND
+            2. in the order your data will be enumerated.
+        """
         self._config = config
+        self._metadata_table = metadata_table
         self.tensorboardx_logger = None
 
     @property
@@ -124,20 +164,55 @@ class HyraxDataset(ABC):
         else:
             return NotImplementedError("You must define __getitem__ or __iter__ to use automatic shape()")
 
-    @abstractmethod
     def metadata_fields(self) -> list[str]:
-        # Implement using a numpy array passed from child
-        pass
+        """Returns a list of metadata fields supported by this object
 
-    @abstractmethod
+        Returns
+        -------
+        list[str]
+            The column names of the metadata table passed. Empty string if no metadata was provided at
+            during construction of the HyraxDataset (or derived class).
+        """
+        return [] if self._metadata_table is None else list(self._metadata_table.colnames)
+
     def metadata(self, idxs: npt.ArrayLike, fields: list[str]) -> npt.ArrayLike:
-        # Implement using a numpy array passed from child
-        pass
+        """Returns a table representing the metadata given an array of indexes and a list of fields.
 
-    def set_metadata_table(self, table: npt.ArrayLike):
-        # This is the function child classes can call during construction to submit their metadata table
-        # TODO implement this or make it part of __init__ above.
-        pass
+        Parameters
+        ----------
+        idxs : npt.ArrayLike
+            The indexes of the relevant tensor objects
+        fields : list[str]
+            The names of the fields you would like returned. All values must be among those returned by
+            metadata_fields()
+
+        Returns
+        -------
+        npt.ArrayLike
+            A numpy record array of your metadata, with only the columns specified.
+            Roughly equivalent to: `metadata_table[idxs][fields].as_array()` where metadata_table is the
+            astropy table that the HyraxDataset (or derived class) was constructed with.
+
+        Raises
+        ------
+        RuntimeError
+            When none of the provided fields are
+        """
+        metadata_fields = self.metadata_fields()
+        for field in fields:
+            if field not in metadata_fields:
+                msg = f"Field {field} is not available for {self.__class__.__name__}."
+                logger.error(msg)
+
+        columns = [field for field in fields if field in metadata_fields]
+
+        if len(columns) == 0:
+            msg = (
+                f"None of the metadata fields passed [{fields}] are available for {self.__class__.__name__}."
+            )
+            raise RuntimeError(msg)
+
+        return self._metadata_table[idxs][columns].as_array()
 
 
 def fetch_data_set_class(runtime_config: dict) -> type[HyraxDataset]:

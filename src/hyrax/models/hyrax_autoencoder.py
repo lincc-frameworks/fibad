@@ -20,7 +20,7 @@ class HyraxAutoencoder(nn.Module):
         super().__init__()
         self.config = config
 
-        # TODO xcxc config-ize or get from data loader somehow
+        # TODO config-ize or get from data loader somehow
         self.num_input_channels, self.image_width, self.image_height = shape
 
         self.c_hid = self.config["model"]["base_channel_size"]
