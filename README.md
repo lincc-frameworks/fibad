@@ -2,7 +2,7 @@
 [![Template](https://img.shields.io/badge/Template-LINCC%20Frameworks%20Python%20Project%20Template-brightgreen)](https://lincc-ppt.readthedocs.io/en/latest/)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/lincc-frameworks/hyrax/smoke-test.yml)](https://github.com/lincc-frameworks/hyrax/actions/workflows/smoke-test.yml)
 [![codecov](https://codecov.io/gh/lincc-frameworks/hyrax/branch/main/graph/badge.svg)](https://codecov.io/gh/lincc-frameworks/hyrax)
-
+[![Read the Docs](https://img.shields.io/readthedocs/hyrax)](https://hyrax.readthedocs.io/en/latest)
 <hr>
 
 ## Introduction
