@@ -75,7 +75,7 @@ class InferenceDataSet(HyraxDataset, Dataset):
     def ids(self) -> Generator[str]:
         """IDs of this dataset
 
-        Note: Not using HyraxDataset.ids() here because we need to be return the ids of whatever
+        Note: Not using HyraxDataset.ids() here because we need to return the ids of whatever
         dataset was used for inference, not the sequential index HyraxDataset.ids() gives.
 
         Returns
