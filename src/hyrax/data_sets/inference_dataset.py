@@ -235,7 +235,10 @@ class InferenceDataSetWriter:
         self.result_dir = result_dir if isinstance(result_dir, Path) else Path(result_dir)
         self.batch_index = 0
 
-        self.all_ids = np.array([], dtype=np.int64)
+        # Detect the dtype numpy will want to use for ids for the original dataset
+        self.id_dtype = np.array([next(original_dataset.ids())]).dtype
+
+        self.all_ids = np.array([], dtype=self.id_dtype)
         self.all_batch_nums = np.array([], dtype=np.int64)
         self.writer_pool = Pool()
 
@@ -256,7 +259,8 @@ class InferenceDataSetWriter:
         Parameters
         ----------
         ids : np.ndarray
-            Array of integer IDs.
+            Array of IDs, dtype of the elements must match the dtype type of the ids of the original dataset
+            used to construct this InferenceDataSetWriter.
         tensors : list[np.ndarray]
             List of consistently dimensioned numpy arrays to save.
         """
@@ -265,7 +269,7 @@ class InferenceDataSetWriter:
         # Save results from this batch in a numpy file as a structured array
         first_tensor = tensors[0]
         structured_batch_type = np.dtype(
-            [("id", np.int64), ("tensor", first_tensor.dtype, first_tensor.shape)]
+            [("id", self.id_dtype), ("tensor", first_tensor.dtype, first_tensor.shape)]
         )
         structured_batch = np.zeros(batch_len, structured_batch_type)
         structured_batch["id"] = ids
@@ -303,7 +307,7 @@ class InferenceDataSetWriter:
 
     def _save_batch_index(self):
         """Save a batch index in the result directory provided"""
-        batch_index_dtype = np.dtype([("id", np.int64), ("batch_num", np.int64)])
+        batch_index_dtype = np.dtype([("id", self.id_dtype), ("batch_num", np.int64)])
         batch_index = np.zeros(len(self.all_ids), batch_index_dtype)
         batch_index["id"] = np.array(self.all_ids)
         batch_index["batch_num"] = np.array(self.all_batch_nums)

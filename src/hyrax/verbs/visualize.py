@@ -69,7 +69,7 @@ class Visualize(Verb):
                 fields.remove(field)
 
         if "object_id" not in fields:
-            msg = "Umap dataset much support object_id field"
+            msg = "Umap dataset must support object_id field"
             raise RuntimeError(msg)
 
         self.data_fields = fields.copy()

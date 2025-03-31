@@ -108,7 +108,7 @@ class Umap(Verb):
         num_batches = int(np.ceil(total_length / batch_size))
 
         all_indexes = np.arange(0, total_length)
-        all_ids = np.array([int(i) for i in inference_results.ids()])
+        all_ids = np.array(list(inference_results.ids()))
 
         # Process pool to do all the transforms
         with Pool(processes=cpu_count()) as pool:

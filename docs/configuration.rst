@@ -145,6 +145,7 @@ While the ``[infer]`` table contains keys such as ``model_weights_file``.
 
 
 .. _complete_default_config:
+
 Complete default configuration file
 -----------------------------------
 

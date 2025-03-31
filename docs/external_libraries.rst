@@ -75,34 +75,35 @@ items in the batch. This loss is logged to MLflow and tensorboard.
 Defining a dataset class
 ------------------------
 
-Dataset classes are written (for now) as subclasses of ``torch.utils.data.Dataset``, and decorated with the 
-``@hyrax_model`` decorator. Datasets must minimally define the methods below. These are similar in form to 
+Dataset classes are written as subclasses of both ``hyrax.data_sets.HyraxDataset`` and 
+``torch.utils.data.Dataset``. Datasets must minimally define the methods below. These are similar in form to 
 Torch's `Map-style datasets <https://pytorch.org/docs/stable/data.html#map-style-datasets>`_
 
-``__init__(self, config, split)``
+A fully worked example of creating a custom dataset class is in the example notebook 
+:doc:`/pre_executed/custom_dataset`
+
+``__init__(self, config)``
 .................................
 On creation of your dataset Hyrax passes the entire Hyrax config as a nested dictionry in the ``config`` 
-argument. Hyrax also passes you the name of the dataset split this object will be iterating over with 
-``__getitem__`` and ``__len__`` below. The split will be either ``"train"``, ``"validate"``, ``"test"``, 
-or ``None`` meaning the entire dataset.
+argument. It is assumed that your dataset will handle the whole of your dataset, and any splitting of the 
+dataset will be done by Hyrax, when running the relevant verb. Further detail on splitting can be found in 
+:doc:`/data_set_splits`
 
-Your dataset class is (for now) in charge of implementing the split and randomness defined in the 
-``[data_set]`` configs, see :ref:`data_set_splits`
+You must call ``super().__init__(config)`` or ``super().__init__(config, metadata_table)`` in your 
+``__init__`` function
 
-``shape(self)``
-...............
-Return a shape tuple corresponding to the standard size of tensors in your data set. An image dataset 
-consisting of 250x250 px images with 3 color channels each might have a shape of (3, 250, 250) indicating that
-the color channels are the first iterable axis of each image tensor.
+``__getitem(self, idx:int)``
+............................
+Return a single item in your dataset given a zero-based index.
+
+``__len__(self)``
+.................
+Return the length of your dataset.
+
+Optional Overrides
+..................
 
 ``ids(self)``
 .............
 Return a list of IDs for the objects in your dataset. These IDs ought be returned as a string generator
 
-``__getitem(self, idx:int)``
-............................
-Return a single item in your dataset from a zero-based index. If your dataset was passed a split, 
-
-``__len__(self)``
-.................
-Return the length of your dataset,

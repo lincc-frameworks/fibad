@@ -15,76 +15,63 @@ DATA_SET_REGISTRY: dict[str, type["HyraxDataset"]] = {}
 
 class HyraxDataset:
     """
-    How to make a hyrax dataset:
+    How to make a hyrax dataset::
 
-    Start from this template and implement your functions.
+        from hyrax.data_sets import HyraxDataset
+        from torch.utils.data import Dataset
 
-    ```
-    from torch.utils.data import Dataset
-    class MyDataset(HyraxDataset, Dataset):
-        def __init__(self, config: dict):
-            super().__init__(config)
+        class MyDataset(HyraxDataset, Dataset):
+            def __init__(self, config: dict):
+                super().__init__(config)
 
-        def __getitem__():
-            # Your getitem goes here
-            pass
+            def __getitem__():
+                # Your getitem goes here
+                pass
 
-        def __len__ ():
-            # Your len function goes here
-            pass
+            def __len__ ():
+                # Your len function goes here
+                pass
 
-    ```
+    Optional interfaces:
 
-    <guidance on what each function should do>
+    ``ids()`` -> Subclasses may override this directly with their own ids function
+    returning a generator of strings
 
-    # Overriding IDs
+    metadata -> Subclasses may pass an astropy table of metadata to `__init__` in the
+    superclass. This table of metadata will be available through the `metadata_fields` and
+    `metadata` functions.  If desired, a subclass may override these functions directly
+    rather than using the astropy Table interface.
 
-    < How to implement the ids() function as a generator of strings>
-
-    # Metadata Interface (simple)
-
-    < How to pass us a numpy rec array (or astropy table) >
-
-    # Metadata interface (complex)
-
-    <How to implement metadata() and metadata_fields()>
-
-    # Data members provided by the superclass
-
-    `self.config` This is the hyrax config nested dictionary that hyrax was launched with.
+    Further documentation is in the :doc:`/pre_executed/custom_dataset` example notebook
 
     """
 
     def __init__(self, config: ConfigDict, metadata_table: Optional[Table] = None):
         """Overall initialization for all DataSets which saves the config
 
-        Subclasses of HyraxDataSet ought call this at the end of their __init__ like:
+        Subclasses of HyraxDataSet ought call this at the end of their __init__ like::
 
-        ```
-        from hyrax.data_sets import HyraxDataset
-        from torch.utils.data import Dataset
+            from hyrax.data_sets import HyraxDataset
+            from torch.utils.data import Dataset
 
-        class MyDataset(HyraxDataset, Dataset):
-            def __init__(config):
-                <your code>
-                super().__init__(config)
-        ```
+            class MyDataset(HyraxDataset, Dataset):
+                def __init__(config):
+                    <your code>
+                    super().__init__(config)
 
         If per tensor metadata is available, it is recommended that dataset authors create an
         astropy Table of that data, in the same order as their data and pass that `metadata_table`
-        as shown below:
+        as shown below::
 
-        ```
-        from hyrax.data_sets import HyraxDataset
-        from torch.utils.data import Dataset
-        from astropy.table import Table
+            from hyrax.data_sets import HyraxDataset
+            from torch.utils.data import Dataset
+            from astropy.table import Table
 
-        class MyDataset(HyraxDataset, Dataset):
-            def __init__(config):
-                <your code>
-                metadata_table = Table(<Your catalog data goes here>)
-                super().__init__(config, metadata_table)
-        ```
+            class MyDataset(HyraxDataset, Dataset):
+                def __init__(config):
+                    <your code>
+                    metadata_table = Table(<Your catalog data goes here>)
+                    super().__init__(config, metadata_table)
 
         Parameters
         ----------
