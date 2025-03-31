@@ -47,6 +47,7 @@ class InferenceDataSet(HyraxDataset, Dataset):
         # Initializes our first element. This primes the cache for sequential access
         # as well as giving us a sample element for shape()
         self.cached_batch_num: Optional[int] = None
+
         self.shape_element = self._load_from_batch_file(
             self.batch_index["batch_num"][0], self.batch_index["id"][0]
         )[0]
@@ -61,6 +62,9 @@ class InferenceDataSet(HyraxDataset, Dataset):
     def shape(self):
         """The shape of the dataset (Discovered from files)
 
+        Note: our __getitem__() needs self.shape() to work. We cannot use HraxDataset.shape()
+        because that shape uses __getitem__(), so we must define this for ourselves
+
         Returns
         -------
         Tuple
@@ -70,6 +74,9 @@ class InferenceDataSet(HyraxDataset, Dataset):
 
     def ids(self) -> Generator[str]:
         """IDs of this dataset
+
+        Note: Not using HyraxDataset.ids() here because we need to return the ids of whatever
+        dataset was used for inference, not the sequential index HyraxDataset.ids() gives.
 
         Returns
         -------
@@ -140,6 +147,8 @@ class InferenceDataSet(HyraxDataset, Dataset):
 
     def metadata_fields(self) -> list[str]:
         """Get the metadata fields associted with the original dataset used to generate this one
+
+        We must override this and pass to the original dataset.
 
         Returns
         -------

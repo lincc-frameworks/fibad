@@ -45,8 +45,6 @@ class HSCDataSet(HyraxDataset, Dataset):
     _called_from_test = False
 
     def __init__(self, config: ConfigDict):
-        super().__init__(config)
-
         crop_to = config["data_set"]["crop_to"]
         filters = config["data_set"]["filters"]
         transform_str = config["data_set"]["transform"]
@@ -78,6 +76,11 @@ class HSCDataSet(HyraxDataset, Dataset):
             filters=filters if filters else None,
             filter_catalog=filter_catalog,
         )
+
+        # Relies on self.filters_ref and self.filter_catalog_table which are both determined
+        # inside _init_from_path()
+        metadata = self._prepare_metadata()
+        super().__init__(config, metadata)
 
         if config["data_set"]["preload_cache"] and self.use_cache:
             self.preload_thread = Thread(
@@ -1014,49 +1017,29 @@ class HSCDataSet(HyraxDataset, Dataset):
         self._log_duration_tensorboard("HSCDataSet/cache_miss_s", start_time)
         return data_torch
 
-    def metadata_fields(self) -> list[str]:
-        """Metadata field names for the HSCDataSet.
-
-        This will return an empty list of fields if there was no filter catalog, and is inherently limited
-        to fields in the filter catalog provided.
-
-        Returns
-        -------
-        list[str]
-            Strings with the names of all metadata fields that can be looked up for a given
-            datum in this dataset
-        """
+    def _prepare_metadata(self) -> Optional[Table]:
         if self.filter_catalog_table is None:
-            return []
+            return None
 
+        # This happens when filter_catalog_table is injected in unit tests
+        if isinstance(self.filter_catalog_table, str):
+            return None
+
+        # We're going to be operating on object_id and filter columns en masse.
+        self.filter_catalog_table.add_index(["object_id", "filter"])
+
+        # Get all object_ids in enumeration order
+        sorted_object_ids = np.array([int(id) for id in self.ids()])
+
+        # Get a single row per object_id by selecting for a single filter
+        filter_catalog_table_dedup = self.filter_catalog_table.loc["filter", self.filters_ref[0]]
+
+        # Get all rows in enumeration order using the object_ids
+        metadata = filter_catalog_table_dedup.loc["object_id", sorted_object_ids]
+
+        # Filter for the appropriate columns
         colnames = list(self.filter_catalog_table.colnames)
-
-        # We don't expose these per object_id, because they have a multiplicy of values for each object_id
         colnames.remove("filename")
         colnames.remove("filter")
 
-        return colnames
-
-    def metadata(self, idxs: npt.ArrayLike, fields: list[str]) -> npt.ArrayLike:
-        # Determine what fields we will be processing
-        metadata_fields = self.metadata_fields()
-        for field in fields:
-            if field not in metadata_fields:
-                msg = f"Field {field} is not available for this HSCDataSet."
-                logger.error(msg)
-
-        columns = [field for field in fields if field in metadata_fields]
-
-        if len(columns) == 0:
-            msg = f"None of the metadata fields passed [{fields}] are available for this HSCDataSet."
-            raise RuntimeError(msg)
-
-        # Find the object IDs corresponding to indicies passed
-        object_ids = np.array(list(self.files.keys()))[idxs]  # type: ignore[index]
-
-        # Query our catalog table based on the object IDs, deduplicating by filter
-        metadata_filter_dup = self.filter_catalog_table.loc["object_id", object_ids]
-        metadata_slice = metadata_filter_dup.loc["filter", self.filters_ref[0]]
-
-        # Slice out only the columns asked for.
-        return metadata_slice[columns].as_array()  # type: ignore[no-any-return]
+        return metadata[colnames]
