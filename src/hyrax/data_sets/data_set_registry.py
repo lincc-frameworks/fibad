@@ -140,7 +140,8 @@ class HyraxDataset:
 
         """
         if hasattr(self, "__len__"):
-            return (str(x) for x in range(len(self)))
+            for x in range(len(self)):
+                yield str(x)
         elif hasattr(self, "__iter__"):
             for index, _ in enumerate(iter(self)):
                 yield (str(index))
