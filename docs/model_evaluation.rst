@@ -1,3 +1,5 @@
+.. _model_evaluation:
+
 Model evaluation
 ================
 
@@ -13,7 +15,7 @@ TensorBoard while training a model.
 This allows for easy visualization of the training process.
 
 For more information about TensorBoard see the
-`documentation <https://www.tensorflow.org/tensorboard/get_started>`_.
+`TensorBoard documentation <https://www.tensorflow.org/tensorboard/get_started>`_.
 
 MLFlow
 ------
@@ -50,4 +52,4 @@ The MLFlow server can be run from within a notebook or from the command line.
 
 
 For more information about MLFlow see the
-`documentation <https://mlflow.org/docs/latest/index.html>`_.
+`MLFlow documentation <https://mlflow.org/docs/latest/index.html>`_.

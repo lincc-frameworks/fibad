@@ -59,7 +59,7 @@ def run(config: ConfigDict):
     # These are values the _save_batch callback needs to run
     write_index = 0
     batch_index = 0
-    object_ids = list(int(id) for id in data_set.ids())  # type: ignore[attr-defined]
+    object_ids = list(data_set.ids())  # type: ignore[attr-defined]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately
