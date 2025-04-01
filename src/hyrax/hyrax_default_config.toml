@@ -208,6 +208,11 @@ model_weights_file = false
 split = false
 
 
+[vector_db]
+# The type of vector db to use. Use "false" to disable vector database.
+name = "chromadb"
+
+
 [results]
 # Path to inference results to use for visualization and lookups. Uses latest inference run if none provided.
 inference_dir = false
@@ -229,8 +234,3 @@ n_components = 2
 # Controls how UMAP balances local versus global structure in the data.
 # See official documentation for details.
 n_neighbors = 15
-
-
-[vector_db]
-# The type of vector db to use. Use "false" to disable vector database.
-name = "chromadb"

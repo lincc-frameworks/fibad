@@ -317,6 +317,9 @@ def create_evaluator(model: torch.nn.Module, save_function: Callable[[torch.Tens
     def log_total_time(evaluator):
         logger.info(f"Total evaluation time: {evaluator.state.times['COMPLETED']:.2f}[s]")
 
+    pbar = ProgressBar(persist=False, bar_format="")
+    pbar.attach(evaluator)
+
     return evaluator
 
 
