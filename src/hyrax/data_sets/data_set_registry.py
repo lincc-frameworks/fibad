@@ -146,9 +146,11 @@ class HyraxDataset:
             Shape tuple of the tensor that will be returned from the dataset.
         """
         if hasattr(self, "__getitem__"):
-            return self[0].shape
+            data_sample = self[0]
+            return data_sample[0].shape if isinstance(data_sample, tuple) else data_sample.shape()
         elif hasattr(self, "__iter__"):
-            return next(iter(self)).shape
+            data_sample = next(iter(self))
+            return data_sample[0].shape if isinstance(data_sample, tuple) else data_sample.shape()
         else:
             return NotImplementedError("You must define __getitem__ or __iter__ to use automatic shape()")
 
