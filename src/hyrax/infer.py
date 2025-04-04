@@ -50,6 +50,9 @@ def run(config: ConfigDict):
     load_model_weights(config, model)
     context["results_dir"] = results_dir
 
+    # Log Results directory
+    logger.info(f"Saving inference results at: {results_dir}")
+
     vector_db = vector_db_factory(config, context)
     if vector_db:
         vector_db.create()
@@ -77,8 +80,10 @@ def run(config: ConfigDict):
         # Save results to vector database
         nonlocal vector_db
         if vector_db:
+            logger.debug(f"Writing Vector DB for index {write_index}")
             ids: list[str | int] = [str(id) for id in batch_object_ids]
             vectors: list[np.ndarray] = [t.flatten().numpy() for t in batch_results]
+            logger.debug("Inseerting vectors into database")
             vector_db.insert(ids=ids, vectors=vectors)
 
         # Save results from this batch in a numpy file as a structured array
@@ -96,7 +101,7 @@ def run(config: ConfigDict):
     tensorboardx_logger.close()
 
     # Log completion
-    logger.info(f"Inference results saved in: {results_dir}")
+    logger.info("Inference Complete.")
 
 
 def load_model_weights(config: ConfigDict, model):
