@@ -236,7 +236,7 @@ class InferenceDataSetWriter:
         self.batch_index = 0
 
         # Detect the dtype numpy will want to use for ids for the original dataset
-        self.id_dtype = np.array([next(original_dataset.ids())]).dtype
+        self.id_dtype = np.array(list(original_dataset.ids())).dtype
 
         self.all_ids = np.array([], dtype=self.id_dtype)
         self.all_batch_nums = np.array([], dtype=np.int64)
