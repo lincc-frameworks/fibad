@@ -456,7 +456,7 @@ def create_trainer(
         prev_checkpoint = torch.load(config["train"]["resume"], map_location=device)
         Checkpoint.load_objects(to_load=to_save, checkpoint=prev_checkpoint)
 
-    # results_root_dir = Path(config["general"]["results_dir"]).resolve()
+    # results_root_dir = Path(config["general"]["results_dir"]).expanduser().resolve()
     # mlflow_logger = MLflowLogger("file://" + str(results_root_dir / "mlflow"))
 
     @trainer.on(Events.STARTED)

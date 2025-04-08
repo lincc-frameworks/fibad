@@ -550,7 +550,7 @@ class HSCDataSet(HyraxDataset, Dataset):
 
         logger.info("Reading in catalog file... ")
         location_table = Downloader.filterfits(
-            Path(config["download"]["fits_file"]).resolve(), ["object_id", "ra", "dec"]
+            Path(config["download"]["fits_file"]).expanduser().resolve(), ["object_id", "ra", "dec"]
         )
 
         obj_to_ra = {
