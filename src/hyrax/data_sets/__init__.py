@@ -1,5 +1,6 @@
 from .data_set_registry import DATA_SET_REGISTRY, HyraxDataset
 from .hsc_data_set import HSCDataSet
+from .huggingface_dataset import HyraxHFIterableDataSet, HyraxHFMapDataSet
 from .hyrax_cifar_data_set import HyraxCifarDataSet
 from .inference_dataset import InferenceDataSet
 
@@ -11,4 +12,6 @@ __all__ = [
     "InferenceDataSet",
     "Dataset",
     "HyraxDataset",
+    "HyraxHFMapDataSet",
+    "HyraxHFIterableDataSet",
 ]
