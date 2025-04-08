@@ -195,6 +195,17 @@ use_cache = true
 # Warning: Only suitable for situations where the entire dataset fits in system memory
 preload_cache = true
 
+["data_set.HuggingFace"]
+# Which dataset to use
+dataset = false
+
+# Sequence of keys in nested dict to use as tensor model input
+dict_keys = false
+
+# Limit on size of data used
+max_size = false
+
+
 [data_loader]
 # The number of data points to load at once.
 batch_size = 512

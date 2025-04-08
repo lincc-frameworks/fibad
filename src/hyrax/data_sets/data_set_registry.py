@@ -5,6 +5,8 @@ from typing import Optional
 
 import numpy.typing as npt
 from astropy.table import Table
+from datasets import Dataset as hfDataset
+from datasets import IterableDataset as hfIterableDataset
 from torch.utils.data import Dataset, IterableDataset
 
 from hyrax.config_utils import ConfigDict
@@ -97,7 +99,9 @@ class HyraxDataset:
         bool
             True if underlying dataset is iterable
         """
-        if isinstance(self, (Dataset, IterableDataset)):
+        if isinstance(self, (hfIterableDataset, hfDataset)):
+            return isinstance(self, hfIterableDataset)
+        elif isinstance(self, (Dataset, IterableDataset)):
             return isinstance(self, IterableDataset)
         else:
             return hasattr(self, "__iter__")
@@ -112,7 +116,9 @@ class HyraxDataset:
         bool
             True if underlying dataset is map-style
         """
-        if isinstance(self, (Dataset, IterableDataset)):
+        if isinstance(self, (hfIterableDataset, hfDataset)):
+            return isinstance(self, hfDataset)
+        elif isinstance(self, (Dataset, IterableDataset)):
             # All torch IterableDatasets are also Datasets
             return not isinstance(self, IterableDataset)
         else:
