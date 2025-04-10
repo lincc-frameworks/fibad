@@ -3,7 +3,6 @@ from typing import Union
 
 import chromadb
 import numpy as np
-from chromadb.api.types import IncludeEnum
 
 from hyrax.vector_dbs.vector_db_interface import VectorDB
 
@@ -56,7 +55,7 @@ def _query_for_id(results_dir: str, shard_name: str, id: str):
     """
     chromadb_client = chromadb.PersistentClient(path=str(results_dir))
     collection = chromadb_client.get_collection(name=shard_name)
-    return collection.get(id, include=[IncludeEnum.embeddings])
+    return collection.get(id, include=["embeddings"])
 
 
 class ChromaDB(VectorDB):
