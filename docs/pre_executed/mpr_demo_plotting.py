@@ -71,7 +71,7 @@ def sort_objects_by_median_distance(all_embeddings, median_dist_all_nn, data_dir
     Return a tuple for easy plotting: (object id, rounded median distance, file name)."""
 
     # Use the indexes to gather metadata: object ID, rounded median distance, and file name
-    data_directory = Path(data_directory).resolve()
+    data_directory = Path(data_directory).expanduser().resolve()
     objects = []
     for indx in np.argsort(median_dist_all_nn):
         object_id = all_embeddings["ids"][indx]

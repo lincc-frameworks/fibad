@@ -35,7 +35,7 @@ class Downloader:
 
     def __init__(self, config):
         self.config = config
-        self.cutout_path = Path(config["general"]["data_dir"]).resolve()
+        self.cutout_path = Path(config["general"]["data_dir"]).expanduser().resolve()
         self.manifest_file = self.cutout_path / Downloader.MANIFEST_FILE_NAME
 
     def run(self):
@@ -80,7 +80,7 @@ class Downloader:
             msg += " https://hsc-release.mtk.nao.ac.jp/datasearch/new_user/new "
             raise RuntimeError(msg)
 
-        fits_file = Path(self.config["download"]["fits_file"]).resolve()
+        fits_file = Path(self.config["download"]["fits_file"]).expanduser().resolve()
         logger.info(f"Reading in fits catalog: {fits_file}")
         # Filter the fits file for the fields we want
         column_names = ["object_id"] + Downloader.VARIABLE_FIELDS

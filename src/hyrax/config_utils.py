@@ -398,7 +398,7 @@ class ConfigManager:
             # On the non-break end of the loop we do path resolution, preserving falsy values
             # as false.
             else:
-                new_val = str(Path(current_val).resolve()) if current_val else False
+                new_val = str(Path(current_val).expanduser().resolve()) if current_val else False
                 current_dict[current_key] = new_val
 
     @staticmethod
@@ -456,7 +456,7 @@ def create_results_dir(config: ConfigDict, postfix: str) -> Path:
     Path
         The path created by this function
     """
-    results_root = Path(config["general"]["results_dir"]).resolve()
+    results_root = Path(config["general"]["results_dir"]).expanduser().resolve()
     # This date format is chosen specifically to create a lexical search order
     # which matches the date order.
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -478,7 +478,7 @@ def find_most_recent_results_dir(config: ConfigDict, verb: str) -> Optional[Path
     This function may return None indicating it could not find a directory matching
     the query verb
     """
-    results_root = Path(config["general"]["results_dir"]).resolve()
+    results_root = Path(config["general"]["results_dir"]).expanduser().resolve()
 
     max_timestamp = 0
     best_path = None
