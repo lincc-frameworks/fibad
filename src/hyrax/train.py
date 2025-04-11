@@ -52,7 +52,7 @@ def run(config):
 
     monitor = GpuMonitor(tensorboard_logger=tensorboardx_logger)
 
-    results_root_dir = Path(config["general"]["results_dir"]).resolve()
+    results_root_dir = Path(config["general"]["results_dir"]).expanduser().resolve()
     mlflow.set_tracking_uri("file://" + str(results_root_dir / "mlflow"))
 
     # Get experiment_name and cast to string (it's a tomlkit.string by default)
