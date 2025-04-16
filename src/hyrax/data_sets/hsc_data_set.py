@@ -79,6 +79,7 @@ class HSCDataSet(HyraxDataset, Dataset):
 
         # Relies on self.filters_ref and self.filter_catalog_table which are both determined
         # inside _init_from_path()
+        logger.debug("Preparing Metadata")
         metadata = self._prepare_metadata()
         super().__init__(config, metadata)
 
@@ -1025,21 +1026,30 @@ class HSCDataSet(HyraxDataset, Dataset):
         if isinstance(self.filter_catalog_table, str):
             return None
 
-        # We're going to be operating on object_id and filter columns en masse.
-        self.filter_catalog_table.add_index(["object_id", "filter"])
-
         # Get all object_ids in enumeration order
         sorted_object_ids = np.array([int(id) for id in self.ids()])
 
-        # Get a single row per object_id by selecting for a single filter
-        filter_catalog_table_dedup = self.filter_catalog_table.loc["filter", self.filters_ref[0]]
+        # Filter for the reference filter
+        mask = self.filter_catalog_table["filter"] == self.filters_ref[0]
+        filter_catalog_table_dedup = self.filter_catalog_table[mask]
 
-        # Get all rows in enumeration order using the object_ids
-        metadata = filter_catalog_table_dedup.loc["object_id", sorted_object_ids]
+        # Build fast lookup from object_id to row index
+        id_to_index = {oid: i for i, oid in enumerate(filter_catalog_table_dedup["object_id"])}
+
+        # Extract rows in the desired order
+        try:
+            row_indices = [id_to_index[oid] for oid in sorted_object_ids]
+        except KeyError as e:
+            missing_id = e.args[0]
+            logger.error(f"Object ID {missing_id} not found in filtered metadata table.")
+            raise
+
+        metadata = filter_catalog_table_dedup[row_indices]
 
         # Filter for the appropriate columns
         colnames = list(self.filter_catalog_table.colnames)
         colnames.remove("filename")
         colnames.remove("filter")
 
+        logger.debug("Finished preparing metadata")
         return metadata[colnames]
