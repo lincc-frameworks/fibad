@@ -97,7 +97,7 @@ class ChromaDB(VectorDB):
 
         return self.collection
 
-    def insert(self, ids: list[Union[str | int]], vectors: list[np.ndarray]):
+    def insert(self, ids: list[Union[str, int]], vectors: list[np.ndarray]):
         """Insert a batch of vectors into the database.
 
         Parameters
@@ -117,7 +117,7 @@ class ChromaDB(VectorDB):
 
         self.collection.add(ids=ids, embeddings=vectors)
 
-    def search_by_id(self, id: Union[str | int], k: int = 1) -> dict[int, list[Union[str | int]]]:
+    def search_by_id(self, id: Union[str, int], k: int = 1) -> dict[int, list[Union[str, int]]]:
         """Get the ids of the k nearest neighbors for a given id in the database.
 
         Parameters
@@ -178,7 +178,7 @@ class ChromaDB(VectorDB):
                 results = collection.get(id, include=["embeddings"])
                 vectors.extend(results["embeddings"])
 
-        query_results: dict[int, list[Union[str | int]]] = {}
+        query_results: dict[int, list[Union[str, int]]] = {}
         # no matching id found in database
         if len(vectors) == 0:
             query_results = {}
@@ -193,7 +193,7 @@ class ChromaDB(VectorDB):
 
         return query_results
 
-    def search_by_vector(self, vectors: list[np.ndarray], k: int = 1) -> dict[int, list[Union[str | int]]]:
+    def search_by_vector(self, vectors: list[np.ndarray], k: int = 1) -> dict[int, list[Union[str, int]]]:
         """Get the ids of the k nearest neighbors for a given vector.
 
         Parameters
@@ -222,12 +222,12 @@ class ChromaDB(VectorDB):
         shards = self.chromadb_client.list_collections()
 
         # This dictionary will hold the k nearest neighbors ids for each input vector
-        result_dict: dict[int, list[Union[str | int]]] = {i: [] for i in range(len(vectors))}
+        result_dict: dict[int, list[Union[str, int]]] = {i: [] for i in range(len(vectors))}
 
         # Intermediate results holds all of the query results from all shards.
         # These results will be sorted and trimmed to the appropriate length before
         # being added to `result_dict`.
-        intermediate_results: dict[int, dict[str, list[Union[str | int]]]] = {
+        intermediate_results: dict[int, dict[str, list[Union[str, int]]]] = {
             i: {"ids": [], "distances": []} for i in range(len(vectors))
         }
 

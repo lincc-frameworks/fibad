@@ -60,6 +60,7 @@ dev = [
     "pre-commit", # Used to run checks before finalizing a git commit
     "pytest",
     "pytest-cov", # Used to report total code coverage
+    "pytest-env", # Used to set environment variables in testing
     "ruff", # Used for static linting of files
 ]
 
@@ -76,6 +77,15 @@ write_to = "src/hyrax/_version.py"
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
+    "src",
+    "docs",
+]
+addopts = "--doctest-modules --doctest-glob=*.rst"
+env = [
+    "TQDM_DISABLE=1",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
 [tool.black]

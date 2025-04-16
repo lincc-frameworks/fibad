@@ -56,7 +56,13 @@ class HSCDataSet(FitsImageDataSet):
         super().__init__(config)
 
     def _read_filter_catalog(self, filter_catalog_path: Optional[Path]) -> Optional[Table]:
-        retval = super()._read_filter_catalog(filter_catalog_path)
+        try:
+            retval = super()._read_filter_catalog(filter_catalog_path)
+        except RuntimeError:
+            # _read_filter_catalog is persnickity about filter_catalog_path.
+            # Ignore all of the error checking in there and _parse_filter_catalog
+            # will try to recover if the table is malformed/missing.
+            retval = None
 
         if isinstance(retval, Table):
             colnames = retval.colnames
@@ -255,10 +261,12 @@ class HSCDataSet(FitsImageDataSet):
         # Scan the filesystem to get the widths and heights of all images into a dict
         logger.info("Scanning for dimensions...")
 
+        # So we can use super() with no args inside the generator expression below
+        super_obj = super()
         retval = {}
         with MultiPool(processes=HSCDataSet._determine_numprocs()) as pool:
             args = (
-                (object_id, list(self._object_files(object_id)))
+                (object_id, list(super_obj._object_files(object_id)))
                 for object_id in self.ids(log_every=1_000_000)
             )
             retval = dict(pool.imap(self._scan_file_dimension, args, chunksize=1000))
@@ -553,7 +561,7 @@ class HSCDataSet(FitsImageDataSet):
             for idx, (filter, filename) in enumerate(self._filter_filename(object_id)):
                 yield (object_id, filter, filename, dims[idx])
 
-    def _object_files_filters_ref(self, object_id):
+    def _object_files(self, object_id):
         """
         Private read-only iterator over all files for a given object. This enforces a strict total order
         across filters. Will not work prior to self.files, and self.path initialization in __init__

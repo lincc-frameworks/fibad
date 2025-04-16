@@ -79,16 +79,13 @@ class FitsImageDataSet(HyraxDataset, Dataset):
             filter_catalog = Path(self.config["data_set"]["filter_catalog"])
 
         self.filter_catalog_table = self._read_filter_catalog(filter_catalog)
-        if self.filter_catalog_table is None:
-            # xcxc write a warning about you don't get metadata if you didn't supply
-            # a table
-            pass
-
         self.files = self._parse_filter_catalog(self.filter_catalog_table)
         if self.files is None:
-            # xcxc rewrite this error to be more informative to a user
-            # xcxc Check if files is essentially the right types
-            raise RuntimeError("xcxc Cannot continue without files. Probably a subclass messed it up.")
+            msg = "Cannot continue without files. Please ensure the table passed in "
+            msg += "config['data_set']['filter_catalog'] is well formed. It should minimally be "
+            msg += "a fits file with columns: object_id, filename, filter. "
+            msg += "This may also occur because of a misimplemented subclass"
+            raise RuntimeError(msg)
 
         first_filter_dict = next(iter(self.files.values()))
         self.num_filters = len(first_filter_dict)
@@ -116,31 +113,39 @@ class FitsImageDataSet(HyraxDataset, Dataset):
         """
         self.cutout_shape = self.config["data_set"]["crop_to"] if self.config["data_set"]["crop_to"] else None
 
-        if not isinstance(self.cutout_shape, list) or not len(self.cutout_shape) == 2:
-            raise RuntimeError("No cutout shape provided")
-            # xcxc better error for user about the cutout size
+        if not isinstance(self.cutout_shape, list) or len(self.cutout_shape) != 2:
+            msg = "Must provide a cutout shape in config['data_set']['crop_to']."
+            msg += " Shape should be a list of integer pixel sizes e.g. [100,100]"
+            raise RuntimeError(msg)
 
         return CenterCrop(size=self.cutout_shape)
 
     def _read_filter_catalog(self, filter_catalog_path: Optional[Path]) -> Optional[Table]:
         if filter_catalog_path is None:
-            return None
+            msg = "Must provide a filter catalog in config['data_set']['filter_catalog']"
+            raise RuntimeError(msg)
 
         if not filter_catalog_path.exists():
-            logger.error(f"Filter catalog file {filter_catalog_path} given in config does not exist.")
-            return None
+            msg = f"Filter catalog file {filter_catalog_path} given in config does not exist."
+            raise RuntimeError(msg)
 
         table = Table.read(filter_catalog_path, format="fits")
         colnames = table.colnames
 
         if "object_id" not in colnames:
-            logger.error(f"Filter catalog file {filter_catalog_path} has no column object_id")
-            return None
+            msg = f"Filter catalog file {filter_catalog_path} has no column object_id"
+            raise RuntimeError(msg)
+
+        if "filename" not in colnames:
+            msg = f"Filter catalog file {filter_catalog_path} has no column filename"
+            raise RuntimeError(msg)
+
+        if "filter" not in colnames:
+            msg = f"Filter catalog file {filter_catalog_path} has no column filter"
+            raise RuntimeError(msg)
 
         table.add_index("object_id")
         table.add_index("filter")
-
-        # xcxc we may want a warning here about required columns so FitsImageDataSet can function
         return table
 
     def _parse_filter_catalog(self, table: Optional[Table]) -> None:
@@ -157,7 +162,6 @@ class FitsImageDataSet(HyraxDataset, Dataset):
             The catalog we read in
 
         """
-        # xcxc warn/error on various malformed table issues?
         filter_catalog: files_dict = {}
 
         for row in table:
@@ -199,7 +203,6 @@ class FitsImageDataSet(HyraxDataset, Dataset):
         # fetching
         pass
 
-    # xcxc read this later to see if it still works in init flow
     def _prepare_metadata(self) -> Optional[Table]:
         # This happens when filter_catalog_table is injected in unit tests
         if FitsImageDataSet._called_from_test:
@@ -516,7 +519,7 @@ class FitsImageDataSet(HyraxDataset, Dataset):
         # Read all the files corresponding to this object
         data = []
 
-        for filepath in self._object_files_filters_ref(object_id):
+        for filepath in self._object_files(object_id):
             file_start_time = time.monotonic_ns()
             raw_data = fits.getdata(filepath, memmap=False)
             data.append(raw_data)
