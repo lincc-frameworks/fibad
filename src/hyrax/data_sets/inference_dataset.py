@@ -57,6 +57,14 @@ class InferenceDataSet(HyraxDataset, Dataset):
         self._original_dataset_config = ConfigManager(
             self.results_dir / ORIGINAL_DATASET_CONFIG_FILENAME
         ).config
+
+        # Disable cache preloading on this dataset because it will only be used for its metadata
+        # TODO: May want to add some sort of metadata_only optional arg to dataset constructor
+        #       so we can opt-out of expensive dataset operations conditional on us only needing metadata
+        #
+        #       Alternatively this may be an opportunity for a metadata mixin sort of class structure where
+        #       we can bring up Only the metadata for a dataset, without constructing the whole thing.
+        self._original_dataset_config["data_set"]["preload_cache"] = False
         self.original_dataset = setup_dataset(self._original_dataset_config)  # type: ignore[arg-type]
 
     def shape(self):

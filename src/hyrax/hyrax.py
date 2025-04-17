@@ -169,14 +169,6 @@ class Hyrax:
         downloader = Downloader(config=self.config)
         return downloader.run(**kwargs)
 
-    def infer(self, **kwargs):
-        """
-        See Hyrax.infer.run()
-        """
-        from .infer import run
-
-        return run(config=self.config, **kwargs)
-
     def prepare(self, **kwargs):
         """
         See Hyrax.prepare.run()
