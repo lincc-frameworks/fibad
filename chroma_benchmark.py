@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 
-from hyrax.vector_dbs.milvus_impl import MilvusDB
+from hyrax.vector_dbs.qdrant_impl import QdrantDB
 
 
 def random_vector_generator(batch_size=1):
@@ -20,7 +20,8 @@ def main():
         shutil.rmtree("./vdb_benchmark_output")
 
     # vdb = ChromaDB({}, {'results_dir': './vdb_benchmark_output'})
-    vdb = MilvusDB({}, {"results_dir": "./vdb_benchmark_output"})
+    # vdb = MilvusDB({}, {"results_dir": "./vdb_benchmark_output"})
+    vdb = QdrantDB({}, {"results_dir": "./vdb_benchmark_output"})
     vdb.create()
 
     num_batches = 120
