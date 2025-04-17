@@ -214,8 +214,10 @@ class FitsImageDataSet(HyraxDataset, Dataset):
         # Get all object_ids in enumeration order
         sorted_object_ids = np.array([int(id) for id in self.ids()])
 
-        # Filter for the reference filter
-        mask = self.filter_catalog_table["filter"] == self.filters_ref[0]
+        # Filter for a single reference filter to deduplicate object_id rows
+        first_filter_dict = next(iter(self.files.values()))
+        first_filter = next(iter(first_filter_dict))
+        mask = self.filter_catalog_table["filter"] == first_filter
         filter_catalog_table_dedup = self.filter_catalog_table[mask]
 
         # Build fast lookup from object_id to row index
