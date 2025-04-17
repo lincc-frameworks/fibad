@@ -15,7 +15,12 @@ def model_class_name(request):
 # Fixture to give us every dataset which will be used for testing
 @pytest.fixture(
     scope="module",
-    params=[("HSCDataSet", "hsc1k"), ("HyraxCifarDataSet", None), ("FitsImageDataSet", "hsc1k")],
+    params=[
+        ("HSCDataSet", "hsc1k"),
+        ("HyraxCifarDataSet", None),
+        ("HyraxCifarIterableDataSet", None),
+        ("FitsImageDataSet", "hsc1k"),
+    ],
 )
 def dataset_spec(request):
     """Fixture to generate all the Dataset class, sample data pairs
