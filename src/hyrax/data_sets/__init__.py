@@ -8,6 +8,7 @@ __all__ = [
     "DATA_SET_REGISTRY",
     "HyraxCifarDataSet",
     "FitsImageDataSet",
+    "HyraxCifarIterableDataSet",
     "HSCDataSet",
     "InferenceDataSet",
     "Dataset",

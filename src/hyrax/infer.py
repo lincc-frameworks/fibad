@@ -43,7 +43,8 @@ def run(config: ConfigDict):
     data_set = setup_dataset(config, tensorboardx_logger)
 
     model = setup_model(config, data_set)
-    logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
+    if data_set.is_map():
+        logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
     data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
     log_runtime_config(config, results_dir)

@@ -75,12 +75,18 @@ items in the batch. This loss is logged to MLflow and tensorboard.
 Defining a dataset class
 ------------------------
 
-Dataset classes are written as subclasses of both ``hyrax.data_sets.HyraxDataset`` and 
-``torch.utils.data.Dataset``. Datasets must minimally define the methods below. These are similar in form to 
-Torch's `Map-style datasets <https://pytorch.org/docs/stable/data.html#map-style-datasets>`_
+Dataset classes are written as subclasses of ``hyrax.data_sets.HyraxDataset``. Datasets must choose to be 
+either "map style", and also inherit from ``torch.utils.data.Dataset`` or "iterable" and inherit from 
+``torch.utils.data.IterableDataset``. `Look here <https://pytorch.org/docs/stable/data.html#dataset-types>`_ 
+for an overview of the difference between map style and iterable datasets.
 
-A fully worked example of creating a custom dataset class is in the example notebook 
+A fully worked example of creating a custom map-style dataset class is in the example notebook 
 :doc:`/pre_executed/custom_dataset`
+
+The methods required are detailed by category below.
+
+All datasets
+............
 
 ``__init__(self, config)``
 .................................
@@ -92,6 +98,9 @@ dataset will be done by Hyrax, when running the relevant verb. Further detail on
 You must call ``super().__init__(config)`` or ``super().__init__(config, metadata_table)`` in your 
 ``__init__`` function
 
+Map style datasets
+..................
+
 ``__getitem(self, idx:int)``
 ............................
 Return a single item in your dataset given a zero-based index.
@@ -99,6 +108,16 @@ Return a single item in your dataset given a zero-based index.
 ``__len__(self)``
 .................
 Return the length of your dataset.
+
+Iterable datasets
+.................
+
+``__iter__(self)``
+.................
+Yield a single item in your dataset, or supply a generator function which does the same.
+If your dataset has an end, yield StopIteration at the end.
+
+Warning: Iterable datasets which do not yield StopIteration are not currently supported in hyrax.
 
 Optional Overrides
 ..................
