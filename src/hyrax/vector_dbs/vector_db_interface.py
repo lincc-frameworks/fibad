@@ -31,7 +31,7 @@ class VectorDB(ABC):
         pass
 
     @abstractmethod
-    def insert(self, ids: list[Union[str | int]], vectors: list[np.ndarray]):
+    def insert(self, ids: list[Union[str, int]], vectors: list[np.ndarray]):
         """Insert a batch of vectors into the database.
 
         Parameters
@@ -44,7 +44,7 @@ class VectorDB(ABC):
         pass
 
     @abstractmethod
-    def search_by_id(self, id: Union[str | int], k: int = 1) -> dict[int, list[Union[str, int]]]:
+    def search_by_id(self, id: Union[str, int], k: int = 1) -> dict[int, list[Union[str, int]]]:
         """Get the ids of the k nearest neighbors for a given id in the database.
         Should use the provided id to look up the vector, then call search_by_vector.
 

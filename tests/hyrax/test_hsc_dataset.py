@@ -5,13 +5,15 @@ from typing import Any, Optional
 
 import numpy as np
 import pytest
+from astropy.table import Table
 from torchvision.transforms.v2 import CenterCrop, Lambda
 
-from hyrax.data_sets.hsc_data_set import HSCDataSet
+from hyrax.data_sets.hsc_data_set import FitsImageDataSet, HSCDataSet
 
 test_dir = Path(__file__).parent / "test_data" / "dataloader"
 
 HSCDataSet._called_from_test = True
+FitsImageDataSet._called_from_test = True
 
 
 class FakeFitsFS:
@@ -44,11 +46,14 @@ class FakeFitsFS:
         if filter_catalog is not None:
             mock_read_filter_catalog = mock.patch(
                 "hyrax.data_sets.hsc_data_set.HSCDataSet._read_filter_catalog",
-                lambda x, y: "Not a real table",
+                lambda x, y: Table(
+                    {"object_id": ["notreal"], "filter": ["notreal"], "filename": ["notreal"]}
+                ),
             )
             self.patchers.append(mock_read_filter_catalog)
             mock_parse_filter_catalog = mock.patch(
-                "hyrax.data_sets.hsc_data_set.HSCDataSet._parse_filter_catalog", lambda x, y: filter_catalog
+                "hyrax.data_sets.hsc_data_set.FitsImageDataSet._parse_filter_catalog",
+                lambda x, y: filter_catalog,
             )
             self.patchers.append(mock_parse_filter_catalog)
 
