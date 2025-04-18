@@ -67,6 +67,14 @@ class Infer(Verb):
         model = setup_model(config, data_set)
         if data_set.is_map():
             logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
+
+        # Inference doesnt work at all with the dataloader doing additional shuffling:
+        if config["data_loader"]["shuffle"]:
+            msg = "Data loader shuffling not supported in inference mode. "
+            msg += "Setting config['data_loader']['shuffle'] = False"
+            logger.warn(msg)
+            config["data_loader"]["shuffle"] = False
+
         data_loader, data_loader_indexes = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
         log_runtime_config(config, results_dir)

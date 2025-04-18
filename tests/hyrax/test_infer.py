@@ -83,14 +83,15 @@ def loopback_hyrax(tmp_path_factory, request):
     return h, dataset
 
 
+@pytest.mark.parametrize("shuffle", [True, False])
 @pytest.mark.parametrize("split", ["test", "train", "validate", None])
-def test_infer_order(loopback_hyrax, split):
+def test_infer_order(loopback_hyrax, split, shuffle):
     """Test that the order of data run through infer
     is correct in the presence of several splits
     """
     h, dataset = loopback_hyrax
-    if split is not None:
-        h.config["infer"]["split"] = split
+    h.config["infer"]["split"] = split if split is not None else False
+    h.config["data_loader"]["shuffle"] = shuffle
 
     inference_results = h.infer()
     inference_result_ids = list(inference_results.ids())
