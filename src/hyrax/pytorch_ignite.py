@@ -18,7 +18,7 @@ from ignite.handlers.tqdm_logger import ProgressBar
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import SequentialSampler
 
 from hyrax.config_utils import ConfigDict
 from hyrax.data_sets.data_set_registry import HyraxDataset, fetch_data_set_class
@@ -109,7 +109,18 @@ def dist_data_loader(
     """
     # Handle case where no split is needed.
     if isinstance(split, bool):
-        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"])
+        # We still need to return the list of indexes used by the dataloader,
+        # but here, it will simply be the indexes for the entire dataset.
+        if data_set.is_iterable():
+            ids = list(data_set.ids())
+            indexes = list(range(len(ids)))
+        else:
+            indexes = list(range(len(data_set)))
+
+        # Note that when sampler=None, a default sampler is used. The default config
+        # defines shuffle=False, which should prevent any shuffling of of the data.
+        # We expect that this will be the primary use case when running inference.
+        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"]), indexes
 
     # Sanitize split argument
     if isinstance(split, str):
@@ -122,20 +133,21 @@ def dist_data_loader(
         torch_rng.manual_seed(seed)
 
     if data_set.is_iterable():
+        ids = list(data_set.ids())
+        indexes = list(range(len(ids)))
         dataloaders = {
-            s: idist.auto_dataloader(data_set, pin_memory=True, **config["data_loader"]) for s in split
+            s: (idist.auto_dataloader(data_set, pin_memory=True, **config["data_loader"]), indexes)
+            for s in split
         }
     else:
         # Create the indexes for all splits based on config.
         indexes = create_splits(data_set, config)
 
         # Create samplers and dataloaders for each split we are interested in
-        samplers = {
-            s: SubsetRandomSampler(indexes[s], generator=torch_rng) if indexes.get(s) else None for s in split
-        }
+        samplers = {s: SequentialSampler(indexes[s]) if indexes.get(s) else None for s in split}
 
         dataloaders = {
-            split: idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
+            split: (idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"]), indexes[split])
             if sampler
             else None
             for split, sampler in samplers.items()
