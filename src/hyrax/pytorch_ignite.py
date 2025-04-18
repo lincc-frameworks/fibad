@@ -11,20 +11,42 @@ with warnings.catch_warnings():
     warnings.simplefilter(action="ignore", category=DeprecationWarning)
     import mlflow
 
+from collections.abc import Iterator, Sequence
+
 import torch
 from ignite.engine import Engine, EventEnum, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
 from ignite.handlers.tqdm_logger import ProgressBar
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import SequentialSampler
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 from hyrax.config_utils import ConfigDict
 from hyrax.data_sets.data_set_registry import HyraxDataset, fetch_data_set_class
 from hyrax.models.model_registry import fetch_model_class
 
 logger = logging.getLogger(__name__)
+
+
+class SubsetSequentialSampler(Sampler[int]):
+    r"""Samples elements sequentially from a given list of indices, without replacement.
+
+    Args:
+        indices (sequence): a sequence of indices
+    """
+
+    indices: Sequence[int]
+
+    def __init__(self, indices: Sequence[int], generator=None) -> None:
+        self.indices = indices
+        self.generator = generator
+
+    def __iter__(self) -> Iterator[int]:
+        for i in self.indices:
+            yield i
+
+    def __len__(self) -> int:
+        return len(self.indices)
 
 
 def setup_dataset(config: ConfigDict, tensorboardx_logger: Optional[SummaryWriter] = None) -> Dataset:
@@ -144,7 +166,7 @@ def dist_data_loader(
         indexes = create_splits(data_set, config)
 
         # Create samplers and dataloaders for each split we are interested in
-        samplers = {s: SequentialSampler(indexes[s]) if indexes.get(s) else None for s in split}
+        samplers = {s: SubsetSequentialSampler(indexes[s]) if indexes.get(s) else None for s in split}
 
         dataloaders = {
             split: (idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"]), indexes[split])
@@ -152,6 +174,10 @@ def dist_data_loader(
             else None
             for split, sampler in samplers.items()
         }
+
+        none_keys = [k for k, v in dataloaders.items() if v is None]
+        for key in none_keys:
+            del dataloaders[key]
 
     # Return only one if we were only passed one split in, return the dictionary otherwise.
     return dataloaders[split[0]] if len(split) == 1 else dataloaders
