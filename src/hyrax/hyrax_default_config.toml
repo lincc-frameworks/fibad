@@ -199,6 +199,10 @@ preload_cache = true
 # The number of data points to load at once.
 batch_size = 512
 
+# STRONG RECOMMENDATION: Leave this as `false`.
+# Ensure that the data loader does no secondary shuffling of the data.
+shuffle = false
+
 
 [infer]
 # The path to the model weights file to use for inference.

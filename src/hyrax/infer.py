@@ -45,7 +45,7 @@ def run(config: ConfigDict):
     model = setup_model(config, data_set)
     if data_set.is_map():
         logger.info(f"data set has length {len(data_set)}")  # type: ignore[arg-type]
-    data_loader = dist_data_loader(data_set, config, split=config["infer"]["split"])
+    data_loader, data_loader_indexes = dist_data_loader(data_set, config, split=config["infer"]["split"])
 
     log_runtime_config(config, results_dir)
     load_model_weights(config, model)
@@ -63,7 +63,7 @@ def run(config: ConfigDict):
     # These are values the _save_batch callback needs to run
     write_index = 0
     batch_index = 0
-    object_ids = list(data_set.ids())  # type: ignore[attr-defined]
+    object_ids = np.array(list(data_set.ids()))[data_loader_indexes]  # type: ignore[attr-defined]
 
     def _save_batch(batch_results: Tensor):
         """Receive and write results tensors to results_dir immediately
