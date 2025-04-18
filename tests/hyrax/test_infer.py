@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch.nn as nn
 from torch import from_numpy
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, IterableDataset
 
 import hyrax
 from hyrax.data_sets import HyraxDataset
@@ -56,7 +56,15 @@ class RandomDataset(HyraxDataset, Dataset):
             yield str(id_item)
 
 
-@pytest.fixture(scope="module")
+class RandomIterableDataset(RandomDataset, IterableDataset):
+    """Iterable version of RandomDataset"""
+
+    def __iter__(self):
+        for item in self.data:
+            yield from_numpy(item)
+
+
+@pytest.fixture(scope="function", params=["RandomDataset", "RandomIterableDataset"])
 def loopback_hyrax(tmp_path_factory, request):
     """This generates a loopback hyrax instance
     which is configured to use the loopback model
@@ -66,10 +74,10 @@ def loopback_hyrax(tmp_path_factory, request):
     h.config["model"]["name"] = "LoopbackModel"
     h.config["train"]["epochs"] = 1
     h.config["data_loader"]["batch_size"] = 5
-    h.config["general"]["results_dir"] = str(tmp_path_factory.mktemp("loopback_hyrax"))
+    h.config["general"]["results_dir"] = str(tmp_path_factory.mktemp(f"loopback_hyrax_{request.param}"))
 
     h.config["general"]["dev_mode"] = True
-    h.config["data_set"]["name"] = "RandomDataset"
+    h.config["data_set"]["name"] = request.param
     h.config["data_set"]["size"] = 20
     h.config["data_set"]["seed"] = 0
 
