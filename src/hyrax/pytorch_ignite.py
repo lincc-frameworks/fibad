@@ -11,20 +11,42 @@ with warnings.catch_warnings():
     warnings.simplefilter(action="ignore", category=DeprecationWarning)
     import mlflow
 
+from collections.abc import Iterator, Sequence
+
 import torch
 from ignite.engine import Engine, EventEnum, Events
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
 from ignite.handlers.tqdm_logger import ProgressBar
 from tensorboardX import SummaryWriter
 from torch.nn.parallel import DataParallel, DistributedDataParallel
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 from hyrax.config_utils import ConfigDict
 from hyrax.data_sets.data_set_registry import HyraxDataset, fetch_data_set_class
 from hyrax.models.model_registry import fetch_model_class
 
 logger = logging.getLogger(__name__)
+
+
+class SubsetSequentialSampler(Sampler[int]):
+    r"""Samples elements sequentially from a given list of indices, without replacement.
+
+    Args:
+        indices (sequence): a sequence of indices
+    """
+
+    indices: Sequence[int]
+
+    def __init__(self, indices: Sequence[int], generator=None) -> None:
+        self.indices = indices
+        self.generator = generator
+
+    def __iter__(self) -> Iterator[int]:
+        for i in self.indices:
+            yield i
+
+    def __len__(self) -> int:
+        return len(self.indices)
 
 
 def setup_dataset(config: ConfigDict, tensorboardx_logger: Optional[SummaryWriter] = None) -> Dataset:
@@ -109,7 +131,18 @@ def dist_data_loader(
     """
     # Handle case where no split is needed.
     if isinstance(split, bool):
-        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"])
+        # We still need to return the list of indexes used by the dataloader,
+        # but here, it will simply be the indexes for the entire dataset.
+        if data_set.is_iterable():
+            ids = list(data_set.ids())
+            indexes = list(range(len(ids)))
+        else:
+            indexes = list(range(len(data_set)))
+
+        # Note that when sampler=None, a default sampler is used. The default config
+        # defines shuffle=False, which should prevent any shuffling of of the data.
+        # We expect that this will be the primary use case when running inference.
+        return idist.auto_dataloader(data_set, sampler=None, **config["data_loader"]), indexes
 
     # Sanitize split argument
     if isinstance(split, str):
@@ -122,24 +155,29 @@ def dist_data_loader(
         torch_rng.manual_seed(seed)
 
     if data_set.is_iterable():
+        ids = list(data_set.ids())
+        indexes = list(range(len(ids)))
         dataloaders = {
-            s: idist.auto_dataloader(data_set, pin_memory=True, **config["data_loader"]) for s in split
+            s: (idist.auto_dataloader(data_set, pin_memory=True, **config["data_loader"]), indexes)
+            for s in split
         }
     else:
         # Create the indexes for all splits based on config.
         indexes = create_splits(data_set, config)
 
         # Create samplers and dataloaders for each split we are interested in
-        samplers = {
-            s: SubsetRandomSampler(indexes[s], generator=torch_rng) if indexes.get(s) else None for s in split
-        }
+        samplers = {s: SubsetSequentialSampler(indexes[s]) if indexes.get(s) else None for s in split}
 
         dataloaders = {
-            split: idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"])
+            split: (idist.auto_dataloader(data_set, sampler=sampler, **config["data_loader"]), indexes[split])
             if sampler
             else None
             for split, sampler in samplers.items()
         }
+
+        none_keys = [k for k, v in dataloaders.items() if v is None]
+        for key in none_keys:
+            del dataloaders[key]
 
     # Return only one if we were only passed one split in, return the dictionary otherwise.
     return dataloaders[split[0]] if len(split) == 1 else dataloaders

@@ -1,3 +1,4 @@
+from .infer import Infer
 from .lookup import Lookup
 from .umap import Umap
 from .verb_registry import all_class_verbs, all_verbs, fetch_verb_class, is_verb_class
@@ -12,4 +13,5 @@ __all__ = [
     "Lookup",
     "Umap",
     "Visualize",
+    "Infer",
 ]
